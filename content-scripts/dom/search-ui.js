@@ -5,7 +5,7 @@
 let wrap = null;
 let input = null;
 
-function ensure() {
+function ensureSearchBox() {
   if (wrap) return;
   wrap = document.createElement("div");
   wrap.id = "vimtext-search";
@@ -57,7 +57,7 @@ function ensure() {
 }
 
 export function openSearch() {
-  ensure();
+  ensureSearchBox();
   input.value = "";
   wrap.style.display = "block";
   input.focus();

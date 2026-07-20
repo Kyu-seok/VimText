@@ -18,7 +18,7 @@ const COLOR = {
 
 let el = null;
 
-function ensure() {
+function ensureBadge() {
   if (el) return el;
   el = document.createElement("div");
   el.id = "vimtext-mode-indicator";
@@ -41,7 +41,7 @@ function ensure() {
 }
 
 export function show(mode) {
-  const node = ensure();
+  const node = ensureBadge();
   node.textContent = LABEL[mode] || "";
   node.style.background = COLOR[mode] || "#333";
   node.style.display = "block";

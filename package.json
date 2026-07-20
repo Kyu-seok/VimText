@@ -13,6 +13,7 @@
   "type": "module",
   "private": true,
   "scripts": {
+    "build": "node tools/bundle.mjs",
     "test": "node --test",
     "icons": "node tools/make-icons.mjs"
   }

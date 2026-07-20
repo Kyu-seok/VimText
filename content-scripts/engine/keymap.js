@@ -9,7 +9,7 @@
 // `key` is a plain object { key, ctrl, shift, alt, meta } so the engine is
 // testable without real KeyboardEvents. `opts.singleLine` is true for <input>.
 
-import { Mode, isVisual, clearPending, pushUndo, undo as undoState, redo as redoState } from "./state.js";
+import { Mode, isVisual, clearPending, pushUndo, undo, redo } from "./state.js";
 import { computeMotion, MOTION_KEYS, lineStart, lineEnd, firstNonBlank, clampCursor } from "./motions.js";
 import {
   rangeFromMotion, deleteText, changeText, yankText, deleteChar,
@@ -139,7 +139,7 @@ export function handleKey(state, doc, key, opts = {}) {
     }
 
     case "u": {
-      const prev = undoState(state, { text, cursor });
+      const prev = undo(state, { text, cursor });
       clearPending(state);
       if (!prev) return { handled: true, text, cursor: clampN(cursor) };
       return { handled: true, text: prev.text, cursor: clampCursor(prev.text, prev.cursor) };
@@ -147,7 +147,7 @@ export function handleKey(state, doc, key, opts = {}) {
 
     case "r": { // Ctrl+r = redo; bare r (replace) is deferred → no-op
       if (!ctrl) return commit(text, clampN(cursor));
-      const next = redoState(state, { text, cursor });
+      const next = redo(state, { text, cursor });
       clearPending(state);
       if (!next) return { handled: true, text, cursor: clampN(cursor) };
       return { handled: true, text: next.text, cursor: clampCursor(next.text, next.cursor) };
