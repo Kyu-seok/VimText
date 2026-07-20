@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>VimText manual test</title>
+    <style>
+      body { max-width: 720px; margin: 30px auto; padding: 0 16px; font: 15px/1.6 system-ui, sans-serif; }
+      h2 { margin-top: 28px; font-size: 16px; }
+      textarea, input { width: 100%; box-sizing: border-box; font: 14px/1.5 ui-monospace, Menlo, monospace; padding: 8px; }
+      .count { color: #0b6e4f; font-weight: 600; }
+      .note { color: #666; font-size: 13px; }
+      kbd { background: #eee; border-radius: 3px; padding: 1px 5px; font-family: ui-monospace, Menlo, monospace; }
+    </style>
+  </head>
+  <body>
+    <h1>VimText manual test page</h1>
+    <p class="note">
+      Focus a field, then press <kbd>Esc</kbd> or <kbd>Ctrl+[</kbd> to enter Normal mode.
+      The mode badge appears bottom-left. The <span class="count">input events</span> counters
+      confirm VimText dispatches real <code>input</code> events (the framework-safe write path).
+    </p>
+
+    <h2>&lt;textarea&gt; — multi-line</h2>
+    <textarea id="ta" rows="10">The quick brown fox jumps over the lazy dog.
+Pack my box with five dozen liquor jugs.
+How vexingly quick daft zebras jump!
+    line with leading spaces
+Sphinx of black quartz, judge my vow.</textarea>
+    <p class="note">input events fired: <span class="count" id="taCount">0</span></p>
+
+    <h2>&lt;input type="text"&gt; — single line</h2>
+    <input id="in" type="text" value="the quick brown fox jumps over the lazy dog" />
+    <p class="note">
+      input events fired: <span class="count" id="inCount">0</span> —
+      <kbd>j</kbd>/<kbd>k</kbd>/<kbd>gg</kbd>/<kbd>G</kbd> should no-op here.
+    </p>
+
+    <script>
+      for (const [id, out] of [["ta", "taCount"], ["in", "inCount"]]) {
+        let n = 0;
+        document.getElementById(id).addEventListener("input", () => {
+          document.getElementById(out).textContent = String(++n);
+        });
+      }
+    </script>
+  </body>
+</html>
