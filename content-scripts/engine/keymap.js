@@ -17,7 +17,15 @@ import {
 import { textObject, TEXT_OBJECT_CHARS } from "./textobjects.js";
 import { addSurround, changeSurround, deleteSurround } from "./surround.js";
 
+// Public entry: dispatch the key, then record it for dot-repeat.
 export function handleKey(state, doc, key, opts = {}) {
+  const before = { mode: state.mode, text: doc.text };
+  const res = dispatch(state, doc, key, opts);
+  recordForDot(state, key, before, res);
+  return res;
+}
+
+function dispatch(state, doc, key, opts = {}) {
   const ctx = { singleLine: !!opts.singleLine, plugins: opts.plugins || {} };
   const text = doc.text;
   const cursor = doc.cursor;
@@ -172,6 +180,10 @@ export function handleKey(state, doc, key, opts = {}) {
       const idx = searchNext(text, cursor, pattern, dir);
       return { handled: true, text, cursor: idx == null ? clampN(cursor) : clampN(idx) };
     }
+
+    case ".":
+      clearPending(state);
+      return repeatChange(state, { text, cursor }, ctx, count);
 
     case "Tab":
       clearPending(state);
@@ -398,4 +410,81 @@ export function performSearch(state, doc, pattern, forward = true) {
   state.lastSearch = { pattern, forward };
   const idx = searchNext(doc.text, doc.cursor, pattern, forward);
   return { cursor: clampCursor(doc.text, idx == null ? doc.cursor : idx), found: idx != null };
+}
+
+// ---- dot-repeat ------------------------------------------------------------
+
+// Is a multi-key command still being composed (so its keys keep accumulating)?
+export function isCommandPending(state) {
+  return !!(state.operator || state.pendingTextObj || state.pendingSurround || state.awaitingG || state.count);
+}
+
+// Accumulate the keys of the command in progress; when a *change* completes,
+// snapshot them as `state.lastChange`. Runs after every dispatch(). Inserted
+// text is filled in later by the DOM via finishInsertRecording().
+function recordForDot(state, key, before, res) {
+  const k = key.key;
+  if (before.mode === Mode.INSERT) return; // insert typing is the DOM's to record
+  if (!res.handled) { state.dotKeys = []; return; }
+  const isUndo = k === "u" || (key.ctrl && (k === "r" || k === "R"));
+  if (k === "." || isUndo) { state.dotKeys = []; return; } // not themselves changes
+
+  state.dotKeys.push(key);
+  const enteredInsert = res.effect && res.effect.type === "insert-enter";
+  const changed = res.text !== before.text;
+  if (enteredInsert) {
+    state.lastChange = { keys: state.dotKeys.slice(), insertedText: null, insert: true };
+    state.dotKeys = [];
+  } else if (changed) {
+    state.lastChange = { keys: state.dotKeys.slice(), insertedText: null, insert: false };
+    state.dotKeys = [];
+  } else if (!isCommandPending(state)) {
+    state.dotKeys = []; // a motion / mode toggle / no-op — nothing to repeat
+  }
+}
+
+// The DOM calls this on insert-exit for a change that entered insert, handing
+// over the text the user typed so `.` can re-insert it.
+export function finishInsertRecording(state, insertedText) {
+  if (state.lastChange && state.lastChange.insert && state.lastChange.insertedText == null) {
+    state.lastChange.insertedText = insertedText;
+  }
+}
+
+function isDigit(k) {
+  return k.length === 1 && k >= "0" && k <= "9";
+}
+
+// Replay the last change at the current cursor. `override` (from a count typed
+// before `.`) replaces the command's original leading count.
+function repeatChange(state, doc, ctx, override) {
+  const rec = state.lastChange;
+  if (!rec || !rec.keys.length) {
+    return { handled: true, text: doc.text, cursor: clampCursor(doc.text, doc.cursor) };
+  }
+  let keys = rec.keys;
+  if (override != null) {
+    let i = 0;
+    if (keys.length && /[1-9]/.test(keys[0].key)) {
+      i = 1;
+      while (i < keys.length && isDigit(keys[i].key)) i++;
+    }
+    keys = [...String(override).split("").map((d) => ({ key: d })), ...keys.slice(i)];
+  }
+  let d = { text: doc.text, cursor: doc.cursor };
+  for (const kk of keys) {
+    const r = dispatch(state, d, kk, { singleLine: ctx.singleLine, plugins: ctx.plugins });
+    d = { text: r.text, cursor: r.cursor };
+  }
+  if (state.mode === Mode.INSERT) {
+    if (rec.insertedText) {
+      d = {
+        text: d.text.slice(0, d.cursor) + rec.insertedText + d.text.slice(d.cursor),
+        cursor: d.cursor + rec.insertedText.length,
+      };
+    }
+    state.mode = Mode.NORMAL;
+    d.cursor = Math.max(lineStart(d.text, d.cursor), d.cursor - 1);
+  }
+  return { handled: true, text: d.text, cursor: clampCursor(d.text, d.cursor) };
 }

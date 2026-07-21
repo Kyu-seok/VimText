@@ -3,7 +3,7 @@
 // DOM renderers.
 
 import { Mode, dropRedundantUndo, pushUndo } from "./engine/state.js";
-import { handleKey, performSearch } from "./engine/keymap.js";
+import { handleKey, performSearch, finishInsertRecording } from "./engine/keymap.js";
 import {
   isEditable, isSingleLine, getState, hasState, isOwnUI,
 } from "./dom/element-tracker.js";
@@ -18,6 +18,10 @@ const DEFAULT_DISABLED = ["docs.google.com"];
 let settings = { enabled: true, disabledSites: [], plugins: { surround: true, targets: true } };
 let siteEnabled = true;
 let composing = false;
+// dot-repeat: capture the text typed during a change's insert session
+let pendingDotInsert = false;
+let dotInsertStart = 0;
+let dotInsertEnd = 0;
 
 function refreshSiteEnabled() {
   const disabled = new Set([...(settings.disabledSites || []), ...DEFAULT_DISABLED]);
@@ -65,6 +69,8 @@ function onKeyDown(e) {
   if (st.mode === Mode.INSERT) {
     // Insert mode is the safe default: only the mode-switch keys are ours.
     if (!isEscCombo) return;
+    // Leaving insert: mark where the typed text ends for dot-repeat.
+    if (pendingDotInsert) dotInsertEnd = el.selectionStart ?? 0;
   } else {
     // Normal/Visual: let unrelated browser shortcuts through (copy, paste,
     // devtools, reload-when-not-redo, etc.). We only own Ctrl+[ and Ctrl+r.
@@ -89,9 +95,17 @@ function applyResult(el, st, res) {
     setValue(el, res.text, res.cursor, res.cursor);
   }
 
-  if (effect === "insert-exit") {
+  if (effect === "insert-enter") {
+    // Start capturing typed text if this insert is part of a recorded change.
+    pendingDotInsert = st.lastChange && st.lastChange.insert && st.lastChange.insertedText == null;
+    dotInsertStart = res.cursor;
+  } else if (effect === "insert-exit") {
     // Nothing typed during the insert session? Drop the pre-insert snapshot.
     dropRedundantUndo(st, el.value);
+    if (pendingDotInsert) {
+      finishInsertRecording(st, el.value.slice(dotInsertStart, dotInsertEnd));
+      pendingDotInsert = false;
+    }
   } else if (effect === "search-open") {
     runSearch(el, st);
     return;

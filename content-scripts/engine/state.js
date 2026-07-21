@@ -34,6 +34,9 @@ export function createState() {
     redoStack: [],
     // last search, for n / N
     lastSearch: { pattern: "", forward: true },
+    // dot-repeat: keys of the command being built, and the last completed change
+    dotKeys: [],
+    lastChange: null, // { keys: [...], insertedText: string|null, insert: bool }
   };
 }
 

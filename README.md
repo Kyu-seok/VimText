@@ -20,7 +20,8 @@ and [explicitly deferred](DESIGN.md#explicitly-deferred-phase-2-not-in-this-desi
 
 ### Operators & editing
 `x` · `dd d{motion}` · `cc c{motion}` (`cw`→`ce`) · `yy y{motion}` · `p P` ·
-`u` / `Ctrl+r` (custom undo stack, edit-coalesced)
+`u` / `Ctrl+r` (custom undo stack, edit-coalesced) · `.` — repeat last change
+(includes text typed in Insert; count override like `3.`)
 
 ### Search
 `/pattern` + `Enter` (smartcase, wrap-around) · `n` / `N`
