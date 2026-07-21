@@ -8,8 +8,8 @@ import {
   isEditable, isSingleLine, getState, hasState, isOwnUI,
 } from "./dom/element-tracker.js";
 import { setValue } from "./dom/write.js";
-import * as cursor from "./dom/cursor.js";
-import * as indicator from "./dom/mode-indicator.js";
+import { render as renderCursor } from "./dom/cursor.js";
+import { show as showIndicator, hide as hideIndicator } from "./dom/mode-indicator.js";
 import { openSearch } from "./dom/search-ui.js";
 
 // Sites where Esc/"/" conflicts are severe or the editor is unsupported.
@@ -22,7 +22,7 @@ let composing = false;
 function refreshSiteEnabled() {
   const disabled = new Set([...(settings.disabledSites || []), ...DEFAULT_DISABLED]);
   siteEnabled = !!settings.enabled && !disabled.has(location.hostname);
-  if (!siteEnabled) indicator.hide();
+  if (!siteEnabled) hideIndicator();
 }
 
 function loadSettings() {
@@ -93,8 +93,8 @@ function applyResult(el, st, res) {
     return;
   }
 
-  cursor.render(el, st, res.cursor);
-  indicator.show(st.mode);
+  renderCursor(el, st, res.cursor);
+  showIndicator(st.mode);
 }
 
 async function runSearch(el, st) {
@@ -103,11 +103,11 @@ async function runSearch(el, st) {
   el.focus();
   if (pattern) {
     const r = performSearch(st, { text: el.value, cursor: from }, pattern, true);
-    cursor.render(el, st, r.cursor);
+    renderCursor(el, st, r.cursor);
   } else {
-    cursor.render(el, st, from);
+    renderCursor(el, st, from);
   }
-  indicator.show(st.mode);
+  showIndicator(st.mode);
 }
 
 function onFocusIn(e) {
@@ -124,13 +124,13 @@ function onFocusIn(e) {
     // `u`; dropped again on Esc if nothing was actually typed.
     pushUndo(st, { text: el.value, cursor: el.selectionStart ?? 0 });
   }
-  cursor.render(el, st, el.selectionStart ?? 0);
-  indicator.show(st.mode);
+  renderCursor(el, st, el.selectionStart ?? 0);
+  showIndicator(st.mode);
 }
 
 function onFocusOut(e) {
   if (isOwnUI(e.target)) return;
-  indicator.hide();
+  hideIndicator();
 }
 
 export function init() {

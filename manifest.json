@@ -25,19 +25,9 @@
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],
-      "js": ["content-scripts/loader.js"],
+      "js": ["content-scripts/vimtext.js"],
       "run_at": "document_idle",
       "all_frames": true
-    }
-  ],
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "content-scripts/index.js",
-        "content-scripts/engine/*.js",
-        "content-scripts/dom/*.js"
-      ],
-      "matches": ["http://*/*", "https://*/*"]
     }
   ]
 }

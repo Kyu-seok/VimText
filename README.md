@@ -2,7 +2,8 @@
 
 A Chrome (MV3) extension that brings **Vim modal editing** — Normal / Insert /
 Visual modes, motions, and operators — to plain `<textarea>` and text `<input>`
-fields on the web. No build step, plain JavaScript.
+fields on the web. Plain-JavaScript ES modules, concatenated into one classic
+content script by a tiny dependency-free bundler (no npm dependencies).
 
 ## Status: MVP
 
@@ -43,10 +44,11 @@ thin adapter. See `DESIGN.md` for the rationale.
 
 ```
 content-scripts/
-  loader.js          classic content script → dynamic-imports index.js
-  index.js           keydown(capture) → keymap → engine → DOM renderers
+  index.js           entry: keydown(capture) → keymap → engine → DOM renderers
   engine/            state · motions · operators · keymap   (pure, testable)
   dom/               write (framework-safe) · cursor · mode-indicator · search-ui · element-tracker
+  vimtext.js         GENERATED bundle of all the above — the file the manifest loads
+tools/bundle.mjs     concatenates the ES modules into vimtext.js (dependency-free)
 options/  popup/     settings UI
 tests/engine/        node:test suites
 tests/fixtures/      manual.html
@@ -58,6 +60,10 @@ Two notes worth knowing:
   (e.g. GitHub) don't revert our edits.
 - **Native-selection cursor** (`dom/cursor.js`): the block cursor is the
   browser's own selection of the char under the cursor — no overlay/mirror-div.
+- **Single classic bundle** (`content-scripts/vimtext.js`): the manifest loads
+  one generated classic script instead of dynamically importing ES modules. A
+  runtime `import()` from a content script is blocked by strict page CSPs
+  (Chrome 130+), which would break loading on many sites.
 
 ## Testing
 
@@ -79,6 +85,18 @@ Test on `tests/fixtures/manual.html`, a single-line `<input>`, and a React site
 - [ ] On a React field, edits **stick** (the input-event counter increments)
 - [ ] `j k gg G` no-op in a single-line `<input>`
 - [ ] Typing and IME/CJK composition are untouched in Insert mode
+
+## Build
+
+The manifest loads one generated bundle. After editing anything under
+`content-scripts/`, regenerate it:
+
+```
+npm run build   # node tools/bundle.mjs → content-scripts/vimtext.js
+```
+
+The bundle is committed so `Load unpacked` works with no install step. CI fails
+if the committed bundle drifts from the sources.
 
 ## Regenerate icons
 

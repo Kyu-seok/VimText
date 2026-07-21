@@ -15,3 +15,7 @@ jobs:
           node-version: 22
       # No dependencies to install — the engine is tested with Node's built-in runner.
       - run: node --test
+      - name: Verify committed bundle matches sources
+        run: |
+          node tools/bundle.mjs
+          git diff --exit-code content-scripts/vimtext.js
