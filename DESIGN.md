@@ -94,6 +94,7 @@ This mirrors what a daily Vim user reaches for 90% of the time in a text field, 
 - **Text objects** (core): `iw`/`aw`, brackets `()[]{}<>` (+ `b`/`B`/`r` aliases), quotes `` "'` ``, tags `it`/`at` — compose with operators and Visual mode.
 - **vim-surround** (toggle): `ys`/`cs`/`ds` and visual `S` for brackets/quotes; delete/change from an existing tag.
 - **targets.vim** (toggle, subset): seeking + next/last (`in`/`il`/`an`/`al`) for pairs and quotes.
+- **Dot-repeat** (`.`, core): repeats the last change including text typed in Insert; a count before `.` overrides the original count.
 
 Plugins are toggled on the options page, stored in `chrome.storage.sync` as `plugins.surround` / `plugins.targets`.
 
@@ -101,7 +102,7 @@ Plugins are toggled on the options page, stored in `chrome.storage.sync` as `plu
 
 - Visual Block mode, paragraph text objects (`ip`/`ap`), `f`/`F`/`t`/`T`/`;`, `%`, `{`/`}` paragraph motions, marks
 - Adding a *tag* via surround (`ysiw<em>`) — needs an inline tag-name prompt; separators/argument objects and `I`/`A` sizes from targets.vim
-- Named registers, macros (`q`, `@`), dot-repeat (`.`)
+- Named registers, macros (`q`, `@`)
 - Replace mode (`R`), `r{char}`
 - Ex command line (`:s/.../.../`, ranges)
 - `contenteditable` support (Gmail/Notion/Slack) — best-effort only, separate DOM adapter, real risk of conflicting with the host site's own handlers
