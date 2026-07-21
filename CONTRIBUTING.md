@@ -43,9 +43,9 @@ unique across modules.
 VimText is split into two layers on purpose:
 
 - `content-scripts/engine/` — **pure, DOM-free** logic (`state`, `motions`,
-  `operators`, `keymap`). Motions/operators are `(text, pos, …) -> result`
-  functions. This is where editing behavior lives and where tests go
-  (`tests/engine/`).
+  `operators`, `textobjects`, `surround`, `keymap`). Motions/operators/objects
+  are `(text, pos, …) -> result` functions. This is where editing behavior lives
+  and where tests go (`tests/engine/`).
 - `content-scripts/dom/` — a thin adapter that reads/writes the focused field and
   renders the cursor (`write`, `cursor`, `mode-indicator`, `search-ui`,
   `element-tracker`). `content-scripts/index.js` wires keydown → engine → DOM.

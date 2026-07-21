@@ -25,6 +25,8 @@ const FILES = [
   "engine/state.js",
   "engine/motions.js",
   "engine/operators.js",
+  "engine/textobjects.js",
+  "engine/surround.js",
   "engine/keymap.js",
   "dom/write.js",
   "dom/element-tracker.js",

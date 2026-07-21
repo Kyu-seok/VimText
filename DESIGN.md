@@ -89,9 +89,18 @@ VimText/
 
 This mirrors what a daily Vim user reaches for 90% of the time in a text field, while staying inside the "safe to reason about on a single textarea" boundary (no cross-buffer registers, no macros, no marks yet).
 
+## Implemented beyond the original MVP
+
+- **Text objects** (core): `iw`/`aw`, brackets `()[]{}<>` (+ `b`/`B`/`r` aliases), quotes `` "'` ``, tags `it`/`at` — compose with operators and Visual mode.
+- **vim-surround** (toggle): `ys`/`cs`/`ds` and visual `S` for brackets/quotes; delete/change from an existing tag.
+- **targets.vim** (toggle, subset): seeking + next/last (`in`/`il`/`an`/`al`) for pairs and quotes.
+
+Plugins are toggled on the options page, stored in `chrome.storage.sync` as `plugins.surround` / `plugins.targets`.
+
 ## Explicitly deferred (phase 2+, not in this design's build scope)
 
-- Visual Block mode, text objects (`iw`, `a(`, `i"`, `ip`, etc.), `f`/`F`/`t`/`T`/`;`, `%`, `{`/`}` paragraph motions, marks
+- Visual Block mode, paragraph text objects (`ip`/`ap`), `f`/`F`/`t`/`T`/`;`, `%`, `{`/`}` paragraph motions, marks
+- Adding a *tag* via surround (`ysiw<em>`) — needs an inline tag-name prompt; separators/argument objects and `I`/`A` sizes from targets.vim
 - Named registers, macros (`q`, `@`), dot-repeat (`.`)
 - Replace mode (`R`), `r{char}`
 - Ex command line (`:s/.../.../`, ranges)
