@@ -1,13 +1,12 @@
 // engine/keymap.js — translate a normalized key into an engine command.
 //
 // handleKey(state, doc, key, opts) mutates `state` (mode, pending count/op,
-// register, undo stacks, visual anchor, last search) and returns:
-//   { handled, text, cursor, effect }
-// `handled` tells the DOM layer whether to preventDefault. `effect` signals
-// mode-crossing events the DOM must react to (insert-enter/exit, search-open).
+// register, undo stacks, visual anchor, last search, text-object/surround
+// sub-states) and returns { handled, text, cursor, effect }.
 //
 // `key` is a plain object { key, ctrl, shift, alt, meta } so the engine is
-// testable without real KeyboardEvents. `opts.singleLine` is true for <input>.
+// testable without real KeyboardEvents. `opts.singleLine` is true for <input>;
+// `opts.plugins` = { surround, targets } gates the plugin features.
 
 import { Mode, isVisual, clearPending, pushUndo, undo, redo } from "./state.js";
 import { computeMotion, MOTION_KEYS, lineStart, lineEnd, firstNonBlank, clampCursor } from "./motions.js";
@@ -15,9 +14,11 @@ import {
   rangeFromMotion, deleteText, changeText, yankText, deleteChar,
   deleteLines, changeLines, yankLines, paste,
 } from "./operators.js";
+import { textObject, TEXT_OBJECT_CHARS } from "./textobjects.js";
+import { addSurround, changeSurround, deleteSurround } from "./surround.js";
 
 export function handleKey(state, doc, key, opts = {}) {
-  const singleLine = !!opts.singleLine;
+  const ctx = { singleLine: !!opts.singleLine, plugins: opts.plugins || {} };
   const text = doc.text;
   const cursor = doc.cursor;
   const k = key.key;
@@ -26,7 +27,7 @@ export function handleKey(state, doc, key, opts = {}) {
 
   const isEsc = k === "Escape" || (ctrl && k === "[");
   const clampN = (to) => clampCursor(text, to);
-  const keepPending = () => ({ handled: true, text, cursor });
+  const keep = () => ({ handled: true, text, cursor });
   const commit = (t, c, effect = null) => { clearPending(state); return { handled: true, text: t, cursor: c, effect }; };
 
   // ---------------- INSERT ----------------
@@ -34,10 +35,9 @@ export function handleKey(state, doc, key, opts = {}) {
     if (isEsc) {
       state.mode = Mode.NORMAL;
       clearPending(state);
-      const ls = lineStart(text, cursor);
-      return { handled: true, text, cursor: clampCursor(text, Math.max(ls, cursor - 1)), effect: { type: "insert-exit" } };
+      return { handled: true, text, cursor: clampCursor(text, Math.max(lineStart(text, cursor), cursor - 1)), effect: { type: "insert-exit" } };
     }
-    return { handled: false, text, cursor }; // let the browser type
+    return { handled: false, text, cursor };
   }
 
   // ---------------- Esc / Ctrl+[ in NORMAL/VISUAL ----------------
@@ -53,7 +53,7 @@ export function handleKey(state, doc, key, opts = {}) {
   const isDigit = k.length === 1 && k >= "0" && k <= "9";
   if (isDigit && !(k === "0" && state.count === "")) {
     state.count += k;
-    return keepPending();
+    return keep();
   }
   const count = state.count ? parseInt(state.count, 10) : null;
 
@@ -65,54 +65,62 @@ export function handleKey(state, doc, key, opts = {}) {
     else return commit(text, clampN(cursor));
   } else if (k === "g") {
     state.awaitingG = true;
-    return keepPending();
+    return keep();
   }
-
-  // resolve remaining single-key motions
   if (!motionName) {
     if (k === "$" || k === "^" || k === "0" || k === "G") motionName = k;
     else if (MOTION_KEYS.has(k)) motionName = k;
   }
 
+  // ---------------- active sub-states (continuation of a multi-key command) ----------------
+  // Text object first: `ysiw)` sets pendingTextObj *while* pendingSurround is
+  // still active, and the object must win over the surround motion parser.
+  if (state.pendingTextObj) return handleTextObject(state, text, cursor, k, count, ctx);
+  if (state.pendingSurround) return handleSurround(state, text, cursor, k, motionName, count, ctx);
+
   // ---------------- VISUAL / VISUAL LINE ----------------
   if (isVisual(mode)) {
+    if (k === "i" || k === "a") { state.pendingTextObj = { kind: k, which: "current" }; return keep(); }
+    if (ctx.plugins.surround && k === "S") { state.pendingSurround = { cmd: "S" }; return keep(); }
     if (k === "d" || k === "x" || k === "y" || k === "c") {
       return visualApply(state, text, cursor, k === "x" ? "d" : k);
     }
     if (k === "v") {
       if (mode === Mode.VISUAL) { state.mode = Mode.NORMAL; state.visualAnchor = null; return commit(text, clampN(cursor)); }
-      state.mode = Mode.VISUAL; return keepPending();
+      state.mode = Mode.VISUAL; return keep();
     }
     if (k === "V") {
       if (mode === Mode.VISUAL_LINE) { state.mode = Mode.NORMAL; state.visualAnchor = null; return commit(text, clampN(cursor)); }
-      state.mode = Mode.VISUAL_LINE; return keepPending();
+      state.mode = Mode.VISUAL_LINE; return keep();
     }
     if (motionName) {
-      const m = computeMotion(motionName, text, cursor, count, { singleLine });
+      const m = computeMotion(motionName, text, cursor, count, { singleLine: ctx.singleLine });
       clearPending(state);
       return { handled: true, text, cursor: clampN(m.to) };
     }
-    return keepPending(); // swallow other keys in visual
+    return keep();
   }
 
   // ---------------- NORMAL: pending operator ----------------
   if (state.operator) {
     const op = state.operator;
+    if (ctx.plugins.surround && k === "s") { enterSurroundFromOperator(state, op); return keep(); }
+    if (k === "i" || k === "a") { state.pendingTextObj = { kind: k, which: "current" }; return keep(); }
     if (k === op) return applyLinewiseDoubled(state, text, cursor, op, count);
-    if (motionName) return applyOperatorMotion(state, text, cursor, op, motionName, count, singleLine);
-    return commit(text, clampN(cursor)); // invalid target: cancel operator
+    if (motionName) return applyOperatorMotion(state, text, cursor, op, motionName, count, ctx.singleLine);
+    return commit(text, clampN(cursor));
   }
 
   // ---------------- NORMAL: bare motion ----------------
   if (motionName) {
-    const m = computeMotion(motionName, text, cursor, count, { singleLine });
+    const m = computeMotion(motionName, text, cursor, count, { singleLine: ctx.singleLine });
     return commit(text, clampN(m.to));
   }
 
   // ---------------- NORMAL: commands ----------------
   switch (k) {
     case "d": case "c": case "y":
-      state.operator = k; return keepPending();
+      state.operator = k; return keep();
 
     case "x": {
       pushUndo(state, { text, cursor });
@@ -122,7 +130,7 @@ export function handleKey(state, doc, key, opts = {}) {
     }
 
     case "i": case "a": case "I": case "A": case "o": case "O": {
-      const variant = singleLine && (k === "o" || k === "O") ? "a" : k;
+      const variant = ctx.singleLine && (k === "o" || k === "O") ? "a" : k;
       const out = enterInsert(state, text, cursor, variant);
       return { handled: true, text: out.text, cursor: out.cursor, effect: { type: "insert-enter" } };
     }
@@ -145,8 +153,8 @@ export function handleKey(state, doc, key, opts = {}) {
       return { handled: true, text: prev.text, cursor: clampCursor(prev.text, prev.cursor) };
     }
 
-    case "r": { // Ctrl+r = redo; bare r (replace) is deferred → no-op
-      if (!ctrl) return commit(text, clampN(cursor));
+    case "r": {
+      if (!ctrl) return commit(text, clampN(cursor)); // bare r (replace) deferred
       const next = redo(state, { text, cursor });
       clearPending(state);
       if (!next) return { handled: true, text, cursor: clampN(cursor) };
@@ -167,16 +175,124 @@ export function handleKey(state, doc, key, opts = {}) {
 
     case "Tab":
       clearPending(state);
-      return { handled: false, text, cursor }; // let focus move on
+      return { handled: false, text, cursor };
 
     default:
-      // Unmapped key in Normal mode does nothing — but swallow it so stray
-      // letters never leak into the page as text.
-      return commit(text, clampN(cursor));
+      return commit(text, clampN(cursor)); // swallow unmapped keys
   }
 }
 
-// ---- command helpers ------------------------------------------------------
+// ---- text objects ---------------------------------------------------------
+
+function handleTextObject(state, text, cursor, k, count, ctx) {
+  const to = state.pendingTextObj;
+  // targets.vim next/last modifiers
+  if (ctx.plugins.targets && (k === "n" || k === "l") && to.which === "current") {
+    to.which = k === "n" ? "next" : "last";
+    return { handled: true, text, cursor };
+  }
+  if (!TEXT_OBJECT_CHARS.has(k)) {
+    if (to.forSurround) state.pendingSurround = null;
+    clearPending(state);
+    return { handled: true, text, cursor: clampCursor(text, cursor) };
+  }
+  const range = textObject(text, cursor, to.kind, k, {
+    seek: !!ctx.plugins.targets, which: to.which, count,
+  });
+  const forSurround = to.forSurround;
+  const op = state.operator;
+  state.pendingTextObj = null;
+
+  if (!range) {
+    if (forSurround) state.pendingSurround = null;
+    clearPending(state);
+    return { handled: true, text, cursor: clampCursor(text, cursor) };
+  }
+  if (forSurround) {
+    state.pendingSurround.range = range;
+    state.pendingSurround.stage = "delim";
+    return { handled: true, text, cursor };
+  }
+  if (isVisual(state.mode)) {
+    state.visualAnchor = range.start;
+    clearPending(state);
+    return { handled: true, text, cursor: clampCursor(text, Math.max(range.start, range.end - 1)) };
+  }
+  return applyOperatorRange(state, text, cursor, op, range);
+}
+
+function applyOperatorRange(state, text, cursor, op, range) {
+  let out;
+  if (op === "y") out = yankText(text, range.start, range.end);
+  else if (op === "c") { pushUndo(state, { text, cursor }); out = changeText(text, range.start, range.end); }
+  else { pushUndo(state, { text, cursor }); out = deleteText(text, range.start, range.end); }
+  return finishOp(state, out, text);
+}
+
+// ---- vim-surround ---------------------------------------------------------
+
+function enterSurroundFromOperator(state, op) {
+  if (op === "y") state.pendingSurround = { cmd: "ys", stage: "motion", range: null };
+  else if (op === "d") state.pendingSurround = { cmd: "ds" };
+  else if (op === "c") state.pendingSurround = { cmd: "cs", src: null };
+  state.operator = null;
+}
+
+function handleSurround(state, text, cursor, k, motionName, count, ctx) {
+  const s = state.pendingSurround;
+  const cancel = () => { clearPending(state); return { handled: true, text, cursor: clampCursor(text, cursor) }; };
+
+  if (s.cmd === "ds") return finishSurroundEdit(state, text, cursor, () => deleteSurround(text, cursor, k, { seek: !!ctx.plugins.targets }));
+
+  if (s.cmd === "cs") {
+    if (!s.src) { s.src = k; return { handled: true, text, cursor }; }
+    return finishSurroundEdit(state, text, cursor, () => changeSurround(text, cursor, s.src, k, { seek: !!ctx.plugins.targets }));
+  }
+
+  if (s.cmd === "S") {
+    const anchor = state.visualAnchor == null ? cursor : state.visualAnchor;
+    const start = Math.min(anchor, cursor);
+    const end = Math.min(Math.max(anchor, cursor) + 1, text.length);
+    state.visualAnchor = null;
+    state.mode = Mode.NORMAL;
+    return finishSurroundEdit(state, text, cursor, () => addSurround(text, start, end, k), { type: "visual-exit" });
+  }
+
+  // cmd === "ys"
+  if (s.stage === "delim") return finishSurroundEdit(state, text, s.range.start, () => addSurround(text, s.range.start, s.range.end, k));
+  // motion stage: resolve the target range
+  if (k === "s") { // yss — whole line (first non-blank .. end)
+    s.range = { start: firstNonBlank(text, cursor), end: lineEnd(text, cursor) };
+    s.stage = "delim";
+    return { handled: true, text, cursor };
+  }
+  if (k === "i" || k === "a") {
+    state.pendingTextObj = { kind: k, which: "current", forSurround: true };
+    return { handled: true, text, cursor };
+  }
+  if (motionName) {
+    const m = computeMotion(motionName, text, cursor, count, { singleLine: ctx.singleLine });
+    if (m) {
+      s.range = m.linewise
+        ? { start: lineStart(text, Math.min(cursor, m.to)), end: lineEnd(text, Math.max(cursor, m.to)) }
+        : rangeFromMotion(text, cursor, m);
+      s.stage = "delim";
+      return { handled: true, text, cursor };
+    }
+  }
+  return cancel();
+}
+
+// Run a surround op that returns { text, cursor } | null, snapshotting undo.
+function finishSurroundEdit(state, text, cursorForSnapshot, run, effect = null) {
+  const out = run();
+  clearPending(state);
+  if (!out) return { handled: true, text, cursor: clampCursor(text, cursorForSnapshot), effect };
+  pushUndo(state, { text, cursor: cursorForSnapshot });
+  return { handled: true, text: out.text, cursor: clampCursor(out.text, out.cursor), effect };
+}
+
+// ---- shared command helpers ----------------------------------------------
 
 function enterInsert(state, text, cursor, variant) {
   pushUndo(state, { text, cursor });
@@ -249,7 +365,6 @@ function visualApply(state, text, cursor, op) {
   return res;
 }
 
-// Common tail: store register, clear pending, set mode, shape the return.
 function finishOp(state, out, originalText) {
   if (out.register) state.register = out.register;
   clearPending(state);
@@ -264,8 +379,6 @@ function finishOp(state, out, originalText) {
 
 // ---- search ---------------------------------------------------------------
 
-// Smartcase substring search: case-insensitive unless the pattern has an
-// uppercase letter. Wraps around. Returns the match offset or null.
 export function searchNext(text, from, pattern, forward = true) {
   if (!pattern) return null;
   const smart = pattern === pattern.toLowerCase();
@@ -281,7 +394,6 @@ export function searchNext(text, from, pattern, forward = true) {
   return idx === -1 ? null : idx;
 }
 
-// Called by the search UI once a pattern is submitted.
 export function performSearch(state, doc, pattern, forward = true) {
   state.lastSearch = { pattern, forward };
   const idx = searchNext(doc.text, doc.cursor, pattern, forward);

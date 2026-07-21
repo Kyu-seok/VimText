@@ -22,6 +22,9 @@ export function createState() {
     count: "", // digits accumulated as a string, "" == none
     operator: null, // "d" | "c" | "y" while waiting for a motion
     awaitingG: false, // saw a lone "g", waiting for the second (gg)
+    // multi-key sub-states for text objects and vim-surround
+    pendingTextObj: null, // { kind: "i"|"a", which, forSurround? } awaiting an object char
+    pendingSurround: null, // { cmd: "ys"|"cs"|"ds"|"S", ... } surround command in progress
     // visual selection anchor (the fixed end); cursor is the moving end
     visualAnchor: null,
     // yank/delete register
@@ -39,6 +42,8 @@ export function clearPending(state) {
   state.count = "";
   state.operator = null;
   state.awaitingG = false;
+  state.pendingTextObj = null;
+  state.pendingSurround = null;
 }
 
 // Snapshot the pre-change doc so `u` can restore it. Any new change invalidates

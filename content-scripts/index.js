@@ -15,7 +15,7 @@ import { openSearch } from "./dom/search-ui.js";
 // Sites where Esc/"/" conflicts are severe or the editor is unsupported.
 const DEFAULT_DISABLED = ["docs.google.com"];
 
-let settings = { enabled: true, disabledSites: [] };
+let settings = { enabled: true, disabledSites: [], plugins: { surround: true, targets: true } };
 let siteEnabled = true;
 let composing = false;
 
@@ -27,14 +27,18 @@ function refreshSiteEnabled() {
 
 function loadSettings() {
   try {
-    chrome.storage.sync.get({ enabled: true, disabledSites: [] }, (v) => {
-      settings = v || settings;
-      refreshSiteEnabled();
-    });
+    chrome.storage.sync.get(
+      { enabled: true, disabledSites: [], plugins: { surround: true, targets: true } },
+      (v) => {
+        settings = v || settings;
+        refreshSiteEnabled();
+      }
+    );
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== "sync") return;
       if (changes.enabled) settings.enabled = changes.enabled.newValue;
       if (changes.disabledSites) settings.disabledSites = changes.disabledSites.newValue;
+      if (changes.plugins) settings.plugins = changes.plugins.newValue;
       refreshSiteEnabled();
     });
   } catch {
@@ -70,7 +74,7 @@ function onKeyDown(e) {
   }
 
   const key = { key: e.key, ctrl: e.ctrlKey, shift: e.shiftKey, alt: e.altKey, meta: e.metaKey };
-  const res = handleKey(st, docOf(el), key, { singleLine: isSingleLine(el) });
+  const res = handleKey(st, docOf(el), key, { singleLine: isSingleLine(el), plugins: settings.plugins });
   if (!res.handled) return;
 
   e.preventDefault();

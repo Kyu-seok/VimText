@@ -4,12 +4,23 @@ const enabledEl = document.getElementById("enabled");
 const sitesEl = document.getElementById("sites");
 const saveBtn = document.getElementById("save");
 const statusEl = document.getElementById("status");
+const pSurround = document.getElementById("plugin-surround");
+const pTargets = document.getElementById("plugin-targets");
+
+const PLUGIN_DEFAULTS = { surround: true, targets: true };
 
 function load() {
-  chrome.storage.sync.get({ enabled: true, disabledSites: [] }, (v) => {
+  chrome.storage.sync.get({ enabled: true, disabledSites: [], plugins: PLUGIN_DEFAULTS }, (v) => {
     enabledEl.checked = v.enabled;
     sitesEl.value = (v.disabledSites || []).join("\n");
+    const p = v.plugins || PLUGIN_DEFAULTS;
+    pSurround.checked = !!p.surround;
+    pTargets.checked = !!p.targets;
   });
+}
+
+function savePlugins() {
+  chrome.storage.sync.set({ plugins: { surround: pSurround.checked, targets: pTargets.checked } });
 }
 
 function parseSites(text) {
@@ -34,5 +45,7 @@ enabledEl.addEventListener("change", () =>
   chrome.storage.sync.set({ enabled: enabledEl.checked })
 );
 saveBtn.addEventListener("click", save);
+pSurround.addEventListener("change", savePlugins);
+pTargets.addEventListener("change", savePlugins);
 
 load();

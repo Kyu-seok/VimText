@@ -25,6 +25,17 @@ and [explicitly deferred](DESIGN.md#explicitly-deferred-phase-2-not-in-this-desi
 ### Search
 `/pattern` + `Enter` (smartcase, wrap-around) · `n` / `N`
 
+### Text objects
+`iw aw` · brackets `i( a( i[ a[ i{ a{ i< a<` (+ `b` `B` `r` aliases) · quotes `i" a" i' a'`
+`` i` a` `` · tags `it at` — compose with any operator (`di(`, `ci"`, `yaw`, `dit`) and in Visual mode.
+
+### Plugins (toggle in Options)
+- **vim-surround** — `ys{motion}{c}` add, `cs{a}{b}` change, `ds{c}` delete, visual `S{c}`.
+  Brackets & quotes; an opening bracket adds inner spaces, a closing one doesn't (`ysiw(` →
+  `( foo )`, `ysiw)` → `(foo)`). Delete/change from an existing tag (`dst`, `cst"`).
+- **targets.vim** — seeking (`ci(` works from *outside* the pair) plus next/last objects
+  (`cin(`, `cil"`, `dan)`).
+
 ## Install (load unpacked)
 
 1. `chrome://extensions`
@@ -45,7 +56,7 @@ thin adapter. See `DESIGN.md` for the rationale.
 ```
 content-scripts/
   index.js           entry: keydown(capture) → keymap → engine → DOM renderers
-  engine/            state · motions · operators · keymap   (pure, testable)
+  engine/            state · motions · operators · textobjects · surround · keymap  (pure, testable)
   dom/               write (framework-safe) · cursor · mode-indicator · search-ui · element-tracker
   vimtext.js         GENERATED bundle of all the above — the file the manifest loads
 tools/bundle.mjs     concatenates the ES modules into vimtext.js (dependency-free)

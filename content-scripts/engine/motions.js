@@ -66,7 +66,7 @@ export function clampCursor(text, pos, { allowEol = false } = {}) {
 
 // ---- word helpers ---------------------------------------------------------
 
-function charClass(ch) {
+export function charClass(ch) {
   if (ch === undefined) return 0;
   if (/\s/.test(ch)) return 0; // whitespace, incl. newline
   if (/[A-Za-z0-9_]/.test(ch)) return 1; // word char
