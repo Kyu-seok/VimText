@@ -13,13 +13,13 @@ decision is recorded in [docs/adr/0001](docs/adr/0001-reuse-codemirror-vim-engin
 
 ## Scope
 
-| Surface | Status |
-|---|---|
-| `<textarea>` | first-class, M1 |
-| `<input>` type text/search/url/email/tel | first-class, M2 |
+| Surface                                   | Status                                                         |
+| ----------------------------------------- | -------------------------------------------------------------- |
+| `<textarea>`                              | first-class, M1                                                |
+| `<input>` type text/search/url/email/tel  | first-class, M2                                                |
 | contenteditable (Gmail, Slack, Notion, …) | separate Field implementation, M4, designed in its own session |
-| password/number/date/color/file inputs | never |
-| canvas editors (Google Docs) | impossible, out of scope |
+| password/number/date/color/file inputs    | never                                                          |
+| canvas editors (Google Docs)              | impossible, out of scope                                       |
 
 ## Architecture
 
@@ -43,14 +43,15 @@ so display-line motions (`gj`/`gk`) approximately match. Own-adapter over the Fi
 documented escape hatch (ADR 0001).
 
 **Ownership of text, by Mode.**
-- *Insert*: the real Field owns typing (IME, autocomplete, site handlers all native). The
+
+- _Insert_: the real Field owns typing (IME, autocomplete, site handlers all native). The
   mirror follows via `input` events. VimText intercepts only the mode-switch keys (`Esc`,
   `Ctrl+[`) and a whitelist of Vim insert keys: `Ctrl-o`, `Ctrl-r {reg}`, `Ctrl-u`, and
   `Ctrl-w` where the platform lets a page see it.
-- *Every other Mode* (Normal, Visual ×3, Replace, Command-line): the engine owns the text.
+- _Every other Mode_ (Normal, Visual ×3, Replace, Command-line): the engine owns the text.
   VimText writes through to the Field with the native value setter + synthetic `input`
   event (framework-safe; React/Vue-controlled inputs keep our edits).
-- *Self-heal*: before dispatching any key in a non-Insert Mode, compare Field value +
+- _Self-heal_: before dispatching any key in a non-Insert Mode, compare Field value +
   selection with the mirror; if they differ, reset the mirror from the Field as one undoable
   change. The Field is the truth whenever they disagree.
 
@@ -58,6 +59,7 @@ documented escape hatch (ADR 0001).
 left alone in Insert mode and not bound in other Modes. One history.
 
 **Key policy in non-Insert Modes** (capture phase on the Field):
+
 1. Keys the engine knows: consumed.
 2. Printable keys the engine doesn't know: swallowed (Vim beeps).
 3. Cmd/Ctrl combos the engine doesn't bind: Pass-through (Cmd+C/V/X, Cmd/Ctrl+Enter, Cmd+W, Cmd+L…).
@@ -90,6 +92,7 @@ Cmd+V in Normal is a Pass-through.
 search + command history, vimrc mappings. Per Field: marks, undo.
 
 **Settings** (`chrome.storage.sync`):
+
 - Site Policy keyed by origin: disabled / enabled+Insert / enabled+Normal. Unknown origin →
   enabled+Insert. No built-in deny list.
 - vimrc: a text box of ex commands (`map`, `noremap`, `set`, …) run through the engine on every Activation.

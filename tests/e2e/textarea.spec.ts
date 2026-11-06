@@ -63,7 +63,9 @@ test("text objects, visual mode, ex :s", async ({ page }) => {
   await expect(ta).toHaveValue(/^the fast brown/);
   await page.keyboard.type("0vee");
   expect(await statusText(page)).toContain("VISUAL");
-  const sel = await ta.evaluate((el: HTMLTextAreaElement) => el.value.slice(el.selectionStart, el.selectionEnd));
+  const sel = await ta.evaluate((el: HTMLTextAreaElement) =>
+    el.value.slice(el.selectionStart, el.selectionEnd),
+  );
   expect(sel).toBe("the fast");
   await page.keyboard.type("d");
   await expect(ta).toHaveValue(/^ brown fox/);

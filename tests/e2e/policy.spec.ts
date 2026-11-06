@@ -1,7 +1,12 @@
 import { test, expect, statusText, setSettings } from "./extension";
 
 test("Site Policy 'normal' activates on focus", async ({ context, page }) => {
-  await setSettings(context, { enabled: true, sites: { "http://localhost:4173": "normal" }, vimrc: "", plugins: {} });
+  await setSettings(context, {
+    enabled: true,
+    sites: { "http://localhost:4173": "normal" },
+    vimrc: "",
+    plugins: {},
+  });
   await page.goto("/textarea.html");
   await page.waitForTimeout(150);
   await page.locator("#ta").focus();
@@ -11,7 +16,12 @@ test("Site Policy 'normal' activates on focus", async ({ context, page }) => {
 });
 
 test("Site Policy 'off' makes Esc a plain key", async ({ context, page }) => {
-  await setSettings(context, { enabled: true, sites: { "http://localhost:4173": "off" }, vimrc: "", plugins: {} });
+  await setSettings(context, {
+    enabled: true,
+    sites: { "http://localhost:4173": "off" },
+    vimrc: "",
+    plugins: {},
+  });
   await page.goto("/textarea.html");
   await page.waitForTimeout(150);
   await page.locator("#ta").focus();
@@ -21,7 +31,12 @@ test("Site Policy 'off' makes Esc a plain key", async ({ context, page }) => {
 });
 
 test("vimrc mappings apply on activation", async ({ context, page }) => {
-  await setSettings(context, { enabled: true, sites: {}, vimrc: "nnoremap Y y$\nnnoremap \\x dd", plugins: {} });
+  await setSettings(context, {
+    enabled: true,
+    sites: {},
+    vimrc: "nnoremap Y y$\nnnoremap \\x dd",
+    plugins: {},
+  });
   await page.goto("/textarea.html");
   await page.waitForTimeout(150);
   const ta = page.locator("#ta");

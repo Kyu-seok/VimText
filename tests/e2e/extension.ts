@@ -20,7 +20,14 @@ export const test = base.extend<{ context: BrowserContext; page: Page }>({
   },
   page: async ({ context }, use) => {
     const page = await context.newPage();
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
+    page.on("console", (m) => {
+      if (m.type() === "error" && /VimText/.test(m.text())) errors.push(`console: ${m.text()}`);
+    });
     await use(page);
+    // An engine exception shows up as a wrong value otherwise; fail loudly instead.
+    base.expect(errors, "VimText errors during the test").toEqual([]);
   },
 });
 
@@ -41,11 +48,29 @@ export async function setSettings(context: BrowserContext, settings: object): Pr
   await page.close();
 }
 
+/** Field value, hidden-mirror text, and Status Line text: the three things that disagree when the bridge is wrong. */
+export function snapshot(
+  page: Page,
+  selector = "#ta",
+): Promise<{ field: string; mirror: string; status: string; active: string }> {
+  return page.evaluate((selector) => {
+    const host = document.querySelector("vimtext-status") as HTMLElement | null;
+    const sr = host?.shadowRoot;
+    const el = document.querySelector(selector) as HTMLTextAreaElement | HTMLInputElement | null;
+    return {
+      field: el?.value ?? "",
+      mirror: sr?.querySelector(".cm-content")?.textContent ?? "",
+      status: host && host.style.display !== "none" ? (sr?.querySelector(".bar")?.textContent ?? "") : "",
+      active: `${document.activeElement?.tagName ?? ""}>${sr?.activeElement?.tagName ?? ""}`,
+    };
+  }, selector);
+}
+
 /** The Status Line host VimText injects next to an activated Field. */
 export function statusText(page: Page): Promise<string> {
   return page.evaluate(() => {
     const host = document.querySelector("vimtext-status") as HTMLElement | null;
     const bar = host?.shadowRoot?.querySelector(".bar") as HTMLElement | null;
-    return bar && host!.style.display !== "none" ? bar.textContent ?? "" : "";
+    return bar && host!.style.display !== "none" ? (bar.textContent ?? "") : "";
   });
 }

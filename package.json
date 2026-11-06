@@ -9,9 +9,12 @@
     "build": "node tools/build.mjs",
     "watch": "node tools/build.mjs --watch",
     "typecheck": "tsc --noEmit",
+    "check:imports": "node tools/check-imports.mjs",
     "test": "vitest run",
-    "test:e2e": "playwright test",
-    "icons": "node tools/make-icons.mjs"
+    "test:e2e": "npm run build && playwright test",
+    "check": "npm run typecheck && npm run check:imports && npm test && npm run test:e2e",
+    "icons": "node tools/make-icons.mjs",
+    "prepare": "husky"
   },
   "dependencies": {
     "@codemirror/commands": "6.11.1",
@@ -27,7 +30,10 @@
     "@types/node": "26.6.6",
     "@vitest/browser": "3.2.7",
     "esbuild": "0.28.2",
+    "husky": "9.1.7",
+    "lint-staged": "17.6.0",
     "playwright": "1.65.0",
+    "prettier": "3.9.10",
     "typescript": "7.0.2",
     "vitest": "3.2.7"
   }

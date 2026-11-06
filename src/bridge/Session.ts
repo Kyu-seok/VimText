@@ -48,7 +48,9 @@ function defineExCommands(): void {
     defineEx(name: string, prefix: string | undefined, fn: (cm: any, params: any) => void): void;
   };
   const session = (cm: any): Session | undefined => cm.state.vimtextSession;
-  V.defineEx("write", "w", (cm) => session(cm)?.mirror.notify("VimText: nothing to write (the page owns saving)", 2500));
+  V.defineEx("write", "w", (cm) =>
+    session(cm)?.mirror.notify("VimText: nothing to write (the page owns saving)", 2500),
+  );
   V.defineEx("quit", "q", (cm) => session(cm)?.leave());
   V.defineEx("wq", undefined, (cm) => session(cm)?.leave());
   V.defineEx("xit", "x", (cm) => session(cm)?.leave());
@@ -71,7 +73,10 @@ export class Session {
   /** The Field selection we last wrote; anything else means the user moved the caret. */
   private lastRendered: { anchor: number; head: number } | null = null;
 
-  constructor(readonly field: Field, config: SessionConfig) {
+  constructor(
+    readonly field: Field,
+    config: SessionConfig,
+  ) {
     defineExCommands();
     this.status = new StatusLine(field);
     const sel = field.getSelection();
@@ -211,12 +216,17 @@ export class Session {
       let start = 0;
       const max = Math.min(text.length, doc.length);
       while (start < max && text.charCodeAt(start) === doc.charCodeAt(start)) start++;
-      let endT = text.length, endD = doc.length;
-      while (endT > start && endD > start && text.charCodeAt(endT - 1) === doc.charCodeAt(endD - 1)) { endT--; endD--; }
+      let endT = text.length,
+        endD = doc.length;
+      while (endT > start && endD > start && text.charCodeAt(endT - 1) === doc.charCodeAt(endD - 1)) {
+        endT--;
+        endD--;
+      }
       const head = Math.min(sel.head, text.length);
       let userEvent = "input.type";
       if (insert) {
-        userEvent = this.firstInsertSync && !this.joinNextInsert ? "input.type.compose.start" : "input.type.compose";
+        userEvent =
+          this.firstInsertSync && !this.joinNextInsert ? "input.type.compose.start" : "input.type.compose";
         this.firstInsertSync = false;
       }
       const changes = view.state.changes({ from: start, to: endD, insert: text.slice(start, endT) });
@@ -239,9 +249,10 @@ export class Session {
     const expected = this.lastRendered ?? this.renderedSelection();
     if (expected.anchor !== sel.anchor || expected.head !== sel.head) {
       // The user moved the caret or dragged a selection with the mouse.
-      const range = sel.anchor === sel.head
-        ? EditorSelection.cursor(clipToLine(view.state.doc, sel.head))
-        : EditorSelection.range(sel.anchor, sel.head);
+      const range =
+        sel.anchor === sel.head
+          ? EditorSelection.cursor(clipToLine(view.state.doc, sel.head))
+          : EditorSelection.range(sel.anchor, sel.head);
       view.dispatch({ selection: range });
     }
   }
@@ -253,7 +264,9 @@ export class Session {
     const vim = this.mirror.vim;
     if (vim.insertMode || vim.visualMode || !main.empty) return { anchor: main.anchor, head: main.head };
     const line = state.doc.lineAt(main.head);
-    return main.head < line.to ? { anchor: main.head, head: main.head + 1 } : { anchor: main.head, head: main.head };
+    return main.head < line.to
+      ? { anchor: main.head, head: main.head + 1 }
+      : { anchor: main.head, head: main.head };
   }
 
   private scheduleRender(): void {

@@ -27,7 +27,13 @@ async function init(): Promise<void> {
     originEl.textContent = origin;
     policy.value = settings.sites[origin] ?? "insert";
   }
-  enabled.addEventListener("change", () => void updateSettings((s) => { s.enabled = enabled.checked; }));
+  enabled.addEventListener(
+    "change",
+    () =>
+      void updateSettings((s) => {
+        s.enabled = enabled.checked;
+      }),
+  );
   policy.addEventListener("change", () => {
     if (!origin) return;
     const value = policy.value as SitePolicy;

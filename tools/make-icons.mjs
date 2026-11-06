@@ -15,7 +15,7 @@ function crc32(buf) {
     c ^= buf[i];
     for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xedb88320 & -(c & 1));
   }
-  return (~c) >>> 0;
+  return ~c >>> 0;
 }
 
 function chunk(type, data) {
@@ -41,12 +41,7 @@ function encodePng(size, rgba) {
     rgba.copy(raw, y * stride + 1, y * size * 4, (y + 1) * size * 4);
   }
   const idat = zlib.deflateSync(raw, { level: 9 });
-  return Buffer.concat([
-    sig,
-    chunk("IHDR", ihdr),
-    chunk("IDAT", idat),
-    chunk("IEND", Buffer.alloc(0)),
-  ]);
+  return Buffer.concat([sig, chunk("IHDR", ihdr), chunk("IDAT", idat), chunk("IEND", Buffer.alloc(0))]);
 }
 
 function draw(size) {
@@ -55,7 +50,10 @@ function draw(size) {
   const fg = [225, 245, 235, 255]; // light block cursor
   const r = size * 0.18; // corner radius
   // block-cursor rectangle (lower-right-ish, like a terminal caret)
-  const bx0 = size * 0.32, bx1 = size * 0.62, by0 = size * 0.3, by1 = size * 0.72;
+  const bx0 = size * 0.32,
+    bx1 = size * 0.62,
+    by0 = size * 0.3,
+    by1 = size * 0.72;
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const i = (y * size + x) * 4;
@@ -64,15 +62,22 @@ function draw(size) {
       const cx = Math.min(x, size - 1 - x);
       const cy = Math.min(y, size - 1 - y);
       if (cx < r && cy < r) {
-        const dx = r - cx, dy = r - cy;
+        const dx = r - cx,
+          dy = r - cy;
         if (dx * dx + dy * dy > r * r) inside = false;
       }
       let col = bg;
       if (x >= bx0 && x <= bx1 && y >= by0 && y <= by1) col = fg;
       if (!inside) {
-        rgba[i] = 0; rgba[i + 1] = 0; rgba[i + 2] = 0; rgba[i + 3] = 0;
+        rgba[i] = 0;
+        rgba[i + 1] = 0;
+        rgba[i + 2] = 0;
+        rgba[i + 3] = 0;
       } else {
-        rgba[i] = col[0]; rgba[i + 1] = col[1]; rgba[i + 2] = col[2]; rgba[i + 3] = col[3];
+        rgba[i] = col[0];
+        rgba[i + 1] = col[1];
+        rgba[i + 2] = col[2];
+        rgba[i + 3] = col[3];
       }
     }
   }

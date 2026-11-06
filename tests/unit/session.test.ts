@@ -19,7 +19,8 @@ function keys(seq: string): void {
 /** Simulates the browser's native Insert-mode typing: value change + input event. */
 function typeNatively(text: string): void {
   const { selectionStart, selectionEnd, value } = ta;
-  const s = selectionStart ?? 0, e = selectionEnd ?? s;
+  const s = selectionStart ?? 0,
+    e = selectionEnd ?? s;
   ta.value = value.slice(0, s) + text + value.slice(e);
   ta.setSelectionRange(s + text.length, s + text.length);
   ta.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));

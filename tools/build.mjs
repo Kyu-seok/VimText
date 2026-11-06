@@ -21,7 +21,7 @@ const common = {
 const ctx = await esbuild.context({
   ...common,
   entryPoints: {
-    "content": "src/content.ts",
+    content: "src/content.ts",
     "popup/popup": "popup/popup.ts",
     "options/options": "options/options.ts",
   },
