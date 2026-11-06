@@ -114,6 +114,10 @@ push/PR · MIT · version restarts at 0.1.0. Upstream engine tests are not re-ru
 - Replace-mode cursor indistinguishable from Normal except via the Status Line.
 - Display-line motions are approximate on exotic fonts/CSS.
 - Visual block highlights only the primary range.
+- Engine deviation: a user mapping whose prefix is itself a bound key (e.g. `nnoremap <Space>x dd`
+  while `<Space>` is `l`) never fires; the engine takes the full match at once instead of waiting
+  like Vim's `timeoutlen`. Map from an unbound prefix such as `\` instead. Upstream behaviour, not ours.
+- `:%s` ends with the engine's "Found N matches" notice rather than Vim's "N substitutions on M lines".
 
 ## Milestones
 

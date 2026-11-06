@@ -1,0 +1,34 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>VimText options</title>
+<style>
+  body { font: 14px system-ui, sans-serif; max-width: 720px; margin: 32px auto; padding: 0 16px; color: #222; }
+  h1 { font-size: 20px; }
+  h2 { font-size: 15px; margin-top: 28px; }
+  textarea { width: 100%; min-height: 160px; font: 13px ui-monospace, Menlo, monospace; box-sizing: border-box; }
+  table { border-collapse: collapse; width: 100%; }
+  td, th { text-align: left; padding: 4px 8px; border-bottom: 1px solid #eee; }
+  .muted { color: #666; font-size: 12px; }
+  button { font: inherit; }
+</style>
+</head>
+<body>
+  <h1>VimText options</h1>
+
+  <h2>vimrc</h2>
+  <p class="muted">Ex commands run on every Field activation: <code>map</code>, <code>noremap</code>, <code>set</code>, …</p>
+  <textarea id="vimrc" spellcheck="false" placeholder="nnoremap Y y$&#10;set ignorecase"></textarea>
+  <p><button id="save-vimrc">Save vimrc</button> <span id="vimrc-status" class="muted"></span></p>
+
+  <h2>Plugins</h2>
+  <label><input type="checkbox" id="plugin-surround"> vim-surround (<code>ys</code> <code>cs</code> <code>ds</code>)</label><br>
+  <label><input type="checkbox" id="plugin-targets"> targets.vim (<code>cin(</code> <code>dil"</code> …)</label>
+
+  <h2>Site Policies</h2>
+  <p class="muted">Unknown sites are on and start in Insert.</p>
+  <table id="sites"><thead><tr><th>Origin</th><th>Policy</th><th></th></tr></thead><tbody></tbody></table>
+  <script src="options.js"></script>
+</body>
+</html>
