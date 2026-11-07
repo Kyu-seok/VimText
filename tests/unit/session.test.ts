@@ -129,6 +129,14 @@ describe("Insert mode", () => {
   });
 });
 
+describe("Replace mode", () => {
+  it("leaves Enter native: Vim's Replace mode breaks the line, so the textarea gets its newline", () => {
+    keys("R");
+    expect(session.mode).toBe("replace");
+    expect(keydown("Enter").defaultPrevented).toBe(false);
+  });
+});
+
 describe("Field is the truth", () => {
   it("heals from a programmatic value change before the next key", () => {
     ta.value = "replaced by the page"; // the browser moves the caret to the end

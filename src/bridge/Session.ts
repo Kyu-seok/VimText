@@ -19,6 +19,11 @@ function isInsertModeVimKey(e: KeyboardEvent): boolean {
   return e.key === "o" || e.key === "r" || e.key === "u" || e.key === "w";
 }
 
+/** A key that would type a character if the page saw it. */
+function isUnmodifiedPrintable(e: KeyboardEvent): boolean {
+  return !e.ctrlKey && !e.metaKey && e.key.length === 1;
+}
+
 /** The browser's own undo/redo. Outside Insert the engine's history is the only one. */
 function isNativeHistoryKey(e: KeyboardEvent): boolean {
   if (e.altKey || !(e.ctrlKey || e.metaKey)) return false;
@@ -240,13 +245,13 @@ export class Session {
     if (handled) {
       e.preventDefault();
       e.stopPropagation();
-    } else if (
-      !this.nativeInsert &&
-      (isNativeHistoryKey(e) || (!e.ctrlKey && !e.metaKey && (e.key.length === 1 || e.key === "Enter")))
-    ) {
-      // Vim beeps at unknown printable keys and at a motion that fails (d<CR> on
-      // a one-line document); the page never sees them, so a half-typed command
-      // cannot submit a form or put a newline in a textarea.
+    } else if (!this.nativeInsert && (isNativeHistoryKey(e) || isUnmodifiedPrintable(e))) {
+      e.preventDefault(); // Vim beeps at unknown printable keys; the page never sees them
+      e.stopPropagation();
+    } else if (!this.mirror.vim.insertMode && e.key === "Enter" && !e.ctrlKey && !e.metaKey) {
+      // Normal/Visual only: Vim beeps at a motion that fails (d<CR> on the last
+      // line), so a half-typed command never submits a form or puts a newline
+      // in a textarea. In Replace mode Enter breaks the line, as Vim's does.
       e.preventDefault();
       e.stopPropagation();
     }
