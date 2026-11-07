@@ -1,4 +1,4 @@
-import { test, expect, statusText } from "./extension";
+import { test, expect, statusText, contentStatus } from "./extension";
 import type { Page } from "@playwright/test";
 
 // Disposal is prompt: a Session ends the moment its Field leaves the page or
@@ -46,6 +46,22 @@ test.describe("textarea fixture", () => {
     expect(await statusText(page)).toContain("NORMAL");
     await page.keyboard.type("0x");
     await expect(input).toHaveValue("ello world");
+  });
+
+  test("the lifecycle observer is connected only while a Session exists", async ({ context, page }) => {
+    expect((await contentStatus(context)).observing).toBe(false); // an inert page costs nothing
+    await page.locator("#ta").focus();
+    await page.keyboard.press("Escape");
+    expect((await contentStatus(context)).observing).toBe(true);
+    await page.locator("#in").focus();
+    await page.keyboard.press("Escape");
+    expect(await hostCount(page)).toBe(2);
+    await page.evaluate(() => document.getElementById("ta")!.remove());
+    await expect.poll(() => hostCount(page)).toBe(1);
+    expect((await contentStatus(context)).observing).toBe(true); // one Session still lives
+    await page.evaluate(() => document.getElementById("in")!.remove());
+    await expect.poll(() => hostCount(page)).toBe(0);
+    expect((await contentStatus(context)).observing).toBe(false); // the last one went
   });
 
   test("a password input qualifies once a 'show password' toggle reveals it as text", async ({ page }) => {

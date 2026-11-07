@@ -107,7 +107,13 @@ chrome.runtime.onMessage.addListener((msg: { type?: string }, _sender, sendRespo
   if (msg?.type === "vimtext:status") {
     const active = document.activeElement;
     const entry = isTextControl(active) ? sessions.get(active) : undefined;
-    sendResponse({ origin: location.origin, mode: entry?.session.mode ?? null, top: window === window.top });
+    sendResponse({
+      origin: location.origin,
+      mode: entry?.session.mode ?? null,
+      top: window === window.top,
+      // The e2e lifecycle spec checks the observer runs only while a Session exists.
+      observing: lifecycleObserver !== null,
+    });
   }
   return false;
 });

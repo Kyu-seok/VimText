@@ -59,3 +59,38 @@ export function statusText(page: Page): Promise<string> {
     return bar && host!.style.display !== "none" ? (bar.textContent ?? "") : "";
   });
 }
+
+/** What the content script reports about a tab (the popup's `vimtext:status` query). */
+export interface ContentStatus {
+  origin: string;
+  mode: string | null;
+  /** True while the lifecycle MutationObserver is connected (only while a Session exists). */
+  observing: boolean;
+}
+
+/**
+ * Asks the content script of the fixture tab for its status, through an
+ * extension page (the only context with `chrome.tabs`). Tabs without the
+ * content script (extension pages themselves) do not answer and are skipped.
+ */
+export async function contentStatus(context: BrowserContext): Promise<ContentStatus> {
+  const page = await context.newPage();
+  await page.goto(`chrome-extension://${extensionId}/options/options.html`);
+  const statuses = await page.evaluate(async (origin) => {
+    const tabs = await chrome.tabs.query({});
+    const answers: ContentStatus[] = [];
+    for (const tab of tabs) {
+      if (!tab.id) continue;
+      try {
+        const res = (await chrome.tabs.sendMessage(tab.id, { type: "vimtext:status" })) as ContentStatus;
+        if (res?.origin === origin) answers.push(res);
+      } catch {
+        // no content script in this tab
+      }
+    }
+    return answers;
+  }, fixtureOrigin);
+  await page.close();
+  if (statuses.length !== 1) throw new Error(`expected one fixture tab, got ${statuses.length}`);
+  return statuses[0]!;
+}
