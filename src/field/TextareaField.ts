@@ -1,4 +1,5 @@
 import type { Field, FieldSelection, TextControl, WrappingStyle } from "./Field";
+import { diffText } from "./diff";
 
 const textareaValueSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!;
 const inputValueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
@@ -10,19 +11,7 @@ const inputValueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.protot
  * deletion. Mask libraries and some React code branch on these.
  */
 function describeEdit(oldText: string, newText: string): { inputType: string; data: string | null } {
-  let start = 0;
-  const max = Math.min(oldText.length, newText.length);
-  while (start < max && oldText.charCodeAt(start) === newText.charCodeAt(start)) start++;
-  let endNew = newText.length,
-    endOld = oldText.length;
-  while (
-    endNew > start &&
-    endOld > start &&
-    oldText.charCodeAt(endOld - 1) === newText.charCodeAt(endNew - 1)
-  ) {
-    endNew--;
-    endOld--;
-  }
+  const { start, endNew } = diffText(oldText, newText);
   const inserted = newText.slice(start, endNew);
   return inserted
     ? { inputType: "insertText", data: inserted }

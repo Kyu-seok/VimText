@@ -1,5 +1,6 @@
 import { EditorSelection, type Text } from "@codemirror/state";
 import type { Field } from "../field/Field";
+import { diffText } from "../field/diff";
 import { Mirror, Vim, type KeyLike } from "../engine/mirror";
 import { StatusLine } from "../ui/StatusLine";
 
@@ -308,15 +309,7 @@ export class Session {
     this.lastText = text;
 
     if (text !== doc) {
-      let start = 0;
-      const max = Math.min(text.length, doc.length);
-      while (start < max && text.charCodeAt(start) === doc.charCodeAt(start)) start++;
-      let endT = text.length,
-        endD = doc.length;
-      while (endT > start && endD > start && text.charCodeAt(endT - 1) === doc.charCodeAt(endD - 1)) {
-        endT--;
-        endD--;
-      }
+      const { start, endOld, endNew } = diffText(doc, text);
       const head = Math.min(sel.head, text.length);
       let userEvent = provoked ? "input.type.compose" : "input.type";
       if (insert) {
@@ -326,7 +319,7 @@ export class Session {
         userEvent = opensStep ? "input.type.compose.start" : "input.type.compose";
         this.firstInsertSync = false;
       }
-      const changes = view.state.changes({ from: start, to: endD, insert: text.slice(start, endT) });
+      const changes = view.state.changes({ from: start, to: endOld, insert: text.slice(start, endNew) });
       const newDoc = changes.apply(view.state.doc);
       view.dispatch({
         changes,
