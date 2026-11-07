@@ -28,6 +28,16 @@ const ctx = await esbuild.context({
   outdir: "dist",
 });
 
+// The React e2e fixture: React 19 ships no UMD build, so its source is bundled
+// into a gitignored file next to react.html (see tests/fixtures/react.tsx).
+async function buildFixtures() {
+  await esbuild.build({
+    ...common,
+    entryPoints: { react: "tests/fixtures/react.tsx" },
+    outdir: "tests/fixtures",
+  });
+}
+
 function copyStatic() {
   cpSync("manifest.json", "dist/manifest.json");
   cpSync("icons", "dist/icons", { recursive: true });
@@ -38,9 +48,11 @@ function copyStatic() {
 if (watch) {
   await ctx.watch();
   copyStatic();
+  await buildFixtures();
   console.log("watching…");
 } else {
   await ctx.rebuild();
   copyStatic();
+  await buildFixtures();
   await ctx.dispose();
 }
