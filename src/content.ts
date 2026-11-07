@@ -21,6 +21,7 @@ function activate(el: TextControl): Session {
   const field = new TextareaField(el);
   const session = new Session(field, { vimrc: settings?.vimrc ?? "" });
   sessions.set(el, { field, session });
+  observeLifecycle();
   return session;
 }
 
@@ -30,10 +31,44 @@ function dispose(el: TextControl): void {
   entry.session.destroy();
   entry.field.destroy();
   sessions.delete(el);
+  if (sessions.size === 0) stopObservingLifecycle();
 }
 
-function sweep(): void {
-  for (const el of sessions.keys()) if (!el.isConnected) dispose(el);
+// Disposal is prompt (decision record #8): a Session ends when its Field leaves
+// the page (framework re-mounts included) or stops qualifying (readonly,
+// disabled, type changed to password), not on the next focus change elsewhere.
+// The observer runs only while a Session exists, so an inert page costs nothing.
+let lifecycleObserver: MutationObserver | null = null;
+
+function isStatusHost(node: Node): boolean {
+  return node instanceof Element && node.localName === "vimtext-status";
+}
+
+/** True when a record can affect a Session; our own Status Line hosts coming and going cannot. */
+function concernsFields(record: MutationRecord): boolean {
+  if (record.type === "attributes") return true;
+  for (const n of record.addedNodes) if (!isStatusHost(n)) return true;
+  for (const n of record.removedNodes) if (!isStatusHost(n)) return true;
+  return false;
+}
+
+function observeLifecycle(): void {
+  if (lifecycleObserver) return;
+  lifecycleObserver = new MutationObserver((records) => {
+    if (!records.some(concernsFields)) return;
+    for (const el of [...sessions.keys()]) if (!el.isConnected || !isTextControl(el)) dispose(el);
+  });
+  lifecycleObserver.observe(document, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ["type", "readonly", "disabled"],
+  });
+}
+
+function stopObservingLifecycle(): void {
+  lifecycleObserver?.disconnect();
+  lifecycleObserver = null;
 }
 
 document.addEventListener(
@@ -55,7 +90,6 @@ document.addEventListener(
 );
 
 document.addEventListener("focusin", (e) => {
-  sweep();
   const target = deepTarget(e);
   if (!isTextControl(target)) return;
   const entry = sessions.get(target);
