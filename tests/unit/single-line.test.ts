@@ -115,6 +115,16 @@ describe("Key Policy on a Single-line Field", () => {
     expect(input.value).toBe("ello world");
   });
 
+  it('"ao beeps too: a register prefix is not an operator, and it is dropped with the beep', () => {
+    keys('"a');
+    expect(keydown("o").defaultPrevented).toBe(true);
+    expect(session.mode).toBe("normal");
+    expect(input.value).toBe("hello world");
+    keys("x"); // the prefix went with the beep: the char lands in the unnamed register, not "a
+    keys("p");
+    expect(input.value).toBe("ehllo world");
+  });
+
   it("Visual o still jumps to the other end of the selection", () => {
     keys("vl");
     expect(session.mode).toBe("visual");
@@ -130,6 +140,34 @@ describe("Key Policy on a Single-line Field", () => {
     expect(keydown("Enter").defaultPrevented).toBe(true);
     keys("3");
     expect(keydown("Enter").defaultPrevented).toBe(true);
+  });
+});
+
+describe("Key Policy row 7 yields to a partial key", () => {
+  /** Runs an ex command through the command line, as the user does. */
+  function exCommand(line: string): void {
+    keys(":");
+    const cmdline = session.status.statusbar.querySelector("input")!;
+    cmdline.value = line;
+    cmdline.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", keyCode: 13, bubbles: true }));
+  }
+
+  // `go` is unbound upstream, so a beep and the engine's own "no such
+  // command" look alike from the Field; a mapping makes the difference visible.
+  beforeEach(() => {
+    session.destroy();
+    session = new Session(field, { vimrc: "nnoremap go A" });
+  });
+
+  afterEach(() => {
+    keydown("Escape");
+    exCommand("unmap go"); // mappings are global across every mirror
+  });
+
+  it("go is the engine's: with g pending, o completes a different command", () => {
+    keys("go");
+    expect(session.mode).toBe("insert");
+    expect(input.selectionStart).toBe("hello world".length);
   });
 });
 

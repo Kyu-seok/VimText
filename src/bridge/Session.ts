@@ -207,8 +207,9 @@ export class Session {
     if (isEscape(e) && plainNormal) return "pass-through"; // row 5: let the page see a 2nd Esc
     if (this.field.singleLine) {
       if (e.key === "Enter" && plainNormal && !e.ctrlKey && !e.metaKey) return "pass-through"; // row 6: submit
-      // Row 7: no line to open; a count is dropped with it. Visual o/O (other
-      // end) and a pending operator or partial key (do, go, "ao) are the engine's.
+      // Row 7: no line to open; a count or register prefix ("a, kept by the
+      // engine outside keyBuffer) is dropped with it. Visual o/O (other end)
+      // and a pending operator or partial key (do, go) are the engine's.
       const onlyCountPending = !operatorPending && /^\d*$/.test(buffered);
       if ((e.key === "o" || e.key === "O") && unmodified && normal && onlyCountPending) return "beep";
     }
