@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { FakeField } from "./FakeField";
 import { Session } from "../../src/bridge/Session";
 
@@ -52,6 +52,27 @@ describe("Controlled Field: synchronous rewrite inside the write", () => {
     // The page uppercases the restored text as it does any write; what matters
     // is that the deleted character is back and a second u has nothing to churn on.
     expect(field.value).toBe("HELLO WORLD");
+    keys("u");
+    expect(field.value).toBe("HELLO WORLD");
+  });
+
+  it("in Insert, a Ctrl-r paste and the page's rewrite of it are one undo step, however slow the page", () => {
+    start("hello world");
+    // The engine's history also groups adjacent changes made within 500 ms
+    // (engine seams: "History grouping"); a page that takes longer to rewrite
+    // shows the join is the bridge's doing.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    field.rewrite = (text) => {
+      vi.setSystemTime(Date.now() + 1000);
+      return { text: text.toUpperCase() };
+    };
+    keys("yiwA");
+    keydown("r", { ctrlKey: true });
+    keydown('"');
+    vi.useRealTimers();
+    expect(field.value).toBe("HELLO WORLDHELLO");
+    expect(session.mode).toBe("insert");
+    keydown("Escape");
     keys("u");
     expect(field.value).toBe("HELLO WORLD");
   });

@@ -319,8 +319,10 @@ export class Session {
       const head = Math.min(sel.head, text.length);
       let userEvent = provoked ? "input.type.compose" : "input.type";
       if (insert) {
-        userEvent =
-          this.firstInsertSync && !this.joinNextInsert ? "input.type.compose.start" : "input.type.compose";
+        // A provoked rewrite joins the engine change that provoked it (a Ctrl-r
+        // paste) even here; the rest of the Insert session then keeps joining.
+        const opensStep = this.firstInsertSync && !this.joinNextInsert && !provoked;
+        userEvent = opensStep ? "input.type.compose.start" : "input.type.compose";
         this.firstInsertSync = false;
       }
       const changes = view.state.changes({ from: start, to: endD, insert: text.slice(start, endT) });
