@@ -1,4 +1,4 @@
-import { test, expect, statusText, contentStatus } from "./extension";
+import { test, expect, statusText, contentStatus, activateAtStart } from "./extension";
 import type { Page } from "@playwright/test";
 
 // Disposal is prompt: a Session ends the moment its Field leaves the page or
@@ -117,14 +117,6 @@ test.describe("React fixture", () => {
     await page.waitForTimeout(150);
     await expect(page.locator("#in")).toHaveValue("the quick brown fox"); // React mounted
   });
-
-  async function activateAtStart(page: Page): Promise<void> {
-    const input = page.locator("#in");
-    await input.focus();
-    await input.evaluate((el: HTMLInputElement) => el.setSelectionRange(0, 0));
-    await page.keyboard.press("Escape");
-    expect(await statusText(page)).toContain("NORMAL");
-  }
 
   test("a re-mounted input is a new Field in the Start Mode with no undo history", async ({ page }) => {
     const input = page.locator("#in");

@@ -60,6 +60,15 @@ export function statusText(page: Page): Promise<string> {
   });
 }
 
+/** Focuses a Field, parks the caret at its start and Activates VimText with Esc. */
+export async function activateAtStart(page: Page, selector = "#in"): Promise<void> {
+  const field = page.locator(selector);
+  await field.focus();
+  await field.evaluate((el: HTMLInputElement | HTMLTextAreaElement) => el.setSelectionRange(0, 0));
+  await page.keyboard.press("Escape");
+  base.expect(await statusText(page)).toContain("NORMAL");
+}
+
 /** What the content script reports about a tab (the popup's `vimtext:status` query). */
 export interface ContentStatus {
   origin: string;

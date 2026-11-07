@@ -1,19 +1,12 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { FakeField } from "./FakeField";
 import { Session } from "../../src/bridge/Session";
+import { keyDriver } from "./keys";
 
 let field: FakeField;
 let session: Session;
 
-function keydown(key: string, init: Partial<KeyboardEventInit> = {}): KeyboardEvent {
-  const e = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, composed: true, ...init });
-  session.handleKeydown(e);
-  return e;
-}
-
-function keys(seq: string): void {
-  for (const ch of seq) keydown(ch);
-}
+const { keydown, keys } = keyDriver(() => session);
 
 /** A mask that keeps the Field four characters wide, padding with `_` (its own output is a fixed point). */
 function fourWide(text: string): { text: string } {

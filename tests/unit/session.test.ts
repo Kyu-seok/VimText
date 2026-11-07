@@ -1,20 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { TextareaField } from "../../src/field/TextareaField";
 import { Session } from "../../src/bridge/Session";
+import { keyDriver } from "./keys";
 
 let ta: HTMLTextAreaElement;
 let field: TextareaField;
 let session: Session;
 
-function keydown(key: string, init: Partial<KeyboardEventInit> = {}): KeyboardEvent {
-  const e = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, composed: true, ...init });
-  session.handleKeydown(e);
-  return e;
-}
-
-function keys(seq: string): void {
-  for (const ch of seq) keydown(ch);
-}
+const { keydown, keys } = keyDriver(() => session);
 
 /** Simulates the browser's native Insert-mode typing: value change + input event. */
 function typeNatively(text: string): void {

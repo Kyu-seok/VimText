@@ -1,20 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { TextareaField } from "../../src/field/TextareaField";
 import { Session } from "../../src/bridge/Session";
+import { keyDriver } from "./keys";
 
 let input: HTMLInputElement;
 let field: TextareaField;
 let session: Session;
 
-function keydown(key: string, init: Partial<KeyboardEventInit> = {}): KeyboardEvent {
-  const e = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, composed: true, ...init });
-  session.handleKeydown(e);
-  return e;
-}
-
-function keys(seq: string): void {
-  for (const ch of seq) keydown(ch);
-}
+const { keydown, keys } = keyDriver(() => session);
 
 beforeEach(() => {
   input = document.createElement("input");

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { TextareaField } from "../../src/field/TextareaField";
 import { Session } from "../../src/bridge/Session";
+import { keyDriver } from "./keys";
 
 // The page's view of a write: what a mask library or a framework's `onChange`
 // would read off the synthetic `input` event. Nothing here reaches into the engine.
@@ -20,15 +21,7 @@ function record(e: Event): void {
   seen.push({ inputType: ie.inputType, data: ie.data, bubbles: ie.bubbles });
 }
 
-function keydown(key: string, init: Partial<KeyboardEventInit> = {}): KeyboardEvent {
-  const e = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, composed: true, ...init });
-  session.handleKeydown(e);
-  return e;
-}
-
-function keys(seq: string): void {
-  for (const ch of seq) keydown(ch);
-}
+const { keydown, keys } = keyDriver(() => session);
 
 /** Simulates the browser's native Insert-mode typing: value change + input event. */
 function typeNatively(text: string): void {

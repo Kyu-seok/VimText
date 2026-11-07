@@ -1,4 +1,4 @@
-import { test, expect, statusText } from "./extension";
+import { test, expect, statusText, activateAtStart } from "./extension";
 import type { Page } from "@playwright/test";
 
 // A React 19 controlled input is a Controlled Field: React re-renders the
@@ -16,14 +16,6 @@ async function forceRerender(page: Page): Promise<void> {
   const before = Number(await page.locator("#renders").textContent());
   await page.evaluate(() => document.getElementById("rerender")!.click());
   await expect.poll(() => page.locator("#renders").textContent().then(Number)).toBeGreaterThan(before);
-}
-
-async function activateAtStart(page: Page): Promise<void> {
-  const input = page.locator("#in");
-  await input.focus();
-  await input.evaluate((el: HTMLInputElement) => el.setSelectionRange(0, 0));
-  await page.keyboard.press("Escape");
-  expect(await statusText(page)).toContain("NORMAL");
 }
 
 for (const [keys, expected] of [
