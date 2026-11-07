@@ -62,6 +62,17 @@ test.describe("textarea fixture", () => {
     await expect(input).toHaveValue("ello world");
   });
 
+  test("setting disabled disposes the Session; the Field's text is untouched", async ({ page }) => {
+    const input = page.locator("#in");
+    await activateAtStart(page);
+    await page.keyboard.type("x");
+    await expect(input).toHaveValue("ello world");
+    await input.evaluate((el: HTMLInputElement) => (el.disabled = true));
+    await expect.poll(() => hostCount(page)).toBe(0);
+    await expect(input).toHaveValue("ello world");
+    expect(await statusText(page)).toBe("");
+  });
+
   test("the lifecycle observer is connected only while a Session exists", async ({ context, page }) => {
     expect((await contentStatus(context)).observing).toBe(false); // an inert page costs nothing
     await page.locator("#ta").focus();
