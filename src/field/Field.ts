@@ -21,6 +21,7 @@ export interface Field {
   setSelection(anchor: number, head: number): void;
   focus(): void;
   blur(): void;
+  hasFocus(): boolean;
   /** Number of text lines that fit in the visible area (for Ctrl-d/u, zz, …). */
   visibleLineCount(): number;
   /** Fires on native user edits (typing, paste, native undo). Not on setValue(). */

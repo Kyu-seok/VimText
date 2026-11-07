@@ -33,6 +33,14 @@
         text-overflow: ellipsis;
         white-space: nowrap;
       }
+      .mode {
+        font:
+          12px ui-monospace,
+          Menlo,
+          monospace;
+        color: #444;
+        margin: 4px 0;
+      }
       a {
         color: #0b57d0;
         font-size: 12px;
@@ -43,6 +51,7 @@
     <h1>VimText</h1>
     <label><input type="checkbox" id="enabled" /> Enabled everywhere</label>
     <div class="origin" id="origin"></div>
+    <div class="mode" id="mode"></div>
     <label
       >This site
       <select id="policy">

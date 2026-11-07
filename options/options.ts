@@ -1,5 +1,6 @@
 import {
   loadSettings,
+  setSitePolicy,
   updateSettings,
   watchSettings,
   type Settings,
@@ -40,21 +41,11 @@ function renderSites(settings: Settings): void {
     sel.value = settings.sites[origin]!;
     sel.addEventListener(
       "change",
-      () =>
-        void updateSettings((s) => {
-          if (sel.value === "insert") delete s.sites[origin];
-          else s.sites[origin] = sel.value as SitePolicy;
-        }),
+      () => void updateSettings((s) => setSitePolicy(s, origin, sel.value as SitePolicy)),
     );
     const remove = document.createElement("button");
     remove.textContent = "Remove";
-    remove.addEventListener(
-      "click",
-      () =>
-        void updateSettings((s) => {
-          delete s.sites[origin];
-        }),
-    );
+    remove.addEventListener("click", () => void updateSettings((s) => setSitePolicy(s, origin, "insert")));
     const c2 = document.createElement("td");
     c2.appendChild(sel);
     const c3 = document.createElement("td");

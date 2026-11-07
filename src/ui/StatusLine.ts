@@ -66,11 +66,6 @@ export class StatusLine {
     window.addEventListener("resize", this.reposition, { passive: true });
   }
 
-  /** True while the engine's `:`/`/` dialog input lives inside the bar. */
-  dialogOpen(): boolean {
-    return !!this.statusbar.querySelector("input");
-  }
-
   setMode(mode: string): void {
     this.bar.classList.toggle("insert", mode === "insert");
   }

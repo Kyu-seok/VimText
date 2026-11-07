@@ -23,6 +23,12 @@ export function policyFor(settings: Settings, origin: string): SitePolicy {
   return settings.sites[origin] ?? "insert";
 }
 
+/** "insert" is the default, so choosing it forgets the origin rather than storing it. */
+export function setSitePolicy(settings: Settings, origin: string, policy: SitePolicy): void {
+  if (policy === "insert") delete settings.sites[origin];
+  else settings.sites[origin] = policy;
+}
+
 function merge(stored: Partial<Settings> | undefined): Settings {
   return {
     ...DEFAULT_SETTINGS,

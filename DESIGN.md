@@ -47,7 +47,8 @@ documented escape hatch (ADR 0001).
 - _Insert_: the real Field owns typing (IME, autocomplete, site handlers all native). The
   mirror follows via `input` events. VimText intercepts only the mode-switch keys (`Esc`,
   `Ctrl+[`) and a whitelist of Vim insert keys: `Ctrl-o`, `Ctrl-r {reg}`, `Ctrl-u`, and
-  `Ctrl-w` where the platform lets a page see it.
+  `Ctrl-w` where the platform lets a page see it. While the engine is waiting for the rest
+  of a whitelisted key (the register after `Ctrl-r`), the keys that complete it are its too.
 - _Every other Mode_ (Normal, Visual ×3, Replace, Command-line): the engine owns the text.
   VimText writes through to the Field with the native value setter + synthetic `input`
   event (framework-safe; React/Vue-controlled inputs keep our edits).
@@ -56,13 +57,15 @@ documented escape hatch (ADR 0001).
   change. The Field is the truth whenever they disagree.
 
 **Undo.** `u` / `Ctrl-r` use the engine's history, grouped per Vim change. Native undo is
-left alone in Insert mode and not bound in other Modes. One history.
+left alone in Insert mode; in other Modes the browser's undo/redo shortcuts (`Cmd/Ctrl+Z`,
+`Cmd+Shift+Z`, `Ctrl+Y`) are swallowed so the page's history never diverges from the
+engine's. One history.
 
 **Key policy in non-Insert Modes** (capture phase on the Field):
 
 1. Keys the engine knows: consumed.
 2. Printable keys the engine doesn't know: swallowed (Vim beeps).
-3. Cmd/Ctrl combos the engine doesn't bind: Pass-through (Cmd+C/V/X, Cmd/Ctrl+Enter, Cmd+W, Cmd+L…).
+3. Cmd/Ctrl combos the engine doesn't bind: Pass-through (Cmd+C/V/X, Cmd/Ctrl+Enter, Cmd+W, Cmd+L…), except the undo/redo shortcuts above.
 4. `Tab`/`Shift+Tab`: Pass-through (focus navigation).
 5. `Esc`/`Ctrl+[` while already in Normal: Pass-through (lets site modals close on 2nd press).
 6. `Enter` in a single-line input in Normal: Pass-through (submits). In a textarea it is the Vim motion.
@@ -86,7 +89,7 @@ write on yank, read at paste time). The unnamed register never touches the clipb
 Cmd+V in Normal is a Pass-through.
 
 **Ex extras.** `:w` → notification no-op, never submits. `:q`/`:q!` → blur the Field.
-`:wq`/`:x` → `:w` then `:q`. VimText never discards Field text.
+`:wq`/`:x` → `:w` then `:q`; the Status Line stays until the `:w` notice closes. VimText never discards Field text.
 
 **Session State** (`chrome.storage.session`, shared by all tabs/frames): registers, macros,
 search + command history, vimrc mappings. Per Field: marks, undo.

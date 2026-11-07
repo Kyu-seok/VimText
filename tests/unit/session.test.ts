@@ -69,6 +69,15 @@ describe("Normal mode editing", () => {
     expect(keydown("c", { metaKey: true }).defaultPrevented).toBe(false);
   });
 
+  it("swallows the browser's undo and redo shortcuts so the engine keeps one history", () => {
+    keys("x");
+    expect(keydown("z", { metaKey: true }).defaultPrevented).toBe(true);
+    expect(keydown("z", { ctrlKey: true }).defaultPrevented).toBe(true);
+    expect(keydown("z", { metaKey: true, shiftKey: true }).defaultPrevented).toBe(true);
+    expect(keydown("y", { ctrlKey: true }).defaultPrevented).toBe(true);
+    expect(ta.value).toMatch(/^he quick/);
+  });
+
   it("lets a second Esc through to the page", () => {
     expect(keydown("Escape").defaultPrevented).toBe(false);
     keys("d");
@@ -100,6 +109,14 @@ describe("Insert mode", () => {
     expect(ta.value).toMatch(/^slow quick brown/);
     keys("u");
     expect(ta.value).toMatch(/^the quick brown/);
+  });
+
+  it("Ctrl-r {register} pastes the register", () => {
+    keys("yiwA");
+    keydown("r", { ctrlKey: true });
+    expect(keydown('"').defaultPrevented).toBe(true);
+    expect(ta.value).toMatch(/^the quick brown foxthe\n/);
+    expect(session.mode).toBe("insert");
   });
 
   it("Ctrl-w and Ctrl-u are Vim keys even in Insert mode", () => {

@@ -7,20 +7,33 @@ export interface SessionConfig {
   vimrc: string;
 }
 
-/** Keys VimText takes from the Field while in Insert mode. Everything else is native. */
-function isInsertModeVimKey(e: KeyboardEvent): boolean {
-  if (e.key === "Escape") return true;
-  if (!e.ctrlKey || e.metaKey || e.altKey) return false;
-  return e.key === "[" || e.key === "o" || e.key === "r" || e.key === "u" || e.key === "w";
+/** `Esc` or its Vim twin `Ctrl+[`. */
+function isEscape(e: KeyboardEvent): boolean {
+  return e.key === "Escape" || (e.ctrlKey && !e.metaKey && !e.altKey && e.key === "[");
 }
 
+/** Keys VimText takes from the Field while in Insert mode. Everything else is native. */
+function isInsertModeVimKey(e: KeyboardEvent): boolean {
+  if (isEscape(e)) return true;
+  if (!e.ctrlKey || e.metaKey || e.altKey) return false;
+  return e.key === "o" || e.key === "r" || e.key === "u" || e.key === "w";
+}
+
+/** The browser's own undo/redo. Outside Insert the engine's history is the only one. */
+function isNativeHistoryKey(e: KeyboardEvent): boolean {
+  if (e.altKey || !(e.ctrlKey || e.metaKey)) return false;
+  const k = e.key.toLowerCase();
+  return k === "z" || (e.ctrlKey && k === "y");
+}
+
+/** The key that Activates VimText on a Field with Site Policy "insert". */
 export function isActivationKey(e: KeyboardEvent): boolean {
-  return e.key === "Escape" || (e.ctrlKey && !e.metaKey && !e.altKey && e.key === "[");
+  return isEscape(e);
 }
 
 /** The adapter maps <C-[> to <Esc> itself, but normalising here keeps the policy checks simple. */
 function toEngineKey(e: KeyboardEvent): KeyLike {
-  const esc = e.key === "Escape" || (e.ctrlKey && e.key === "[");
+  const esc = isEscape(e);
   return {
     key: esc ? "Escape" : e.key,
     code: e.code,
@@ -48,12 +61,16 @@ function defineExCommands(): void {
     defineEx(name: string, prefix: string | undefined, fn: (cm: any, params: any) => void): void;
   };
   const session = (cm: any): Session | undefined => cm.state.vimtextSession;
-  V.defineEx("write", "w", (cm) =>
-    session(cm)?.mirror.notify("VimText: nothing to write (the page owns saving)", 2500),
-  );
+  const write = (cm: any) =>
+    session(cm)?.mirror.notify("VimText: nothing to write (the page owns saving)", 2500);
+  const writeQuit = (cm: any) => {
+    write(cm);
+    session(cm)?.leave();
+  };
+  V.defineEx("write", "w", write);
   V.defineEx("quit", "q", (cm) => session(cm)?.leave());
-  V.defineEx("wq", undefined, (cm) => session(cm)?.leave());
-  V.defineEx("xit", "x", (cm) => session(cm)?.leave());
+  V.defineEx("wq", undefined, writeQuit);
+  V.defineEx("xit", "x", writeQuit);
 }
 
 /**
@@ -70,6 +87,8 @@ export class Session {
   private destroyed = false;
   private syncing = false;
   private renderQueued = false;
+  /** Set by `:wq`/`:x`: the Status Line shows the `:w` notice after the Field blurs. */
+  private noticeOutlivesBlur = false;
   /** The Field selection we last wrote; anything else means the user moved the caret. */
   private lastRendered: { anchor: number; head: number } | null = null;
 
@@ -91,6 +110,7 @@ export class Session {
     });
     (this.mirror.cm.state as any).vimtextSession = this;
     this.mirror.cm.on("vim-mode-change", this.onModeChange);
+    this.mirror.cm.on("dialog", this.onDialogChange);
     this.mirror.onUpdate((docChanged, selectionSet) => {
       // Ex commands typed into the command line (:s, :g, :sort, …) and the
       // engine's own async work change the mirror outside handleKeydown.
@@ -129,7 +149,10 @@ export class Session {
     const vim = this.mirror.vim;
 
     if (this.nativeInsert) {
-      if (!isInsertModeVimKey(e)) return; // native typing
+      // A whitelisted key may leave the engine waiting for more (<C-r> wants a
+      // register); the keys that complete it are the engine's too.
+      const pendingInsert = vim.inputState.keyBuffer.length > 0;
+      if (!pendingInsert && !isInsertModeVimKey(e)) return; // native typing
       this.syncFromField();
       this.dispatchToEngine(e);
       return;
@@ -142,7 +165,7 @@ export class Session {
 
     if (e.key === "Tab" && !e.ctrlKey && !e.metaKey && !e.altKey) return; // focus navigation
     if (e.key === "Enter" && this.field.singleLine && plainNormal && !e.ctrlKey && !e.metaKey) return; // submit
-    const esc = e.key === "Escape" || (e.ctrlKey && e.key === "[");
+    const esc = isEscape(e);
     if (esc && plainNormal) return; // let the page see a 2nd Esc
 
     this.dispatchToEngine(e);
@@ -171,7 +194,10 @@ export class Session {
     if (handled) {
       e.preventDefault();
       e.stopPropagation();
-    } else if (!this.nativeInsert && !e.ctrlKey && !e.metaKey && e.key.length === 1) {
+    } else if (
+      !this.nativeInsert &&
+      (isNativeHistoryKey(e) || (!e.ctrlKey && !e.metaKey && e.key.length === 1))
+    ) {
       e.preventDefault(); // Vim beeps at unknown printable keys; the page never sees them
       e.stopPropagation();
     }
@@ -186,6 +212,13 @@ export class Session {
   private onModeChange = (): void => {
     if (this.destroyed) return;
     this.status.setMode(this.mode);
+  };
+
+  /** After `:wq`, the `:w` notice outlives the Field's focus; the bar hides once it closes. */
+  private onDialogChange = (): void => {
+    if (this.destroyed || !this.noticeOutlivesBlur || this.mirror.dialog) return;
+    this.noticeOutlivesBlur = false;
+    if (!this.field.hasFocus()) this.status.hide();
   };
 
   /**
@@ -300,8 +333,9 @@ export class Session {
 
   onBlur(): void {
     if (this.destroyed) return;
-    // Keep the bar while the command line has focus; it lives in our shadow root.
-    if (this.status.dialogOpen()) return;
+    // Keep the bar while the command line has focus (it lives in our shadow
+    // root) or `:wq` is leaving behind its notice.
+    if (this.mirror.commandLineOpen() || this.noticeOutlivesBlur) return;
     this.status.hide();
   }
 
@@ -309,8 +343,9 @@ export class Session {
   leave(): void {
     // The engine re-focuses the Field when its dialog closes; blur after that.
     queueMicrotask(() => {
+      this.noticeOutlivesBlur = !!this.mirror.dialog;
       this.field.blur();
-      this.status.hide();
+      if (!this.noticeOutlivesBlur) this.status.hide();
     });
   }
 
@@ -318,6 +353,7 @@ export class Session {
     if (this.destroyed) return;
     this.destroyed = true;
     this.mirror.cm.off("vim-mode-change", this.onModeChange);
+    this.mirror.cm.off("dialog", this.onDialogChange);
     this.stopInput();
     this.mirror.destroy();
     this.status.destroy();

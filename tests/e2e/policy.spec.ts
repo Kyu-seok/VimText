@@ -63,4 +63,5 @@ test("popup reports the origin and mode of the focused Field", async ({ context,
   await page.bringToFront();
   await popup.reload();
   await expect(popup.locator("#origin")).toHaveText("http://localhost:4173");
+  await expect(popup.locator("#mode")).toHaveText("NORMAL");
 });

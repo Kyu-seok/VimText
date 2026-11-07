@@ -101,6 +101,19 @@ test(":q leaves the field; refocus resumes Normal", async ({ page }) => {
   await expect(ta).toHaveValue(/^he quick/);
 });
 
+for (const cmd of [":wq", ":x"]) {
+  test(`${cmd} says the page owns saving, then leaves the field`, async ({ page }) => {
+    const ta = page.locator("#ta");
+    await ta.focus();
+    await page.keyboard.press("Escape");
+    await page.keyboard.type(cmd);
+    await page.keyboard.press("Enter");
+    await expect(ta).not.toBeFocused();
+    expect(await statusText(page)).toContain("nothing to write");
+    await expect.poll(() => statusText(page), { timeout: 5000 }).toBe(""); // notice closes, bar hides
+  });
+}
+
 test("single-line input: Enter submits in Normal, j/k are no-ops", async ({ page }) => {
   const input = page.locator("#in");
   await input.focus();

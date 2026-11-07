@@ -149,6 +149,16 @@ export class Mirror {
     (Vim as unknown as { handleEx(cm: VimCM, input: string): void }).handleEx(this.cm, line);
   }
 
+  /** The engine's open command line or notice, if any. */
+  get dialog(): HTMLElement | null {
+    return this.cm.state.dialog ?? null;
+  }
+
+  /** True while the `:` `/` `?` input is open (it takes focus from the Field). */
+  commandLineOpen(): boolean {
+    return !!this.dialog?.querySelector("input");
+  }
+
   notify(text: string, durationMs = 4000): void {
     const span = document.createElement("span");
     span.textContent = text;

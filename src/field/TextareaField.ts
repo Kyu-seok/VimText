@@ -57,6 +57,10 @@ export class TextareaField implements Field {
     this.element.setSelectionRange(Math.min(a, h), Math.max(a, h), h < a ? "backward" : "forward");
   }
 
+  hasFocus(): boolean {
+    return this.element.matches(":focus");
+  }
+
   focus(): void {
     this.element.focus({ preventScroll: true });
   }
