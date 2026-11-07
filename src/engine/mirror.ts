@@ -5,7 +5,7 @@ import { vim, getCM, Vim } from "@replit/codemirror-vim";
 import type { WrappingStyle } from "../field/Field";
 
 /** The slice of the adapter's CM5-style object the bridge relies on. */
-export interface VimCM {
+interface VimCM {
   state: {
     vim?: VimState | null;
     statusbar?: Element | null;
@@ -20,7 +20,7 @@ export interface VimCM {
   openNotification(template: Node, options: { bottom?: boolean; duration?: number }): () => void;
 }
 
-export interface VimState {
+interface VimState {
   insertMode: boolean;
   visualMode: boolean;
   visualLine: boolean;
@@ -31,7 +31,7 @@ export interface VimState {
   inputState: { keyBuffer: string[]; operator: string | null | undefined; prefixRepeat: string[] };
 }
 
-export interface VimPlugin {
+interface VimPlugin {
   handleKey(e: KeyLike, view: EditorView): boolean;
   updateStatus(): void;
 }
@@ -48,7 +48,7 @@ export interface KeyLike {
   stopPropagation(): void;
 }
 
-export interface MirrorOptions {
+interface MirrorOptions {
   /** Element (inside VimText's shadow root) to mount the hidden view in. */
   container: HTMLElement;
   /** The Field's real element; the engine attaches its Insert-mode key recorder here. */
@@ -128,10 +128,6 @@ export class Mirror {
     content.style.overflowWrap = style.overflowWrap;
     content.style.tabSize = style.tabSize;
     this.view.dom.style.width = `${style.contentWidth}px`;
-  }
-
-  setHeight(px: number): void {
-    this.view.dom.style.height = `${Math.max(16, px)}px`;
   }
 
   onUpdate(handler: (docChanged: boolean, selectionSet: boolean) => void): () => void {

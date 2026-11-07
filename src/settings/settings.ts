@@ -43,7 +43,7 @@ export async function loadSettings(): Promise<Settings> {
   return merge(stored.settings);
 }
 
-export async function saveSettings(settings: Settings): Promise<void> {
+async function saveSettings(settings: Settings): Promise<void> {
   await chrome.storage.sync.set({ settings });
 }
 

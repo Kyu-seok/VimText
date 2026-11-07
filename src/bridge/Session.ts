@@ -3,7 +3,7 @@ import type { Field } from "../field/Field";
 import { Mirror, Vim, type KeyLike } from "../engine/mirror";
 import { StatusLine } from "../ui/StatusLine";
 
-export interface SessionConfig {
+interface SessionConfig {
   vimrc: string;
 }
 

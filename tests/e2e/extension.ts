@@ -48,24 +48,6 @@ export async function setSettings(context: BrowserContext, settings: object): Pr
   await page.close();
 }
 
-/** Field value, hidden-mirror text, and Status Line text: the three things that disagree when the bridge is wrong. */
-export function snapshot(
-  page: Page,
-  selector = "#ta",
-): Promise<{ field: string; mirror: string; status: string; active: string }> {
-  return page.evaluate((selector) => {
-    const host = document.querySelector("vimtext-status") as HTMLElement | null;
-    const sr = host?.shadowRoot;
-    const el = document.querySelector(selector) as HTMLTextAreaElement | HTMLInputElement | null;
-    return {
-      field: el?.value ?? "",
-      mirror: sr?.querySelector(".cm-content")?.textContent ?? "",
-      status: host && host.style.display !== "none" ? (sr?.querySelector(".bar")?.textContent ?? "") : "",
-      active: `${document.activeElement?.tagName ?? ""}>${sr?.activeElement?.tagName ?? ""}`,
-    };
-  }, selector);
-}
-
 /** The Status Line host VimText injects next to an activated Field. */
 export function statusText(page: Page): Promise<string> {
   return page.evaluate(() => {

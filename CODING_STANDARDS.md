@@ -11,6 +11,7 @@ Read during review. Terms as defined in `GLOSSARY.md`.
 
 ## Mechanical
 
-Enforced by `tools/check-imports.mjs` in `npm run check`, listed here so the reviewer knows it is covered:
+Enforced in `npm run check`, listed here so the reviewer knows it is covered:
 
-- `@replit/codemirror-vim` and `@codemirror/{view,commands,language,search}` are imported only under `src/engine/`. `@codemirror/state` is shared vocabulary (positions, selections) and may be used anywhere in `src/`.
+- `tools/check-imports.mjs`: `@replit/codemirror-vim` and `@codemirror/{view,commands,language,search}` are imported only under `src/engine/`. `@codemirror/state` is shared vocabulary (positions, selections) and may be used anywhere in `src/`.
+- `knip` (`knip.json`): no unused files, exports, exported types, or dependencies. It does not see unused interface or class members; those stay a reviewer's call.
