@@ -1,9 +1,9 @@
-import { test, expect, statusText, setSettings } from "./extension";
+import { test, expect, statusText, setSettings, fixtureOrigin } from "./extension";
 
 test("Site Policy 'normal' activates on focus", async ({ context, page }) => {
   await setSettings(context, {
     enabled: true,
-    sites: { "http://localhost:4173": "normal" },
+    sites: { [fixtureOrigin]: "normal" },
     vimrc: "",
     plugins: {},
   });
@@ -18,7 +18,7 @@ test("Site Policy 'normal' activates on focus", async ({ context, page }) => {
 test("Site Policy 'off' makes Esc a plain key", async ({ context, page }) => {
   await setSettings(context, {
     enabled: true,
-    sites: { "http://localhost:4173": "off" },
+    sites: { [fixtureOrigin]: "off" },
     vimrc: "",
     plugins: {},
   });
@@ -62,6 +62,6 @@ test("popup reports the origin and mode of the focused Field", async ({ context,
   // The popup queries the active tab; make the fixture page the active one.
   await page.bringToFront();
   await popup.reload();
-  await expect(popup.locator("#origin")).toHaveText("http://localhost:4173");
+  await expect(popup.locator("#origin")).toHaveText(fixtureOrigin);
   await expect(popup.locator("#mode")).toHaveText("NORMAL");
 });

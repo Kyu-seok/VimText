@@ -6,6 +6,9 @@ import { createHash } from "node:crypto";
 
 const dist = resolve("dist");
 
+/** The fixture server's origin (see playwright.config.ts for the port). */
+export const fixtureOrigin = `http://localhost:${process.env.VIMTEXT_E2E_PORT ?? "4173"}`;
+
 /** Launches Chromium with the built extension loaded (needs `npm run build` first). */
 export const test = base.extend<{ context: BrowserContext; page: Page }>({
   context: async ({}, use) => {
