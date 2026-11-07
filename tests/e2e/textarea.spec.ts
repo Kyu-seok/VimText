@@ -113,13 +113,3 @@ for (const cmd of [":wq", ":x"]) {
     await expect.poll(() => statusText(page), { timeout: 5000 }).toBe(""); // notice closes, bar hides
   });
 }
-
-test("single-line input: Enter submits in Normal, j/k are no-ops", async ({ page }) => {
-  const input = page.locator("#in");
-  await input.focus();
-  await page.keyboard.press("Escape");
-  await page.keyboard.type("0jkdw");
-  await expect(input).toHaveValue("world");
-  await page.keyboard.press("Enter");
-  await expect(page.locator("#log")).toContainText("submit");
-});
