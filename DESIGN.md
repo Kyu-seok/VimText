@@ -93,6 +93,10 @@ reaches them:
 7. `o`/`O` on a Single-line Field in Normal: swallowed as a Vim beep, pending count cleared.
    Visual-mode `o`/`O` (other end of the selection) keep working.
 
+A plain `Enter` the engine reports unhandled in Normal or Visual (a failed motion such as
+`d<CR>` on the last line) is swallowed on every Field, so a half-typed command never submits
+a form or inserts a newline. Cmd/Ctrl+Enter stay row-3 Pass-through.
+
 **Lifecycle.** Engine + mirror are created lazily on Activation (first `Esc`/`Ctrl+[`
 while focused), never on focus. They live while the element stays in the DOM; refocusing
 resumes the last Mode. Element removed → destroyed (marks and undo gone), promptly, via a
@@ -162,8 +166,9 @@ push/PR · MIT · version restarts at 0.1.0. Upstream engine tests are not re-ru
 - On a Controlled Field that reformats every edit, the cursor may jump to where the page put
   the caret. A page that rewrites asynchronously leaves its rewrite as a separate undo step,
   so `u` can appear to do nothing there. On a page that filters every write (an uppercase
-  filter), `u` restores the pre-edit text in the page's form, and the page's rewrite of that
-  restored text is a new change, so the redo of the undone edit is gone.
+  filter), the first `u` restores the pre-edit text in the page's form; the page's rewrite of
+  that restored text is a new change, so redo is gone and every further `u` appears to do
+  nothing (it undoes the rewrite, which the page applies again).
 - Fields that reformat in a `setTimeout` or set `.value` with no event are only reconciled on
   the next keystroke; the block cursor is gone until then.
 

@@ -34,7 +34,7 @@ function dispose(el: TextControl): void {
   if (sessions.size === 0) stopObservingLifecycle();
 }
 
-// Disposal is prompt (decision record #8): a Session ends when its Field leaves
+// Disposal is prompt (decision record on issue #8): a Session ends when its Field leaves
 // the page (framework re-mounts included) or stops qualifying (readonly,
 // disabled, type changed to password), not on the next focus change elsewhere.
 // The observer runs only while a Session exists, so an inert page costs nothing.
