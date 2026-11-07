@@ -159,7 +159,9 @@ push/PR · MIT · version restarts at 0.1.0. Upstream engine tests are not re-ru
   passes the key through). `u` restores the text.
 - On a Controlled Field that reformats every edit, the cursor may jump to where the page put
   the caret. A page that rewrites asynchronously leaves its rewrite as a separate undo step,
-  so `u` can appear to do nothing there.
+  so `u` can appear to do nothing there. On a page that filters every write (an uppercase
+  filter), `u` restores the pre-edit text in the page's form, and the page's rewrite of that
+  restored text is a new change, so the redo of the undone edit is gone.
 - Fields that reformat in a `setTimeout` or set `.value` with no event are only reconciled on
   the next keystroke; the block cursor is gone until then.
 

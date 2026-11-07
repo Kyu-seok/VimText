@@ -1,0 +1,49 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>VimText fixture: Single-line Fields</title>
+    <style>
+      body {
+        font-family: system-ui;
+        margin: 40px;
+      }
+      input {
+        width: 320px;
+        font:
+          14px Menlo,
+          monospace;
+      }
+      #log {
+        font: 12px monospace;
+        color: #555;
+        white-space: pre;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>VimText fixture: Single-line Fields</h1>
+    <form
+      id="form"
+      onsubmit="
+        event.preventDefault();
+        document.getElementById('log').textContent += 'submit\n';
+      "
+    >
+      <p>
+        <label>Text <input id="in" type="text" value="hello world" /></label>
+      </p>
+      <p>
+        <label>Search <input id="search" type="search" value="find me" /></label>
+      </p>
+      <!-- Two text fields need a submit button for Enter to submit (no implicit submission otherwise). -->
+      <p><button type="submit">Go</button></p>
+    </form>
+    <div id="log"></div>
+    <script>
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") document.getElementById("log").textContent += "page-esc\n";
+      });
+    </script>
+  </body>
+</html>

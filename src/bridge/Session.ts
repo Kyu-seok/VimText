@@ -87,10 +87,14 @@ export class Session {
   private destroyed = false;
   private syncing = false;
   private renderQueued = false;
+  /** Set when the queued render carries a text change; cleared when the render lands or drops it. */
+  private queuedDocChange = false;
   /** Set by `:wq`/`:x`: the Status Line shows the `:w` notice after the Field blurs. */
   private noticeOutlivesBlur = false;
   /** The Field selection we last wrote; anything else means the user moved the caret. */
   private lastRendered: { anchor: number; head: number } | null = null;
+  /** The Field text the bridge last wrote or agreed with; anything else means the page changed the Field. */
+  private lastText: string | null = null;
 
   constructor(
     readonly field: Field,
@@ -114,7 +118,9 @@ export class Session {
     this.mirror.onUpdate((docChanged, selectionSet) => {
       // Ex commands typed into the command line (:s, :g, :sort, …) and the
       // engine's own async work change the mirror outside handleKeydown.
-      if (!this.syncing && (docChanged || selectionSet)) this.scheduleRender();
+      if (this.syncing || !(docChanged || selectionSet)) return;
+      if (docChanged) this.queuedDocChange = true;
+      this.scheduleRender();
     });
     this.stopInput = field.onInput(this.onFieldInput);
     this.runVimrc(config.vimrc);
@@ -160,21 +166,61 @@ export class Session {
 
     // Engine-owned Modes. The Field is the truth if the page changed it behind our back.
     this.syncFromField();
-    const pending = vim.inputState.keyBuffer.length > 0 || !!vim.inputState.operator;
-    const plainNormal = !vim.insertMode && !vim.visualMode && !pending;
-
-    if (e.key === "Tab" && !e.ctrlKey && !e.metaKey && !e.altKey) return; // focus navigation
-    if (e.key === "Enter" && this.field.singleLine && plainNormal && !e.ctrlKey && !e.metaKey) return; // submit
-    const esc = isEscape(e);
-    if (esc && plainNormal) return; // let the page see a 2nd Esc
+    const policy = this.keyPolicy(e);
+    if (policy === "pass-through") return;
+    if (policy === "beep") {
+      this.beep();
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
 
     this.dispatchToEngine(e);
-    if (esc) {
+    if (isEscape(e)) {
       // The engine reports Esc in Normal as unhandled even when it cancelled a
       // pending operator or count; the page must not see that press.
       e.preventDefault();
       e.stopPropagation();
     }
+  }
+
+  /**
+   * The Key Policy rows decided before the engine sees a key (DESIGN.md "Key
+   * Policy" rows 4–7); a vimrc mapping never reaches them. Everything else is
+   * the engine's call.
+   */
+  private keyPolicy(e: KeyboardEvent): "engine" | "pass-through" | "beep" {
+    const vim = this.mirror.vim;
+    const buffered = vim.inputState.keyBuffer.join(""); // a count ("3") or a partial key ("g", '"')
+    const operatorPending = !!vim.inputState.operator;
+    const pending = buffered.length > 0 || operatorPending;
+    const normal = !vim.insertMode && !vim.visualMode;
+    const plainNormal = normal && !pending;
+    const unmodified = !e.ctrlKey && !e.metaKey && !e.altKey;
+
+    if (e.key === "Tab" && unmodified) return "pass-through"; // row 4: focus navigation
+    if (isEscape(e) && plainNormal) return "pass-through"; // row 5: let the page see a 2nd Esc
+    if (this.field.singleLine) {
+      if (e.key === "Enter" && plainNormal && !e.ctrlKey && !e.metaKey) return "pass-through"; // row 6: submit
+      // Row 7: no line to open; a count is dropped with it. Visual o/O (other
+      // end) and a pending operator or partial key (do, go, "ao) are the engine's.
+      const onlyCountPending = !operatorPending && /^\d*$/.test(buffered);
+      if ((e.key === "o" || e.key === "O") && unmodified && normal && onlyCountPending) return "beep";
+    }
+    return "engine";
+  }
+
+  /** Vim's beep: the pending count is dropped and the Status Line's pending keys clear. */
+  private beep(): void {
+    this.mirror.handleKey({
+      key: "Escape",
+      ctrlKey: false,
+      altKey: false,
+      metaKey: false,
+      shiftKey: false,
+      preventDefault() {},
+      stopPropagation() {},
+    });
   }
 
   private dispatchToEngine(e: KeyboardEvent): void {
@@ -196,9 +242,12 @@ export class Session {
       e.stopPropagation();
     } else if (
       !this.nativeInsert &&
-      (isNativeHistoryKey(e) || (!e.ctrlKey && !e.metaKey && e.key.length === 1))
+      (isNativeHistoryKey(e) || (!e.ctrlKey && !e.metaKey && (e.key.length === 1 || e.key === "Enter")))
     ) {
-      e.preventDefault(); // Vim beeps at unknown printable keys; the page never sees them
+      // Vim beeps at unknown printable keys and at a motion that fails (d<CR> on
+      // a one-line document); the page never sees them, so a half-typed command
+      // cannot submit a form or put a newline in a textarea.
+      e.preventDefault();
       e.stopPropagation();
     }
     this.render();
@@ -238,12 +287,19 @@ export class Session {
     }
   }
 
-  private syncFromFieldInner(): void {
+  /**
+   * @param provoked The Field's text is the page's answer to the change the
+   *   mirror just made (a Controlled Field's rewrite): it joins that change's
+   *   undo step, or `u` would undo the rewrite, the page would rewrite again,
+   *   and undo would never move.
+   */
+  private syncFromFieldInner(provoked = false): void {
     const view = this.mirror.view;
     const text = this.field.getValue();
     const doc = view.state.doc.toString();
     const sel = this.field.getSelection();
     const insert = this.mirror.vim.insertMode;
+    this.lastText = text;
 
     if (text !== doc) {
       let start = 0;
@@ -256,7 +312,7 @@ export class Session {
         endD--;
       }
       const head = Math.min(sel.head, text.length);
-      let userEvent = "input.type";
+      let userEvent = provoked ? "input.type.compose" : "input.type";
       if (insert) {
         userEvent =
           this.firstInsertSync && !this.joinNextInsert ? "input.type.compose.start" : "input.type.compose";
@@ -290,6 +346,16 @@ export class Session {
     }
   }
 
+  /** Syncs from inside the render path, where the mirror's updates must not queue another render. */
+  private syncWhileRendering(provoked: boolean): void {
+    this.syncing = true;
+    try {
+      this.syncFromFieldInner(provoked);
+    } finally {
+      this.syncing = false;
+    }
+  }
+
   /** What the Field's selection should look like for the mirror's current state. */
   private renderedSelection(): { anchor: number; head: number } {
     const state = this.mirror.view.state;
@@ -310,15 +376,56 @@ export class Session {
     });
   }
 
+  /**
+   * The mirror of a Single-line Field never holds a newline. An engine dispatch
+   * that left one (linewise `p`, `:put`, `Ctrl-r` with a multi-line register,
+   * `:s/x/\r/`) is stripped as the input's own value sanitization would, in a
+   * change joined to that command's undo step (userEvent `input.type.compose`,
+   * see the undo-grouping seam in docs/engine-seams.md). Not an engine mapping:
+   * those are global across every mirror.
+   */
+  private enforceSingleLine(): void {
+    if (!this.field.singleLine) return;
+    const view = this.mirror.view;
+    const doc = view.state.doc;
+    if (doc.lines === 1) return;
+    const changes = view.state.changes(
+      Array.from({ length: doc.lines - 1 }, (_, i) => {
+        const to = doc.line(i + 1).to;
+        return { from: to, to: to + 1 };
+      }),
+    );
+    // Our own dispatch, like a sync: the caller renders, nothing to schedule.
+    this.syncing = true;
+    try {
+      view.dispatch({ changes, userEvent: "input.type.compose" });
+    } finally {
+      this.syncing = false;
+    }
+  }
+
   /** Writes the engine's text and cursor into the Field. */
   render(): void {
     this.renderQueued = false;
     if (this.destroyed) return;
+    if (this.lastText !== null && this.field.getValue() !== this.lastText) {
+      // The page changed the Field since we last agreed with it (rule 1): the
+      // Field wins, and the engine's change we were about to write is dropped,
+      // folded into the Field's text so `u` never brings it back.
+      this.syncWhileRendering(this.queuedDocChange);
+    }
+    this.queuedDocChange = false;
+    this.enforceSingleLine();
     const text = this.mirror.view.state.doc.toString();
-    if (text !== this.field.getValue()) this.field.setValue(text);
+    if (text !== this.field.getValue()) {
+      this.field.setValue(text);
+      // A Controlled Field rewrote the text inside the write; the Field is the truth.
+      if (this.field.getValue() !== text) this.syncWhileRendering(true);
+    }
     const sel = this.renderedSelection();
     this.field.setSelection(sel.anchor, sel.head);
     this.lastRendered = this.field.getSelection();
+    this.lastText = this.field.getValue();
     this.status.setMode(this.mode);
     this.status.reposition();
   }
