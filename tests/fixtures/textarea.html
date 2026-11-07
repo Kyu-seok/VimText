@@ -60,8 +60,20 @@ third line here</textarea>
         show password
       </button>
     </p>
+    <!-- A web component: its textarea lives in an open shadow root, where no document-level observer looks. -->
+    <p><shadow-field id="shadow"></shadow-field></p>
     <div id="log"></div>
     <script>
+      customElements.define(
+        "shadow-field",
+        class extends HTMLElement {
+          constructor() {
+            super();
+            this.attachShadow({ mode: "open" }).innerHTML =
+              '<textarea id="sta" style="width:320px;height:60px;font:14px Menlo,monospace">inside a shadow root</textarea>';
+          }
+        },
+      );
       document.addEventListener("keydown", (e) => {
         if (e.key === "Escape") document.getElementById("log").textContent += "page-esc\n";
       });

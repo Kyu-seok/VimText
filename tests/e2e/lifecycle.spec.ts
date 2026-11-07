@@ -28,6 +28,20 @@ test.describe("textarea fixture", () => {
     await expect.poll(() => hostCount(page)).toBe(0);
   });
 
+  test("removing a Field from inside an open shadow root removes its Status Line host too", async ({
+    page,
+  }) => {
+    const sta = page.locator("#sta"); // Playwright pierces open shadow roots
+    await sta.focus();
+    await page.keyboard.press("Escape");
+    expect(await statusText(page)).toContain("NORMAL");
+    expect(await hostCount(page)).toBe(1);
+    // The document's observer never sees records from inside a shadow tree,
+    // and the removal fires no blur either: only the Field's own root can tell.
+    await page.evaluate(() => document.getElementById("shadow")!.shadowRoot!.getElementById("sta")!.remove());
+    await expect.poll(() => hostCount(page)).toBe(0);
+  });
+
   test("setting readonly disposes the Session so keys go native; clearing it lets Esc activate anew", async ({
     page,
   }) => {

@@ -96,7 +96,9 @@ reaches them:
 **Lifecycle.** Engine + mirror are created lazily on Activation (first `Esc`/`Ctrl+[`
 while focused), never on focus. They live while the element stays in the DOM; refocusing
 resumes the last Mode. Element removed → destroyed (marks and undo gone), promptly, via a
-`MutationObserver` on the document that runs only while a Session exists. A framework
+`MutationObserver` on the document that runs only while a Session exists (it also watches
+the shadow root of a Field that lives in one, since records from inside a shadow tree never
+reach the document). A framework
 re-mount (React key change, conditional render) is a new element and therefore a new Field:
 fresh Session, Start Mode per Site Policy, even when the id is the same. An element that
 stops qualifying (type changed to password, `readonly`, `disabled`) is destroyed the same

@@ -21,7 +21,7 @@ function activate(el: TextControl): Session {
   const field = new TextareaField(el);
   const session = new Session(field, { vimrc: settings?.vimrc ?? "" });
   sessions.set(el, { field, session });
-  observeLifecycle();
+  observeLifecycle(el.getRootNode());
   return session;
 }
 
@@ -52,18 +52,29 @@ function concernsFields(record: MutationRecord): boolean {
   return false;
 }
 
-function observeLifecycle(): void {
-  if (lifecycleObserver) return;
-  lifecycleObserver = new MutationObserver((records) => {
-    if (!records.some(concernsFields)) return;
-    for (const el of [...sessions.keys()]) if (!el.isConnected || !isTextControl(el)) dispose(el);
-  });
-  lifecycleObserver.observe(document, {
-    childList: true,
-    subtree: true,
-    attributes: true,
-    attributeFilter: ["type", "readonly", "disabled"],
-  });
+const lifecycleOptions: MutationObserverInit = {
+  childList: true,
+  subtree: true,
+  attributes: true,
+  attributeFilter: ["type", "readonly", "disabled"],
+};
+
+/**
+ * Starts the observer if it is not running and adds the new Field's root to
+ * it: records from inside a shadow tree never reach an observer on the
+ * document, so a Field in an open shadow root (reached through `composedPath`
+ * on activation) is watched at its own root. One observer may observe many
+ * targets; `disconnect()` drops them all.
+ */
+function observeLifecycle(root: Node): void {
+  if (!lifecycleObserver) {
+    lifecycleObserver = new MutationObserver((records) => {
+      if (!records.some(concernsFields)) return;
+      for (const el of [...sessions.keys()]) if (!el.isConnected || !isTextControl(el)) dispose(el);
+    });
+    lifecycleObserver.observe(document, lifecycleOptions);
+  }
+  if (root instanceof ShadowRoot) lifecycleObserver.observe(root, lifecycleOptions);
 }
 
 function stopObservingLifecycle(): void {
