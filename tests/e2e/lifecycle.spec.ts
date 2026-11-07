@@ -47,6 +47,27 @@ test.describe("textarea fixture", () => {
     await page.keyboard.type("0x");
     await expect(input).toHaveValue("ello world");
   });
+
+  test("a password input qualifies once a 'show password' toggle reveals it as text", async ({ page }) => {
+    const pw = page.locator("#pw");
+    const log = page.locator("#log");
+    await pw.focus();
+    await page.keyboard.press("Escape"); // secret text is never a Field: native
+    await expect(log).toContainText("page-esc");
+    expect(await statusText(page)).toBe("");
+    await page.evaluate(() => document.getElementById("showpw")!.click());
+    await expect(pw).toHaveAttribute("type", "text");
+    await page.keyboard.press("Escape");
+    expect(await statusText(page)).toContain("NORMAL");
+    await page.keyboard.type("0x");
+    await expect(pw).toHaveValue("3cret");
+    // Hidden again: the Session goes and keys are native once more (a native
+    // "x" replaces the block cursor's leftover selection; Normal "x" would delete it).
+    await page.evaluate(() => document.getElementById("showpw")!.click());
+    await expect.poll(() => hostCount(page)).toBe(0);
+    await page.keyboard.type("x");
+    await expect(pw).toHaveValue("xcret");
+  });
 });
 
 test.describe("React fixture", () => {

@@ -46,6 +46,20 @@ third line here</textarea>
       <p><input id="in" type="text" value="hello world" /></p>
     </form>
     <p><button id="btn">button</button></p>
+    <!-- A login form's "show password" toggle: the input qualifies only while revealed. -->
+    <p>
+      <input id="pw" type="password" value="s3cret" />
+      <button
+        id="showpw"
+        type="button"
+        onclick="
+          const pw = document.getElementById('pw');
+          pw.type = pw.type === 'password' ? 'text' : 'password';
+        "
+      >
+        show password
+      </button>
+    </p>
     <div id="log"></div>
     <script>
       document.addEventListener("keydown", (e) => {
