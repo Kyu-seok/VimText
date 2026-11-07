@@ -1,0 +1,52 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>VimText fixture: Controlled Field</title>
+    <style>
+      body {
+        font-family: system-ui;
+        margin: 40px;
+      }
+      input {
+        width: 320px;
+        font:
+          14px Menlo,
+          monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>VimText fixture: Controlled Field</h1>
+    <!-- A hand-written stand-in for masks and non-React frameworks: the page
+         rewrites the value from its own `input` handler, synchronously. -->
+    <p>
+      <label
+        >uppercase, 12 chars, rewritten inside <code>input</code>
+        <input id="upper" type="text" value="hello world"
+      /></label>
+    </p>
+    <p>
+      <label
+        >uppercase, rewritten in a <code>setTimeout</code> <input id="later" type="text" value="hello world"
+      /></label>
+    </p>
+    <script>
+      const upper = document.getElementById("upper");
+      upper.addEventListener("input", () => {
+        const caret = upper.selectionStart;
+        upper.value = upper.value.toUpperCase().slice(0, 12);
+        upper.setSelectionRange(caret, caret); // a careful page puts the caret back where the edit was
+      });
+
+      const later = document.getElementById("later");
+      later.addEventListener("input", (e) => {
+        if (e.detail === "reformat") return;
+        setTimeout(() => {
+          later.value = later.value.toUpperCase();
+          later.dispatchEvent(new CustomEvent("input", { bubbles: true, detail: "reformat" }));
+        }, 0);
+      });
+    </script>
+  </body>
+</html>
