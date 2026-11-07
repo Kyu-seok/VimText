@@ -51,6 +51,10 @@ third line here</textarea>
       document.addEventListener("keydown", (e) => {
         if (e.key === "Escape") document.getElementById("log").textContent += "page-esc\n";
       });
+      // What a mask library or framework listener would read off each input event.
+      document.getElementById("ta").addEventListener("input", (e) => {
+        document.getElementById("log").textContent += `input:${e.inputType}:${e.data}\n`;
+      });
     </script>
   </body>
 </html>
