@@ -219,15 +219,7 @@ export class Session {
 
   /** Vim's beep: the pending count is dropped and the Status Line's pending keys clear. */
   private beep(): void {
-    this.mirror.handleKey({
-      key: "Escape",
-      ctrlKey: false,
-      altKey: false,
-      metaKey: false,
-      shiftKey: false,
-      preventDefault() {},
-      stopPropagation() {},
-    });
+    this.mirror.handleKey(toEngineKey(new KeyboardEvent("keydown", { key: "Escape" })));
   }
 
   private dispatchToEngine(e: KeyboardEvent): void {
@@ -286,9 +278,14 @@ export class Session {
     // A render queued by a mirror update must land before we judge whether the
     // Field's selection is the user's doing.
     if (this.renderQueued) this.render();
+    this.withSyncing(() => this.syncFromFieldInner());
+  }
+
+  /** Runs our own mirror dispatches, whose updates must not queue a render: the caller renders. */
+  private withSyncing(fn: () => void): void {
     this.syncing = true;
     try {
-      this.syncFromFieldInner();
+      fn();
     } finally {
       this.syncing = false;
     }
@@ -347,16 +344,6 @@ export class Session {
     }
   }
 
-  /** Syncs from inside the render path, where the mirror's updates must not queue another render. */
-  private syncWhileRendering(provoked: boolean): void {
-    this.syncing = true;
-    try {
-      this.syncFromFieldInner(provoked);
-    } finally {
-      this.syncing = false;
-    }
-  }
-
   /** What the Field's selection should look like for the mirror's current state. */
   private renderedSelection(): { anchor: number; head: number } {
     const state = this.mirror.view.state;
@@ -396,13 +383,7 @@ export class Session {
         return { from: to, to: to + 1 };
       }),
     );
-    // Our own dispatch, like a sync: the caller renders, nothing to schedule.
-    this.syncing = true;
-    try {
-      view.dispatch({ changes, userEvent: "input.type.compose" });
-    } finally {
-      this.syncing = false;
-    }
+    this.withSyncing(() => view.dispatch({ changes, userEvent: "input.type.compose" }));
   }
 
   /** Writes the engine's text and cursor into the Field. */
@@ -413,7 +394,7 @@ export class Session {
       // The page changed the Field since we last agreed with it (rule 1): the
       // Field wins, and the engine's change we were about to write is dropped,
       // folded into the Field's text so `u` never brings it back.
-      this.syncWhileRendering(this.queuedDocChange);
+      this.withSyncing(() => this.syncFromFieldInner(this.queuedDocChange));
     }
     this.queuedDocChange = false;
     this.enforceSingleLine();
@@ -421,7 +402,7 @@ export class Session {
     if (text !== this.field.getValue()) {
       this.field.setValue(text);
       // A Controlled Field rewrote the text inside the write; the Field is the truth.
-      if (this.field.getValue() !== text) this.syncWhileRendering(true);
+      if (this.field.getValue() !== text) this.withSyncing(() => this.syncFromFieldInner(true));
     }
     const sel = this.renderedSelection();
     this.field.setSelection(sel.anchor, sel.head);
