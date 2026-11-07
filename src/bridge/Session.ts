@@ -87,10 +87,14 @@ export class Session {
   private destroyed = false;
   private syncing = false;
   private renderQueued = false;
+  /** Set when the queued render carries a text change; cleared when the render lands or drops it. */
+  private queuedDocChange = false;
   /** Set by `:wq`/`:x`: the Status Line shows the `:w` notice after the Field blurs. */
   private noticeOutlivesBlur = false;
   /** The Field selection we last wrote; anything else means the user moved the caret. */
   private lastRendered: { anchor: number; head: number } | null = null;
+  /** The Field text the bridge last wrote or agreed with; anything else means the page changed the Field. */
+  private lastText: string | null = null;
 
   constructor(
     readonly field: Field,
@@ -114,7 +118,9 @@ export class Session {
     this.mirror.onUpdate((docChanged, selectionSet) => {
       // Ex commands typed into the command line (:s, :g, :sort, …) and the
       // engine's own async work change the mirror outside handleKeydown.
-      if (!this.syncing && (docChanged || selectionSet)) this.scheduleRender();
+      if (this.syncing || !(docChanged || selectionSet)) return;
+      if (docChanged) this.queuedDocChange = true;
+      this.scheduleRender();
     });
     this.stopInput = field.onInput(this.onFieldInput);
     this.runVimrc(config.vimrc);
@@ -238,12 +244,19 @@ export class Session {
     }
   }
 
-  private syncFromFieldInner(): void {
+  /**
+   * @param provoked The Field's text is the page's answer to the change the
+   *   mirror just made (a Controlled Field's rewrite): it joins that change's
+   *   undo step, or `u` would undo the rewrite, the page would rewrite again,
+   *   and undo would never move.
+   */
+  private syncFromFieldInner(provoked = false): void {
     const view = this.mirror.view;
     const text = this.field.getValue();
     const doc = view.state.doc.toString();
     const sel = this.field.getSelection();
     const insert = this.mirror.vim.insertMode;
+    this.lastText = text;
 
     if (text !== doc) {
       let start = 0;
@@ -256,7 +269,7 @@ export class Session {
         endD--;
       }
       const head = Math.min(sel.head, text.length);
-      let userEvent = "input.type";
+      let userEvent = provoked ? "input.type.compose" : "input.type";
       if (insert) {
         userEvent =
           this.firstInsertSync && !this.joinNextInsert ? "input.type.compose.start" : "input.type.compose";
@@ -290,6 +303,16 @@ export class Session {
     }
   }
 
+  /** Syncs from inside the render path, where the mirror's updates must not queue another render. */
+  private syncWhileRendering(provoked: boolean): void {
+    this.syncing = true;
+    try {
+      this.syncFromFieldInner(provoked);
+    } finally {
+      this.syncing = false;
+    }
+  }
+
   /** What the Field's selection should look like for the mirror's current state. */
   private renderedSelection(): { anchor: number; head: number } {
     const state = this.mirror.view.state;
@@ -314,11 +337,23 @@ export class Session {
   render(): void {
     this.renderQueued = false;
     if (this.destroyed) return;
+    if (this.lastText !== null && this.field.getValue() !== this.lastText) {
+      // The page changed the Field since we last agreed with it (rule 1): the
+      // Field wins, and the engine's change we were about to write is dropped,
+      // folded into the Field's text so `u` never brings it back.
+      this.syncWhileRendering(this.queuedDocChange);
+    }
+    this.queuedDocChange = false;
     const text = this.mirror.view.state.doc.toString();
-    if (text !== this.field.getValue()) this.field.setValue(text);
+    if (text !== this.field.getValue()) {
+      this.field.setValue(text);
+      // A Controlled Field rewrote the text inside the write; the Field is the truth.
+      if (this.field.getValue() !== text) this.syncWhileRendering(true);
+    }
     const sel = this.renderedSelection();
     this.field.setSelection(sel.anchor, sel.head);
     this.lastRendered = this.field.getSelection();
+    this.lastText = this.field.getValue();
     this.status.setMode(this.mode);
     this.status.reposition();
   }
