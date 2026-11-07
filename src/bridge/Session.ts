@@ -310,10 +310,39 @@ export class Session {
     });
   }
 
+  /**
+   * The mirror of a Single-line Field never holds a newline. An engine dispatch
+   * that left one (linewise `p`, `:put`, `Ctrl-r` with a multi-line register,
+   * `:s/x/\r/`) is stripped as the input's own value sanitization would, in a
+   * change joined to that command's undo step (userEvent `input.type.compose`,
+   * see the undo-grouping seam in docs/engine-seams.md). Not an engine mapping:
+   * those are global across every mirror.
+   */
+  private enforceSingleLine(): void {
+    if (!this.field.singleLine) return;
+    const view = this.mirror.view;
+    const doc = view.state.doc;
+    if (doc.lines === 1) return;
+    const changes = view.state.changes(
+      Array.from({ length: doc.lines - 1 }, (_, i) => {
+        const to = doc.line(i + 1).to;
+        return { from: to, to: to + 1 };
+      }),
+    );
+    // Our own dispatch, like a sync: the caller renders, nothing to schedule.
+    this.syncing = true;
+    try {
+      view.dispatch({ changes, userEvent: "input.type.compose" });
+    } finally {
+      this.syncing = false;
+    }
+  }
+
   /** Writes the engine's text and cursor into the Field. */
   render(): void {
     this.renderQueued = false;
     if (this.destroyed) return;
+    this.enforceSingleLine();
     const text = this.mirror.view.state.doc.toString();
     if (text !== this.field.getValue()) this.field.setValue(text);
     const sel = this.renderedSelection();
