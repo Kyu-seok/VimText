@@ -100,3 +100,55 @@ function yankTwoLinesIntoUnnamedRegister(twoLines: string): void {
   ta.remove();
   input.focus();
 }
+
+describe("Key Policy on a Single-line Field", () => {
+  it("o in Normal is swallowed as a beep: Normal stays, text unchanged, pending count cleared", () => {
+    expect(keydown("o").defaultPrevented).toBe(true);
+    expect(session.mode).toBe("normal");
+    expect(input.value).toBe("hello world");
+    keys("3o");
+    expect(session.mode).toBe("normal");
+    keys("x");
+    expect(input.value).toBe("ello world"); // not "lo world": the 3 was cleared with the o
+    keys("O");
+    expect(session.mode).toBe("normal");
+    expect(input.value).toBe("ello world");
+  });
+
+  it("Visual o still jumps to the other end of the selection", () => {
+    keys("vl");
+    expect(session.mode).toBe("visual");
+    expect([input.selectionStart, input.selectionEnd, input.selectionDirection]).toEqual([0, 2, "forward"]);
+    keys("o");
+    expect(session.mode).toBe("visual");
+    expect([input.selectionStart, input.selectionEnd, input.selectionDirection]).toEqual([0, 2, "backward"]);
+  });
+
+  it("Enter in plain Normal is a Pass-through (submits); with a pending operator it is the engine's", () => {
+    expect(keydown("Enter").defaultPrevented).toBe(false);
+    keys("d");
+    expect(keydown("Enter").defaultPrevented).toBe(true);
+    keys("3");
+    expect(keydown("Enter").defaultPrevented).toBe(true);
+  });
+});
+
+describe("Key Policy on a textarea", () => {
+  it("Enter in Normal is still the Vim motion", () => {
+    const ta = document.createElement("textarea");
+    ta.value = "first line\n  second line";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.setSelectionRange(0, 0);
+    const taField = new TextareaField(ta);
+    const taSession = new Session(taField, { vimrc: "" });
+    const enter = new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true });
+    taSession.handleKeydown(enter);
+    expect(enter.defaultPrevented).toBe(true);
+    expect(ta.value).toBe("first line\n  second line");
+    expect(ta.selectionStart).toBe("first line\n  ".length); // first non-blank of the next line
+    taSession.destroy();
+    taField.destroy();
+    ta.remove();
+  });
+});
