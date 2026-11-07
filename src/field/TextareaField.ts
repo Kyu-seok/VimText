@@ -4,6 +4,32 @@ const textareaValueSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.
 const inputValueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
 
 /**
+ * The `inputType` and `data` Chrome would put on the `input` event for the edit
+ * that turns `oldText` into `newText`: `insertText` carrying the inserted text
+ * for an insertion or a replacement, `deleteContentBackward` for a pure
+ * deletion. Mask libraries and some React code branch on these.
+ */
+function describeEdit(oldText: string, newText: string): { inputType: string; data: string | null } {
+  let start = 0;
+  const max = Math.min(oldText.length, newText.length);
+  while (start < max && oldText.charCodeAt(start) === newText.charCodeAt(start)) start++;
+  let endNew = newText.length,
+    endOld = oldText.length;
+  while (
+    endNew > start &&
+    endOld > start &&
+    oldText.charCodeAt(endOld - 1) === newText.charCodeAt(endNew - 1)
+  ) {
+    endNew--;
+    endOld--;
+  }
+  const inserted = newText.slice(start, endNew);
+  return inserted
+    ? { inputType: "insertText", data: inserted }
+    : { inputType: "deleteContentBackward", data: null };
+}
+
+/**
  * Field implementation for <textarea> and single-line <input> elements.
  *
  * Writes go through the native prototype setter plus a synthetic `input`
@@ -30,12 +56,13 @@ export class TextareaField implements Field {
   }
 
   setValue(text: string): void {
-    if (this.element.value === text) return;
+    const old = this.element.value;
+    if (old === text) return;
     this.writing = true;
     try {
       const setter = this.element instanceof HTMLTextAreaElement ? textareaValueSetter : inputValueSetter;
       setter.call(this.element, text);
-      this.element.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText" }));
+      this.element.dispatchEvent(new InputEvent("input", { bubbles: true, ...describeEdit(old, text) }));
     } finally {
       this.writing = false;
     }

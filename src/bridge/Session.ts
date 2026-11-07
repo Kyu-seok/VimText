@@ -166,21 +166,61 @@ export class Session {
 
     // Engine-owned Modes. The Field is the truth if the page changed it behind our back.
     this.syncFromField();
-    const pending = vim.inputState.keyBuffer.length > 0 || !!vim.inputState.operator;
-    const plainNormal = !vim.insertMode && !vim.visualMode && !pending;
-
-    if (e.key === "Tab" && !e.ctrlKey && !e.metaKey && !e.altKey) return; // focus navigation
-    if (e.key === "Enter" && this.field.singleLine && plainNormal && !e.ctrlKey && !e.metaKey) return; // submit
-    const esc = isEscape(e);
-    if (esc && plainNormal) return; // let the page see a 2nd Esc
+    const policy = this.keyPolicy(e);
+    if (policy === "pass-through") return;
+    if (policy === "beep") {
+      this.beep();
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
 
     this.dispatchToEngine(e);
-    if (esc) {
+    if (isEscape(e)) {
       // The engine reports Esc in Normal as unhandled even when it cancelled a
       // pending operator or count; the page must not see that press.
       e.preventDefault();
       e.stopPropagation();
     }
+  }
+
+  /**
+   * The Key Policy rows decided before the engine sees a key (DESIGN.md "Key
+   * Policy" rows 4–7); a vimrc mapping never reaches them. Everything else is
+   * the engine's call.
+   */
+  private keyPolicy(e: KeyboardEvent): "engine" | "pass-through" | "beep" {
+    const vim = this.mirror.vim;
+    const buffered = vim.inputState.keyBuffer.join(""); // a count ("3") or a partial key ("g", '"')
+    const operatorPending = !!vim.inputState.operator;
+    const pending = buffered.length > 0 || operatorPending;
+    const normal = !vim.insertMode && !vim.visualMode;
+    const plainNormal = normal && !pending;
+    const unmodified = !e.ctrlKey && !e.metaKey && !e.altKey;
+
+    if (e.key === "Tab" && unmodified) return "pass-through"; // row 4: focus navigation
+    if (isEscape(e) && plainNormal) return "pass-through"; // row 5: let the page see a 2nd Esc
+    if (this.field.singleLine) {
+      if (e.key === "Enter" && plainNormal && !e.ctrlKey && !e.metaKey) return "pass-through"; // row 6: submit
+      // Row 7: no line to open; a count is dropped with it. Visual o/O (other
+      // end) and a pending operator or partial key (do, go, "ao) are the engine's.
+      const onlyCountPending = !operatorPending && /^\d*$/.test(buffered);
+      if ((e.key === "o" || e.key === "O") && unmodified && normal && onlyCountPending) return "beep";
+    }
+    return "engine";
+  }
+
+  /** Vim's beep: the pending count is dropped and the Status Line's pending keys clear. */
+  private beep(): void {
+    this.mirror.handleKey({
+      key: "Escape",
+      ctrlKey: false,
+      altKey: false,
+      metaKey: false,
+      shiftKey: false,
+      preventDefault() {},
+      stopPropagation() {},
+    });
   }
 
   private dispatchToEngine(e: KeyboardEvent): void {
@@ -202,9 +242,12 @@ export class Session {
       e.stopPropagation();
     } else if (
       !this.nativeInsert &&
-      (isNativeHistoryKey(e) || (!e.ctrlKey && !e.metaKey && e.key.length === 1))
+      (isNativeHistoryKey(e) || (!e.ctrlKey && !e.metaKey && (e.key.length === 1 || e.key === "Enter")))
     ) {
-      e.preventDefault(); // Vim beeps at unknown printable keys; the page never sees them
+      // Vim beeps at unknown printable keys and at a motion that fails (d<CR> on
+      // a one-line document); the page never sees them, so a half-typed command
+      // cannot submit a form or put a newline in a textarea.
+      e.preventDefault();
       e.stopPropagation();
     }
     this.render();
@@ -333,6 +376,34 @@ export class Session {
     });
   }
 
+  /**
+   * The mirror of a Single-line Field never holds a newline. An engine dispatch
+   * that left one (linewise `p`, `:put`, `Ctrl-r` with a multi-line register,
+   * `:s/x/\r/`) is stripped as the input's own value sanitization would, in a
+   * change joined to that command's undo step (userEvent `input.type.compose`,
+   * see the undo-grouping seam in docs/engine-seams.md). Not an engine mapping:
+   * those are global across every mirror.
+   */
+  private enforceSingleLine(): void {
+    if (!this.field.singleLine) return;
+    const view = this.mirror.view;
+    const doc = view.state.doc;
+    if (doc.lines === 1) return;
+    const changes = view.state.changes(
+      Array.from({ length: doc.lines - 1 }, (_, i) => {
+        const to = doc.line(i + 1).to;
+        return { from: to, to: to + 1 };
+      }),
+    );
+    // Our own dispatch, like a sync: the caller renders, nothing to schedule.
+    this.syncing = true;
+    try {
+      view.dispatch({ changes, userEvent: "input.type.compose" });
+    } finally {
+      this.syncing = false;
+    }
+  }
+
   /** Writes the engine's text and cursor into the Field. */
   render(): void {
     this.renderQueued = false;
@@ -344,6 +415,7 @@ export class Session {
       this.syncWhileRendering(this.queuedDocChange);
     }
     this.queuedDocChange = false;
+    this.enforceSingleLine();
     const text = this.mirror.view.state.doc.toString();
     if (text !== this.field.getValue()) {
       this.field.setValue(text);
