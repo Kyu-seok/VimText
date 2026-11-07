@@ -8,6 +8,14 @@ VimText is a Chrome extension that gives Vim's modal editing to the text fields 
 An editable element on a web page that VimText can attach to, such as a textarea, a single-line text input, or (later) a contenteditable region.
 _Avoid_: input, element, editor, box
 
+**Single-line Field**:
+A Field that cannot hold a newline, such as a text, search, url, email or tel input. Commands that would open a new line have nowhere to go on it.
+_Avoid_: single-line input, input field, one-line box
+
+**Controlled Field**:
+A Field whose page rewrites its value in response to edits, as React controlled components, input masks and uppercase filters do. The page's rewrite is the truth; VimText follows it.
+_Avoid_: framework field, React input, managed input
+
 **Attach / Detach**:
 VimText attaches to a Field when the Field gains focus and detaches when it loses focus or leaves the page.
 _Avoid_: activate, bind, hook
@@ -42,6 +50,10 @@ _Avoid_: extension, add-on, feature flag
 **Pass-through**:
 A key press that VimText deliberately lets reach the page untouched, even while a Field is in a non-Insert Mode (for example Cmd+Enter or Tab).
 _Avoid_: ignored key, unhandled key
+
+**Key Policy**:
+The fixed set of keys VimText decides on before the engine sees them while a Field is in a non-Insert Mode: some are Pass-through, others are swallowed because the Field cannot act on them (a new line on a Single-line Field). A vimrc mapping never reaches a key the Key Policy has decided.
+_Avoid_: key filter, hotkey table, interception list
 
 **Session State**:
 The Vim state shared by every Field in every tab for as long as the browser session lasts: registers, macros, search and command history, and the user's vimrc mappings. Marks and undo history are not Session State; they belong to one Field.
