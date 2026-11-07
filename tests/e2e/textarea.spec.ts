@@ -77,6 +77,20 @@ test("text objects, visual mode, ex :s", async ({ page }) => {
   await expect(ta).toHaveValue(" br0wn f0x\njumps 0ver the lazy dg\nthird line here");
 });
 
+test("synthetic input events carry the inputType and data Chrome would", async ({ page }) => {
+  const ta = page.locator("#ta");
+  const log = page.locator("#log");
+  await ta.focus();
+  await ta.evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(0, 0));
+  await page.keyboard.press("Escape");
+  await page.keyboard.type("x");
+  await expect(ta).toHaveValue(/^he quick/);
+  await expect(log).toHaveText("input:deleteContentBackward:null\n");
+  await page.keyboard.type("yiwP");
+  await expect(ta).toHaveValue(/^hehe quick/);
+  await expect(log).toHaveText("input:deleteContentBackward:null\ninput:insertText:he\n");
+});
+
 test("second Esc in Normal reaches the page; Tab passes through", async ({ page }) => {
   const ta = page.locator("#ta");
   await ta.focus();
