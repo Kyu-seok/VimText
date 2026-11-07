@@ -27,4 +27,82 @@ test.describe("textarea fixture", () => {
     await page.evaluate(() => document.getElementById("ta")!.remove());
     await expect.poll(() => hostCount(page)).toBe(0);
   });
+
+  test("setting readonly disposes the Session so keys go native; clearing it lets Esc activate anew", async ({
+    page,
+  }) => {
+    const input = page.locator("#in");
+    const log = page.locator("#log");
+    await input.focus();
+    await page.keyboard.press("Escape");
+    expect(await statusText(page)).toContain("NORMAL");
+    await input.evaluate((el: HTMLInputElement) => (el.readOnly = true));
+    await expect.poll(() => hostCount(page)).toBe(0);
+    await page.keyboard.press("Escape"); // native: the page sees it, VimText shows nothing
+    await expect(log).toContainText("page-esc");
+    expect(await statusText(page)).toBe("");
+    await input.evaluate((el: HTMLInputElement) => (el.readOnly = false));
+    await page.keyboard.press("Escape");
+    expect(await statusText(page)).toContain("NORMAL");
+    await page.keyboard.type("0x");
+    await expect(input).toHaveValue("ello world");
+  });
+});
+
+test.describe("React fixture", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/react.html");
+    await page.waitForTimeout(150);
+    await expect(page.locator("#in")).toHaveValue("the quick brown fox"); // React mounted
+  });
+
+  async function activateAtStart(page: Page): Promise<void> {
+    const input = page.locator("#in");
+    await input.focus();
+    await input.evaluate((el: HTMLInputElement) => el.setSelectionRange(0, 0));
+    await page.keyboard.press("Escape");
+    expect(await statusText(page)).toContain("NORMAL");
+  }
+
+  test("a re-mounted input is a new Field in the Start Mode with no undo history", async ({ page }) => {
+    const input = page.locator("#in");
+    await activateAtStart(page);
+    await page.keyboard.type("x");
+    await expect(input).toHaveValue("he quick brown fox");
+    // React replaces the element for a new key; the old Field's Session goes with it.
+    await page.evaluate(() => document.getElementById("remount")!.click());
+    await expect(page.locator("#mount")).toHaveText("2");
+    await expect.poll(() => hostCount(page)).toBe(0);
+    // The new element is inert until Esc (Start Mode Insert for an unknown origin)…
+    await input.focus();
+    expect(await statusText(page)).toBe("");
+    await page.keyboard.type("!");
+    await expect(input).toHaveValue("he quick brown fox!");
+    // …and once activated it remembers nothing of the old Field: `u` has nothing to undo.
+    await page.keyboard.press("Escape");
+    expect(await statusText(page)).toContain("NORMAL");
+    await page.keyboard.type("u");
+    await expect(input).toHaveValue("he quick brown fox!");
+    await expect(page.locator("#state")).toHaveText("he quick brown fox!");
+  });
+
+  test("React setting readOnly disposes the Session; clearing it lets Esc activate anew", async ({
+    page,
+  }) => {
+    const input = page.locator("#in");
+    await activateAtStart(page);
+    await page.evaluate(() => document.getElementById("readonly")!.click());
+    await expect(input).toHaveAttribute("readonly", "");
+    await expect.poll(() => hostCount(page)).toBe(0);
+    await page.keyboard.type("x"); // native on a readonly input: nothing happens
+    await expect(input).toHaveValue("the quick brown fox");
+    expect(await statusText(page)).toBe("");
+    await page.evaluate(() => document.getElementById("readonly")!.click());
+    await expect(input).not.toHaveAttribute("readonly");
+    await page.keyboard.press("Escape");
+    expect(await statusText(page)).toContain("NORMAL");
+    await page.keyboard.type("0x"); // the fresh Field starts from the caret the page has
+    await expect(input).toHaveValue("he quick brown fox");
+    await expect(page.locator("#state")).toHaveText("he quick brown fox");
+  });
 });
