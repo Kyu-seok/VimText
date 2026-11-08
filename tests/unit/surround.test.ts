@@ -268,10 +268,10 @@ describe(". repeats with the same characters", () => {
     expect(text()).toBe("'a' 'b'");
   });
 
-  it(". after Visual S] wraps a same-sized region from the cursor: the engine replays a Visual operator (DESIGN.md limitation)", () => {
+  it(". after Visual S] changes nothing: vim-surround does not repeat Visual S (DESIGN.md limitation)", () => {
     open("one two", 0);
     feed("v", "i", "w", "SurroundS", "]", "W", ".");
-    expect(text()).toBe("[one] [two]");
+    expect(text()).toBe("[one] two");
   });
 
   it(". after ds( deletes the next pair", () => {

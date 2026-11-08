@@ -226,8 +226,9 @@ function inner(cm: CodeMirrorV, span: Span, target: string): string {
 
 /**
  * `ys{motion}`, `yss`, Visual `S`: wraps the range. With the character known
- * (Visual `S{char}` is one binding; a `.` replay has the last one) it wraps
- * at once; typed `ys` waits for it.
+ * (Visual `S{char}` is one binding; a `.` replay of `ys` has the last one) it
+ * wraps at once; typed `ys` waits for it. A `.` replay of Visual `S` does
+ * nothing: vim-surround does not repeat it (DESIGN.md accepted limitations).
  */
 const wrap: OperatorFn = (cm, args, ranges, oldAnchor) => {
   const vim = cm.state.vim;
@@ -237,7 +238,10 @@ const wrap: OperatorFn = (cm, args, ranges, oldAnchor) => {
   const first = cm.posFromIndex(spans[0]!.from);
   // Only Visual S{char} carries its character; in Normal, `selectedCharacter`
   // is the motion's (`iw`'s w, `f)`'s parenthesis), copied in by the engine.
+  // The engine replays a Visual operator over a same-sized selection, so the
+  // replay arrives here in Visual mode too.
   if (vim.visualMode && args.selectedCharacter !== undefined) {
+    if (repeating(cm, args)) return oldAnchor;
     return wrapSpans(cm, spans, args.selectedCharacter, linewise, keepTrailing) ?? first;
   }
   if (repeating(cm, args)) {

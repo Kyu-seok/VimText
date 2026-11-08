@@ -283,9 +283,8 @@ push/PR · MIT · version restarts at 0.1.0. Upstream engine tests are not re-ru
   (`( x )` leaves `( )`).
   In Visual, an object typed again grows only when the selection is wider than one
   character (a one-character inner cannot be told from a fresh `v`). Linewise
-  Visual `S)` on a Single-line Field yields `(text)` (the newline strip). `.` after Visual
-  `S` wraps a same-sized region from the cursor, as the engine replays any Visual operator
-  (Vim's `.` does not repeat it). While `ys{motion}` or `cs{old}` waits for its character, a
+  Visual `S)` on a Single-line Field yields `(text)` (the newline strip). Visual `S` is not
+  `.`-repeatable (vim-surround does not promise it). While `ys{motion}` or `cs{old}` waits for its character, a
   digit `1`-`9` is a count for the key after it, not the character (`ysiw3)` wraps with `)`;
   `0` and every other printable key are taken as typed). After a cancelled wait (Esc), `.`
   repeats that `ys`/`cs` with the last character it completed with, where Vim repeats the
