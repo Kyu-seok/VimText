@@ -81,7 +81,7 @@ export class Sessions {
   }
 
   /** Mode of the Session on the focused Field, or null when it has none. */
-  get focusedMode(): string | null {
+  get focusedMode(): Session["mode"] | null {
     const active = deepActiveElement(this.document);
     const entry = isTextControl(active) ? this.sessions.get(active) : undefined;
     return entry?.session.mode ?? null;
@@ -124,6 +124,8 @@ export class Sessions {
     const policy = policyFor(s, this.origin);
     if (policy === "off") this.disposeAll();
     else this.reconcile(policy);
+    // The arrival has decided what the remembered key was; a later change must not Activate from it.
+    this.remembered = null;
   };
 
   /**

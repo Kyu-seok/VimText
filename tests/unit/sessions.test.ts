@@ -134,6 +134,15 @@ describe("Activation key before settings arrive", () => {
     expect(statusText()).toContain("NORMAL");
   });
 
+  it("is spent by the arrival: 'off' then a change to 'insert' leaves the Field inert", async () => {
+    ta.focus();
+    keydown(ta, "Escape");
+    port.arrive(settingsFor("off"));
+    await settle();
+    port.change(settingsFor("insert"));
+    expect(hostCount()).toBe(0);
+  });
+
   it("is remembered for a Single-line Field too", async () => {
     const single = makeSingleLine();
     single.focus();
