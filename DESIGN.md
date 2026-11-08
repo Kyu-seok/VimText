@@ -234,8 +234,9 @@ bundle (strict page CSPs block dynamic `import()`). No `activeTab`/`scripting`/`
 
 TypeScript · esbuild (content, popup, options bundles) · Vitest browser mode (Chromium via
 Playwright) for the sync layer · a second Vitest project in Node (`tests/node/*.test.ts`; one
-file per repo-wide consistency check, the first being that `manifest.json` and `package.json`
-agree on the version) · Playwright e2e loading the unpacked extension against local
+file per repo-wide consistency check: `manifest.json` and `package.json` agree on the version;
+the manifest's permissions, host match and `description` are reflected in `PRIVACY.md` and
+`docs/store/listing.md`) · Playwright e2e loading the unpacked extension against local
 fixtures (textarea, single-line input, a React 19 controlled input bundled by esbuild into a
 gitignored fixture file, a hand-written rewriting Controlled Field standing in for masks and
 other frameworks, a page with same-origin, cross-origin and short frames) · GitHub Actions on

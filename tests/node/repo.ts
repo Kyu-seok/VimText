@@ -7,5 +7,9 @@ import { readFileSync } from "node:fs";
 const repoRoot = new URL("../../", import.meta.url);
 
 export function readJson(relPath: string): Record<string, unknown> {
-  return JSON.parse(readFileSync(new URL(relPath, repoRoot), "utf8"));
+  return JSON.parse(readText(relPath));
+}
+
+export function readText(relPath: string): string {
+  return readFileSync(new URL(relPath, repoRoot), "utf8");
 }
