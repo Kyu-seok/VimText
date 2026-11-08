@@ -90,8 +90,8 @@ so Chrome and the store page show the same words):
 
 ## Permission justifications
 
-Why these permissions and not narrower ones is also recorded in `DESIGN.md`
-("Manifest").
+Why these permissions and not narrower ones is also recorded in
+`docs/release.md` ("Permission choices").
 
 **`storage`:**
 
