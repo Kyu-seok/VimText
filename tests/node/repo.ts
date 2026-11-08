@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 /**
  * The repo-wide consistency checks read files the release workflow reads, so
@@ -12,4 +13,9 @@ export function readJson(relPath: string): Record<string, unknown> {
 
 export function readText(relPath: string): string {
   return readFileSync(new URL(relPath, repoRoot), "utf8");
+}
+
+/** A repository file as a filesystem path, for the checks that spawn it. */
+export function repoPath(relPath: string): string {
+  return fileURLToPath(new URL(relPath, repoRoot));
 }
