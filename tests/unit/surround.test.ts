@@ -125,6 +125,15 @@ describe("ys{motion}{char} wraps the motion's text", () => {
     feed("SurroundYs", "i", "w", "ArrowLeft", ")");
     expect(text()).toBe("Hello world!");
   });
+
+  it("a page rewrite of the Field while the wait is armed voids it: the spans no longer fit the text", () => {
+    open("Hello world!", 7);
+    feed("SurroundYs", "i", "w");
+    // What the Session's sync dispatches when a Controlled Field rewrote its value.
+    mirror!.view.dispatch({ changes: { from: 0, to: 0, insert: "X" } });
+    feed(")");
+    expect(text()).toBe("XHello world!");
+  });
 });
 
 describe("yss{char} wraps the line, ignoring leading whitespace", () => {

@@ -86,7 +86,7 @@ function findTarget(cm: CodeMirrorV, head: Pos, char: string, count: number): [n
 
 interface Wait {
   cm: CodeMirrorV;
-  /** The document as it was: a change in between (focus went elsewhere) voids the wait. */
+  /** The document as it was: the spans are offsets into it, so a page rewrite of the Field in between (a Controlled Field) voids the wait. */
   doc: string;
   apply(char: string): Pos | null;
 }
@@ -308,9 +308,9 @@ export const surround: Plugin = {
   ],
 
   define(engine) {
+    api = engine; // the one this Activation gave: the waits bind and unbind through it
     if (defined) return;
     defined = true;
-    api = engine;
     engine.defineOperator("surroundWrap", wrap);
     engine.defineOperator("surroundDelete", deleteSurroundings);
     engine.defineOperator("surroundChange", changeSurroundings);
