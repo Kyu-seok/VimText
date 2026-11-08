@@ -9,9 +9,10 @@ import { keyDriver } from "./keys";
  * on a `"+` yank and reads it on a `"+` paste. Observed from outside through a
  * stubbed `navigator.clipboard` (the unit suite's page has no clipboard
  * permission): what a yank leaves there, what a paste takes from it, and what
- * the user sees when the read is denied. Coverage: Normal on a textarea; the
- * register prefix is the same key in Visual, and Insert's `Ctrl-r` takes a
- * register through the same rewrite.
+ * the user sees when the read is denied or there is no clipboard at all.
+ * Coverage (rule 5): the rewrite is made inside the Session, so placement is
+ * the Sessions class's concern, not this file's. Modes: Normal and Visual on a
+ * textarea, Insert through `Ctrl-r`; Normal on a Single-line Field.
  */
 
 let ta: HTMLTextAreaElement;
@@ -75,6 +76,34 @@ describe("Clipboard registers", () => {
     clipboard = "THE";
     keys('"*p');
     await expect.poll(() => ta.value).toMatch(/^tTHEhe quick/);
+  });
+
+  it('Visual "*y puts the selection on the clipboard', () => {
+    keys('vee"*y');
+    expect(clipboard).toBe("the quick");
+  });
+
+  it('on a Single-line Field "*yiw then "+P round-trips too', async () => {
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = "hello world";
+    document.body.appendChild(input);
+    input.focus();
+    input.setSelectionRange(0, 0);
+    const singleField = new TextareaField(input);
+    const single = new Session(singleField, { vimrc: "" });
+    const drive = keyDriver(() => single);
+    try {
+      drive.keys('"*yiw');
+      expect(clipboard).toBe("hello");
+      clipboard = "HELLO";
+      drive.keys('"+P');
+      await expect.poll(() => input.value).toBe("HELLOhello world");
+    } finally {
+      single.destroy();
+      singleField.destroy();
+      input.remove();
+    }
   });
 
   it("Insert-mode Ctrl-r * takes the clipboard register, as Ctrl-r + does", () => {

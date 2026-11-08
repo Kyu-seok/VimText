@@ -28,7 +28,7 @@ test('"+p pastes what the page put on the clipboard', async ({ page }) => {
   await expect(page.locator("#ta")).toHaveValue(/^tCLIPhe quick/);
 });
 
-test('"*p pastes from the clipboard as "+p does', async ({ page }) => {
+test('"*P pastes from the clipboard as "+p does', async ({ page }) => {
   await page.evaluate(() => navigator.clipboard.writeText("STAR"));
   await page.keyboard.type('"*P');
   await expect(page.locator("#ta")).toHaveValue(/^STARthe quick/);

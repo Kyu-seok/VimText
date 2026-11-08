@@ -38,8 +38,10 @@ function statusText(): string {
   return bar && host!.style.display !== "none" ? (bar.textContent ?? "") : "";
 }
 
-function keydown(el: Element, key: string): void {
-  el.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, composed: true }));
+function keydown(el: Element, key: string): KeyboardEvent {
+  const e = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, composed: true });
+  el.dispatchEvent(e);
+  return e;
 }
 
 function keys(el: Element, seq: string): void {
@@ -137,11 +139,14 @@ describe("Plugin mappings", () => {
     expect(ta.value).toBe("the quick brown fox\nthe quick brown fox\njumps over");
   });
 
-  it("a disabled Plugin's mapping is not applied: \\ beeps and s is Vim's substitute", async () => {
+  it("a disabled Plugin's mapping is not applied: \\ is swallowed as a beep and s is Vim's substitute", async () => {
     port.arrive(withSurround(null, "", false));
     await settle();
     activateAtStart();
-    keys(ta, "\\s");
+    const backslash = keydown(ta, "\\");
+    expect(backslash.defaultPrevented).toBe(true); // an unbound printable key: Vim beeps, the page never sees it
+    expect(ta.value).toBe(TEXT);
+    keys(ta, "s");
     expect(ta.value).toBe("he quick brown fox\njumps over");
   });
 });

@@ -60,7 +60,7 @@ The Vim engine and its mirror attached to one Activated Field, living from Activ
 _Avoid_: instance, attachment, editor
 
 **Session State**:
-The Vim state shared by every Field in every tab for as long as the browser session lasts: registers, macros, and search and command history. Marks and undo history are not Session State; they belong to one Field. The vimrc is a Setting, not Session State: its mappings are in every tab because every tab runs it.
+The Vim state shared by every Field in every tab for as long as the browser session lasts: registers, macros, search and command history, and the last `f`/`t` character search. Marks, undo history and the jump list are not Session State; they belong to one Field. The vimrc is a Setting, not Session State: its mappings are in every tab because every tab runs it.
 _Avoid_: global state
 
 **vimrc**:
