@@ -259,7 +259,7 @@ const ARG_OPEN = "([";
 const ARG_CLOSE = ")]";
 const ARG_SEP = ",";
 
-/** Scans back from `at` for an argument's opening delimiter (a separator or an opening bracket at depth 0); -1 at the text's start. */
+/** Walks back from `at` to an argument's opening delimiter (a separator or an opening bracket at depth 0); -1 at the text's start. */
 function argOpenBefore(text: string, at: number): number {
   let depth = 0;
   for (let i = at; i >= 0; i--) {
@@ -273,7 +273,7 @@ function argOpenBefore(text: string, at: number): number {
   return -1;
 }
 
-/** Scans forward from `at` for an argument's closing delimiter (a separator or a closing bracket at depth 0); -1 at the text's end. */
+/** Walks forward from `at` to an argument's closing delimiter (a separator or a closing bracket at depth 0); -1 at the text's end. */
 function argCloseAfter(text: string, at: number): number {
   let depth = 0;
   for (let i = at; i < text.length; i++) {

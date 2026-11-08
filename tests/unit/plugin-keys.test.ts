@@ -62,7 +62,7 @@ describe("with surround on, in Normal", () => {
     expect(ta.value).toMatch(/^\(he quick/);
   });
 
-  it("d w feeds d then w: holding d for s costs nothing", () => {
+  it("d w feeds d then w: the released d is the operator and w its motion", () => {
     keys("dw");
     expect(ta.value).toMatch(/^quick brown/);
   });
@@ -226,7 +226,7 @@ describe("with targets on, in operator-pending", () => {
     expect(session.mode).toBe("insert");
   });
 
-  it("c i w feeds c i w: holding i for n or l costs nothing", () => {
+  it("c i w feeds c i w: the released i and w are the stock text object under c", () => {
     keys("ciw");
     expect(ta.value).toBe(' (bar) "baz" qux');
     expect(session.mode).toBe("insert");

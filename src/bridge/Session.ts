@@ -71,7 +71,7 @@ function toEngineKey(e: KeyboardEvent): KeyLike {
  * name (`SurroundDs`; the engine brackets any multi-character name). Never
  * shifted: a shifted multi-character name would become `<S-SurroundS>`.
  */
-function syntheticKey(key: string): KeyLike {
+function fedKey(key: string): KeyLike {
   return {
     key,
     ctrlKey: false,
@@ -373,10 +373,10 @@ export class Session {
         case "hold":
           return "consumed";
         case "release":
-          for (const key of step.held) this.mirror.handleKey(syntheticKey(key));
+          for (const key of step.held) this.mirror.handleKey(fedKey(key));
           break;
         case "plugin-key":
-          this.mirror.handleKey(syntheticKey(step.key));
+          this.mirror.handleKey(fedKey(step.key));
           this.mirror.showTypedKeys(`<${step.key}>`, step.typed);
           if (step.consumed) return "consumed";
       }
