@@ -63,15 +63,16 @@ choices to keep in mind when touching the manifest.
   Field the user Activated (`PRIVACY.md`).
 - **`clipboardRead` and `clipboardWrite` at install time, not requested at first use.** They
   back the `"+` and `"*` registers only: the clipboard is read on a `"+`/`"*` paste and
-  written on a `"+`/`"*` yank, never otherwise. Requesting them on first use would interrupt
-  a paste with a prompt in the middle of an editing command, and the install prompt already
-  shows them once.
+  written when a yank, delete or change stores text into `"+`/`"*`, never otherwise.
+  Requesting them on first use would interrupt a paste with a prompt in the middle of an
+  editing command, and the install prompt already shows them once.
 - **`storage`.** Settings (Site Policies, the vimrc, Plugin toggles) in sync storage, so they
   travel with Chrome Sync when the user has it on; registers, macros and history (Session
   State) in session storage, gone when the browser closes.
 
 ## What the machine checks and what it does not
 
-The Node project checks the version agreement and the package script's refusals and zip layout.
-The workflow's only logic is in the package script, so its proof is the first tag run; the
-dashboard submission, the listing prose and the privacy policy are reviewed by a human.
+What `npm test` checks of a release (the Node project's entries) is inventoried under
+"Mechanical" in `CODING_STANDARDS.md` and summarised in `DESIGN.md` "Tooling". The workflow's
+only logic is in the package script, so its proof is the first tag run; the dashboard
+submission, the listing prose and the privacy policy are reviewed by a human.

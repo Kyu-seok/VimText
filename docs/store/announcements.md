@@ -34,12 +34,13 @@ Source, issues, design and the accepted limitations: https://github.com/Kyu-seok
 new since 0.2.0:
 
 Clipboard registers
-- "+ is the system clipboard: "+y writes it, "+p reads it. "* is an alias
-  of "+. The unnamed register never touches the clipboard.
-- The clipboard is read only for a "+ or "* paste and written only for a
-  "+ or "* yank. A denied read shows a message on the Status Line and
-  leaves the text alone. A plain http:// page has no clipboard API, so
-  every "+ and "* command beeps there, with a message.
+- "+ is the system clipboard: "+p reads it; "+y, "+d and "+c write it. "*
+  is an alias of "+. The unnamed register never touches the clipboard.
+- The clipboard is read only for a "+ or "* paste and written only when a
+  yank, delete or change stores text into "+ or "*. A denied read shows a
+  message on the Status Line and leaves the text alone. A plain http://
+  page has no clipboard API, so every "+ and "* command beeps there, with
+  a message.
 
 Session State across tabs
 - Registers (the macros they hold included), search and command history
@@ -138,15 +139,15 @@ Source (MIT): https://github.com/Kyu-seok/VimText
 
 How it behaves: every field starts in Insert mode and is the page's own, so IME, autocomplete and the site's handlers work as before. Press Esc (or Ctrl+[) in a focused field and that field is under Vim until it leaves the page, with a small Status Line at its edge for the mode, pending keys, the : / ? command line and messages. A Site Policy can make a site start in Normal mode, or turn VimText off there. Tab, Cmd/Ctrl shortcuts the engine doesn't bind, a second Esc in Normal and Enter in a single-line input all reach the page, so the site stays usable.
 
-The engine is the Vim implementation behind CodeMirror (@replit/codemirror-vim), run on a hidden mirror of the field. That is why motions, operators, text objects, counts, registers, marks, macros, Visual block, ".", search and ex commands (:s, :g, :sort, :map, :set) work; VimText is the bridge between that engine and the page: key routing, syncing the field and the mirror, and keeping the page's and Vim's undo from diverging. The baseline for "correct" is Vim's own :help. Two opt-in plugins, off by default: surround (ys/cs/ds/Visual S) and targets (seeking text objects, the n/l prefixes, argument objects).
+The engine is the Vim implementation behind CodeMirror (@replit/codemirror-vim), run on a hidden mirror of the field. That is why motions, operators, text objects, counts, registers, marks, macros, Visual block, ".", search and ex commands (:s, :g, :sort, :map, :set) work; VimText is the bridge between that engine and the page: key routing, syncing the field and the mirror, and keeping the page's and Vim's undo from diverging. The baseline for "correct" is Vim's own :help. Two opt-in Plugins, off by default: surround (ys/cs/ds/Visual S) and targets (seeking text objects, the n/l prefixes, argument objects).
 
 0.3.0 adds clipboard registers ("+ and its alias "*, touched only by "+/"* commands), registers and history shared across tabs for the life of the browser session, and a vimrc box whose failing lines are listed in the options page.
 
 What it does not do: only Chrome (Firefox untested, not submitted). Only textarea and single-line text inputs; contenteditable editors (Gmail, Slack, Notion, Reddit's rich-text composer) are the next milestone, Google Docs is out of scope, password fields never. No hlsearch highlighting. Scroll commands approximate. One engine quirk: a mapping whose prefix is itself a bound key never fires (the engine takes the full match at once, no timeoutlen). Every known deviation is listed under "Accepted limitations" in DESIGN.md in the repo.
 
-Privacy: no analytics, no network requests, no remote code. Settings travel with Chrome Sync if you have it on and otherwise stay on the device. The content script runs on every http/https page (nothing else could hear the Esc that activates a field) but reads only the field you activated. The policy is PRIVACY.md in the repo.
+Privacy: no analytics, no network requests, no remote code. Settings travel with Chrome Sync if you have it on and otherwise stay on the device. The content script runs on every http/https page (nothing else could hear the Esc that Activates a field) but reads only the field you Activated. The policy is PRIVACY.md in the repo.
 
-I wrote this because I kept reaching for dd in comment boxes. Happy to answer questions about the bridge, the undo story on React-controlled inputs, or why the plugins are engine commands rather than a fork.
+I wrote this because I kept reaching for dd in comment boxes. Happy to answer questions about the bridge, the undo story on React-controlled inputs, or why the Plugins are engine commands rather than a fork.
 ```
 
 ## 3. r/vim
@@ -154,7 +155,7 @@ I wrote this because I kept reaching for dd in comment boxes. Happy to answer qu
 Title:
 
 ```text
-VimText: Vim modal editing in the browser's own text fields, as a Chrome extension (baseline is :help; surround and targets as opt-in plugins)
+VimText: Vim modal editing in the browser's own text fields, as a Chrome extension (baseline is :help; surround and targets as opt-in Plugins)
 ```
 
 Body:
@@ -170,9 +171,9 @@ Source (MIT): https://github.com/Kyu-seok/VimText
 - A field starts in Insert mode and is the page's own. Press `Esc` or `Ctrl+[` and that field is under Vim until it leaves the page. A Site Policy can make a site start in Normal mode, or turn VimText off there.
 - A Status Line at the edge of the field shows the mode, pending keys, `recording @q`, the `:` `/` `?` command line and messages such as `E486`.
 - The engine is the Vim implementation behind CodeMirror (`@replit/codemirror-vim`), so what you expect is there: motions, operators, text objects, counts, registers, marks, macros, Visual charwise/linewise/block, `.`, search and ex commands (`:s`, `:g`, `:sort`, `:map`, `:set`). `u` and `Ctrl-r` are one history; the browser's own undo shortcuts are swallowed outside Insert so the two never diverge.
-- A vimrc box in the options page takes ex commands (`nnoremap Y y$`, `set ignorecase`, ...) and runs them on every activation; a failing line is listed under the box with the engine's message.
+- A vimrc box in the options page takes ex commands (`nnoremap Y y$`, `set ignorecase`, ...) and runs them on every Activation; a failing line is listed under the box with the engine's message.
 - `"+` is the system clipboard and `"*` is its alias. Registers, macros, search and command history are shared across tabs for the life of the browser session.
-- Plugins, off by default: **surround** (`ys` `yss` `cs` `ds`, Visual `S`, `.` repeats) and **targets** (`ci(` from outside the parentheses seeks the next pair, `i"` from anywhere on the line, `cin(` `dil"`, the argument objects `ia`/`aa`). A vimrc mapping on a key a plugin also binds wins, as in Vim.
+- Plugins, off by default: **surround** (`ys` `yss` `cs` `ds`, Visual `S`, `.` repeats) and **targets** (`ci(` from outside the parentheses seeks the next pair, `i"` from anywhere on the line, `cin(` `dil"`, the argument objects `ia`/`aa`). A vimrc mapping on a key a Plugin also binds wins, as in Vim.
 
 The rule for "is it correct" is Vim's `:help`. Plugin behaviour is never part of that baseline, and the upstream plugin's documentation is the oracle for it.
 
@@ -182,11 +183,11 @@ The rule for "is it correct" is Vim's `:help`. Plugin behaviour is never part of
 - textarea and single-line text inputs (text, search, url, email, tel) only, in the top page and in frames, including React-controlled inputs and masks. contenteditable editors (Gmail, Slack, Notion, Reddit's rich-text composer) are the next milestone; Google Docs is out of scope; password fields never.
 - No `hlsearch` highlighting (`n`/`N` work). Scroll commands approximate. Visual block highlights only the primary range.
 - Engine quirk: a mapping whose prefix is itself a bound key (`nnoremap <Space>x dd` while `<Space>` is `l`) never fires, because the engine takes the full match at once instead of waiting like `timeoutlen`. Map from an unbound prefix such as `\`.
-- surround v1 has no tag or function targets (`ysiw<div>`, `cst`, `dst`); targets v1 has no separator objects, `I`/`A`, any-block `ib` or any-quote `iq`. Visual `S` is not `.`-repeatable. The key VimText holds while it waits for the rest of a plugin sequence (the `d` of `ds`) is not shown on the Status Line until the sequence resolves.
+- surround v1 has no tag or function targets (`ysiw<div>`, `cst`, `dst`); targets v1 has no separator objects, `I`/`A`, any-block `ib` or any-quote `iq`. Visual `S` is not `.`-repeatable. The key VimText holds while it waits for the rest of a Plugin sequence (the `d` of `ds`) is not shown on the Status Line until the sequence resolves.
 
 The full list is under "Accepted limitations" in DESIGN.md in the repo. If something behaves differently from Vim and is not on that list, that is a bug: https://github.com/Kyu-seok/VimText/issues
 
-Privacy: no analytics, no network requests, no remote code. Settings travel with Chrome Sync if you have it on and otherwise stay on the device. The content script runs on every http/https page (nothing else could hear the Esc that activates a field) but reads only the field you activated. PRIVACY.md in the repo has the full text.
+Privacy: no analytics, no network requests, no remote code. Settings travel with Chrome Sync if you have it on and otherwise stay on the device. The content script runs on every http/https page (nothing else could hear the Esc that Activates a field) but reads only the field you Activated. PRIVACY.md in the repo has the full text.
 ```
 
 ## 4. r/chrome_extensions
@@ -207,17 +208,17 @@ Source (MIT): https://github.com/Kyu-seok/VimText
 
 **What it does**
 
-- Every field starts in Insert mode and behaves natively; VimText shows nothing. Press `Esc` or `Ctrl+[` in a focused field to activate Vim on it. A Site Policy (from the popup or the options page) can make a site start in Normal mode or turn VimText off there.
+- Every field starts in Insert mode and behaves natively; VimText shows nothing. Press `Esc` or `Ctrl+[` in a focused field to Activate Vim on it. A Site Policy (from the popup or the options page) can make a site start in Normal mode or turn VimText off there.
 - In every other mode the engine owns the text and writes it back to the field with the native value setter plus a synthetic `input` event, so React-controlled inputs and masks keep the edits. When the page rewrites the value, the page wins and VimText follows.
 - A fixed set of keys always reaches the page: `Tab`, `Cmd`/`Ctrl` shortcuts the engine does not bind, a second `Esc` in Normal (so a site's modal still closes), `Enter` on a single-line input in plain Normal (so the form still submits).
 - A Status Line in a shadow root at the edge of the field shows the mode, pending keys and the command line. No page-level bar.
-- Options page: a vimrc box (ex commands, failing lines listed under it), two opt-in plugins (surround, targets), the Site Policy table.
+- Options page: a vimrc box (ex commands, failing lines listed under it), two opt-in Plugins (surround, targets), the Site Policy table.
 
 **Permissions, and why**
 
-- `storage`: Site Policies, the vimrc and the plugin toggles in `storage.sync` (carried by Chrome Sync when you have it on, otherwise on the device); registers and history in `storage.session`, gone when the browser closes.
-- `clipboardRead` / `clipboardWrite`: for Vim's `"+` and `"*` registers only. The clipboard is read only on a `"+`/`"*` paste and written only on a `"+`/`"*` yank; the unnamed register never touches it.
-- Content script on `http://*/*` and `https://*/*`, all frames. This is what Chrome shows as "read and change all your data on all websites". `activeTab` cannot work here: an extension that is inert until you press Esc inside a field needs something listening for that Esc before you have clicked anything. The script reads only the field you activated.
+- `storage`: Site Policies, the vimrc and the Plugin toggles in `storage.sync` (carried by Chrome Sync when you have it on, otherwise on the device); registers and history in `storage.session`, gone when the browser closes.
+- `clipboardRead` / `clipboardWrite`: for Vim's `"+` and `"*` registers only. The clipboard is read only on a `"+`/`"*` paste and written only when a yank, delete or change stores text into `"+`/`"*`; the unnamed register never touches it.
+- Content script on `http://*/*` and `https://*/*`, all frames. This is what Chrome shows as "read and change all your data on all websites". `activeTab` cannot work here: an extension that is inert until you press Esc inside a field needs something listening for that Esc before you have clicked anything. The script reads only the field you Activated.
 - No `tabs`, no `scripting`, no remote code, no network requests, no analytics. The service worker does one thing: grant content scripts access to session storage. The policy is PRIVACY.md in the repo and is linked from the store page.
 
 **What it does not do**
@@ -253,11 +254,11 @@ Disclosure: I wrote the extension this answer recommends.
 
 The navigation extensions you tried are for moving around the page; they do not give you a Normal mode inside a text field. What you describe (press Esc in the text area you are typing in, then `dd`) is what [VimText](<CHROME-WEB-STORE-URL>) does. It is a Chrome extension (Chrome only; Firefox is untested) that edits the page's own textarea or input in place: no native host and no editor widget replacing the field. Source is on GitHub: https://github.com/Kyu-seok/VimText
 
-How it works: every field starts in Insert mode and behaves natively. Press `Esc` or `Ctrl+[` and that field is under Vim until it leaves the page, with a small status line at its edge for the mode, pending keys and the `:` `/` `?` command line. The engine is the Vim implementation behind CodeMirror, so motions, operators, text objects, counts, registers, marks, macros, Visual block, `.`, `u`/`Ctrl-r` and ex commands (`:s`, `:g`, `:sort`, `:map`, `:set`) work, and a vimrc box in the options page takes your mappings. A per-site setting can make a site start in Normal mode or turn the extension off there. `Tab`, `Cmd`/`Ctrl` shortcuts, a second `Esc` and `Enter` in a single-line input still reach the page.
+How it works: every field starts in Insert mode and behaves natively. Press `Esc` or `Ctrl+[` and that field is under Vim until it leaves the page, with a small Status Line at its edge for the mode, pending keys and the `:` `/` `?` command line. The engine is the Vim implementation behind CodeMirror, so motions, operators, text objects, counts, registers, marks, macros, Visual block, `.`, `u`/`Ctrl-r` and ex commands (`:s`, `:g`, `:sort`, `:map`, `:set`) work, and a vimrc box in the options page takes your mappings. A Site Policy can make a site start in Normal mode or turn the extension off there. `Tab`, `Cmd`/`Ctrl` shortcuts, a second `Esc` and `Enter` in a single-line input still reach the page.
 
 Limits worth knowing before you install: it covers `<textarea>` and single-line text inputs only, not contenteditable editors (Gmail, Slack, Notion), and not Google Docs. There is no `hlsearch` highlighting, scroll commands are approximate, and a mapping whose prefix is itself a bound key never fires (the engine takes the full match at once, there is no `timeoutlen`). The full list is under "Accepted limitations" in the repo's DESIGN.md.
 
-Privacy: no analytics, no network requests, no remote code; the content script runs on every page but reads only the field you activated with Esc. The policy is PRIVACY.md in the repo.
+Privacy: no analytics, no network requests, no remote code; the content script runs on every page but reads only the field you Activated with Esc. The policy is PRIVACY.md in the repo.
 ```
 
 ### 5b. Unix & Linux Stack Exchange: "Vim interface on web browser input fields?"
@@ -271,11 +272,11 @@ Disclosure: I wrote the extension this answer recommends.
 
 A current option for Chrome: [VimText](<CHROME-WEB-STORE-URL>) (source: https://github.com/Kyu-seok/VimText, MIT). It gives Vim's modal editing to the page's own text fields, in place. There is nothing to run outside the browser: no native host, no editor server, no Neovim install, and the field is not replaced by an editor widget. Chrome only; Firefox is untested and not submitted.
 
-Each field starts in Insert mode and is the page's own, so IME, autocomplete and the site's handlers keep working. Press `Esc` (or `Ctrl+[`) in a focused field and it is under Vim until it leaves the page; a status line at the edge of the field shows the mode, pending keys and the `:` `/` `?` command line. The engine is the one behind CodeMirror's Vim mode, so motions, operators, text objects, counts, registers, marks, macros, Visual block, `.`, search and ex commands work, `"+` and `"*` are the system clipboard, and a vimrc box in the options page takes mappings and `set` options. A per-site setting can make a site start in Normal mode (closer to what you ask for) or turn the extension off there. Two opt-in plugins, off by default, model surround and targets.
+Each field starts in Insert mode and is the page's own, so IME, autocomplete and the site's handlers keep working. Press `Esc` (or `Ctrl+[`) in a focused field and it is under Vim until it leaves the page; a Status Line at the edge of the field shows the mode, pending keys and the `:` `/` `?` command line. The engine is the one behind CodeMirror's Vim mode, so motions, operators, text objects, counts, registers, marks, macros, Visual block, `.`, search and ex commands work, `"+` and `"*` are the system clipboard, and a vimrc box in the options page takes mappings and `set` options. A Site Policy can make a site start in Normal mode (closer to what you ask for) or turn the extension off there. Two opt-in Plugins, off by default, model surround and targets.
 
 What it does not do: only `<textarea>` and single-line text inputs (text, search, url, email, tel), in the top page and in frames. contenteditable editors such as Gmail, Slack and Notion are not covered yet, Google Docs is out of scope, password fields never. No `hlsearch` highlighting; scroll commands are approximate; a user mapping whose prefix is itself a bound key never fires (the engine takes the full match at once, no `timeoutlen`). The repo's DESIGN.md lists every known deviation from Vim under "Accepted limitations".
 
-Privacy: no analytics, no network requests, no remote code. Settings travel with Chrome Sync when it is on and otherwise stay on the device; the content script runs on every http/https page but reads only the field you activated. The policy is PRIVACY.md in the repo.
+Privacy: no analytics, no network requests, no remote code. Settings travel with Chrome Sync when it is on and otherwise stay on the device; the content script runs on every http/https page but reads only the field you Activated. The policy is PRIVACY.md in the repo.
 ```
 
 ### 5c. Unix & Linux Stack Exchange: "Is there a method for making Google Chrome open textareas in vim?"
@@ -289,11 +290,11 @@ Disclosure: I wrote the extension this answer recommends.
 
 If what you miss is Vim's editing rather than your own Vim binary and plugins, there is now a way that needs no server and no native host: [VimText](<CHROME-WEB-STORE-URL>), a Chrome extension (source: https://github.com/Kyu-seok/VimText, MIT). To be clear about what it is not: it does not open the textarea in your installed vim or gvim, and your `~/.vimrc` and plugins are not involved. It runs a Vim engine (the one behind CodeMirror's Vim mode) inside the browser and edits the page's own textarea in place.
 
-What you get: press `Esc` or `Ctrl+[` in a focused textarea or single-line input and that field is under Vim until it leaves the page, with a status line at its edge for the mode, pending keys and the `:` `/` `?` command line. Motions, operators, text objects, counts, registers, marks, macros, Visual block, `.`, search and ex commands (`:s`, `:g`, `:sort`, `:map`, `:set`) work; `"+` and `"*` are the system clipboard; a vimrc box in the options page takes mappings and `set` options; surround and targets are available as opt-in plugins. Until you press Esc the field is the page's own, so nothing changes on sites where you do not want it, and a per-site setting can turn it off or make a site start in Normal mode.
+What you get: press `Esc` or `Ctrl+[` in a focused textarea or single-line input and that field is under Vim until it leaves the page, with a Status Line at its edge for the mode, pending keys and the `:` `/` `?` command line. Motions, operators, text objects, counts, registers, marks, macros, Visual block, `.`, search and ex commands (`:s`, `:g`, `:sort`, `:map`, `:set`) work; `"+` and `"*` are the system clipboard; a vimrc box in the options page takes mappings and `set` options; surround and targets are available as opt-in Plugins. Until you press Esc the field is the page's own, so nothing changes on sites where you do not want it, and a Site Policy can turn it off or make a site start in Normal mode.
 
 Limits: Chrome only (Firefox untested, not submitted). `<textarea>` and single-line text inputs only; contenteditable editors (Gmail, Slack, Notion) are not covered yet and Google Docs is out of scope. No `hlsearch` highlighting, approximate scroll commands, and a mapping whose prefix is itself a bound key never fires (the engine takes the full match at once, no `timeoutlen`). DESIGN.md in the repo lists every known deviation under "Accepted limitations".
 
-Privacy: no analytics, no network requests, no remote code; the content script runs on every http/https page but reads only the field you activated. The policy is PRIVACY.md in the repo.
+Privacy: no analytics, no network requests, no remote code; the content script runs on every http/https page but reads only the field you Activated. The policy is PRIVACY.md in the repo.
 ```
 
 ## 6. GitHub Discussion (category: Announcements, on Kyu-seok/VimText)
@@ -311,7 +312,7 @@ VimText 0.3.0 is the first version you can install from the Chrome Web Store: <C
 
 The release and the zip the store received are at https://github.com/Kyu-seok/VimText/releases/tag/v0.3.0; the release notes there are the full list of what changed since 0.2.0. In short, M3 is closed:
 
-- **Clipboard registers.** `"+` is the system clipboard, `"*` its alias; read only on a `"+`/`"*` paste, written only on a `"+`/`"*` yank. A denied read is a Status Line message, not an error.
+- **Clipboard registers.** `"+` is the system clipboard, `"*` its alias; read only on a `"+`/`"*` paste, written only when a yank, delete or change stores text into them. A denied read is a Status Line message, not an error.
 - **Session State across tabs.** Registers (macros included), search and command history and the last `f`/`t` search are shared by every Field in every tab for the life of the browser session, in session storage. Last writer wins.
 - **vimrc.** Failing lines are listed under the box in the options page; the saved vimrc is the whole truth about your mappings, re-run on every Activation, so a deleted mapping is gone everywhere at the next Activation.
 - **Plugins**, off by default: surround (`ys` `yss` `cs` `ds`, Visual `S`, `.` repeats) and targets (Seek, the `n`/`l` prefixes, `ia`/`aa`). A vimrc mapping on a key a Plugin also binds wins.

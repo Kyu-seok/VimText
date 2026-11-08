@@ -37,9 +37,9 @@ Or load it unpacked from a clone: see [Develop](#develop).
   `E486`. It is never shown on a Field that was not Activated; after
   Activation it shows a dim `-- INSERT --`.
 - **Clipboard registers.** `"+` is the system clipboard and `"*` is an alias of
-  it. The clipboard is read only on a `"+`/`"*` paste and written only on a
-  `"+`/`"*` yank; the unnamed register never touches it. `Cmd+V` in Normal is
-  a Pass-through.
+  it. The clipboard is read only on a `"+`/`"*` paste and written only when a
+  yank, delete or change stores text into `"+`/`"*`; the unnamed register never
+  touches it. `Cmd+V` in Normal is a Pass-through.
 - **Session State across tabs.** Registers (the macros they hold included),
   search and command history and the last `f`/`t` search are shared by every
   Field in every tab for as long as the browser runs, and gone when it closes.
@@ -99,8 +99,10 @@ npm ci                 # also installs the git hooks (pre-commit, pre-push)
 npm run build          # → dist/
 npm run watch          # rebuild dist/ on change (then reload the extension in Chrome)
 npm run typecheck
-npm test               # sync-layer unit tests in real Chromium (Vitest browser mode)
+npm test               # Vitest, two projects: sync-layer unit tests in real Chromium, repo-wide consistency checks in Node
 npm run test:e2e       # Playwright drives the built extension against tests/fixtures
+npm run screenshots    # regenerates the store PNGs under docs/store/ from a fixture (outside the gate)
+npm run package        # builds and zips dist/ for the store, see docs/release.md
 npm run check          # the one gate: typecheck, import and unused-code checks, unit, build, e2e
 ```
 
@@ -119,7 +121,7 @@ src/
   content.ts     entry: capture-phase keydown → bridge
   background.ts  service worker: grants content scripts session storage, nothing else
 popup/ options/  plain HTML + TS
-tests/           unit/ (Vitest browser mode) · e2e/ (Playwright) · fixtures/
+tests/           unit/ (Vitest in Chromium) · node/ (Vitest in Node: repo-wide consistency checks) · e2e/ (Playwright) · screenshots/ (the store PNGs) · fixtures/
 ```
 
 Design: [DESIGN.md](DESIGN.md) · Vocabulary: [GLOSSARY.md](GLOSSARY.md) ·

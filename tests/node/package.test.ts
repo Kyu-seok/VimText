@@ -19,9 +19,15 @@ const packageScript = repoPath("tools/package.mjs");
  * The pre-commit hook runs `npm test` with GIT_DIR and GIT_INDEX_FILE exported.
  * Inherited, they would point the fake repository's git, and the script's
  * `git status`, at VimText's own repository (the first run committed "fake
- * repo" there). The children get an environment without any GIT_* variable.
+ * repo" there). The children get an environment without any GIT_* variable,
+ * and one that hides the user's global and system git config (a
+ * `core.hooksPath` there would run that user's hooks on the fake commit).
  */
-const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
+const envWithoutGit = {
+  ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_"))),
+  GIT_CONFIG_GLOBAL: "/dev/null",
+  GIT_CONFIG_NOSYSTEM: "1",
+};
 
 /** A committed repo shaped like VimText: the two version files, a gitignored dist/ and release/. */
 function fakeRepo(manifestVersion: string, packageVersion = manifestVersion): string {
@@ -36,7 +42,7 @@ function fakeRepo(manifestVersion: string, packageVersion = manifestVersion): st
   const git = (...args: string[]) =>
     execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.com", ...args], {
       cwd: root,
-      env,
+      env: envWithoutGit,
       stdio: "pipe",
     });
   git("init", "-q");
@@ -48,7 +54,7 @@ function fakeRepo(manifestVersion: string, packageVersion = manifestVersion): st
 function runPackage(root: string, ...args: string[]) {
   const result = spawnSync(process.execPath, [packageScript, "--root", root, "--no-build", ...args], {
     encoding: "utf8",
-    env,
+    env: envWithoutGit,
   });
   return { status: result.status, stderr: result.stderr, stdout: result.stdout };
 }

@@ -18,7 +18,7 @@ bold are defined in [GLOSSARY.md](GLOSSARY.md).
 - **No reading of pages.** VimText does not read page text, form contents,
   cookies or history. Of the address it reads only the page's origin (scheme and
   host, such as `https://github.com`), to look up your **Site Policy** for that
-  site. The one element it reads is the **Field** you **Activated** (below).
+  site. The one thing it reads is the **Field** you **Activated** (below).
 
 ## What the content script does on every page
 

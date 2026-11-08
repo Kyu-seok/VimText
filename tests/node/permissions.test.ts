@@ -17,6 +17,14 @@ interface Manifest {
 
 const JUSTIFICATIONS_HEADING = "## Permission justifications";
 
+/** The names the texts must contain: every permission and every content script match pattern, as the manifest spells them. */
+function manifestTokens(manifest: Manifest): string[] {
+  return [
+    ...(manifest.permissions ?? []),
+    ...(manifest.content_scripts ?? []).flatMap((script) => script.matches),
+  ];
+}
+
 function justificationsSection(listing: string): string {
   const start = listing.indexOf(JUSTIFICATIONS_HEADING);
   if (start < 0) return "";
@@ -27,12 +35,8 @@ function justificationsSection(listing: string): string {
 
 /** The manifest tokens absent from one of the two texts, each named with the text it is missing from. */
 function missingMentions(manifest: Manifest, privacy: string, listing: string): string[] {
-  const tokens = [
-    ...(manifest.permissions ?? []),
-    ...(manifest.content_scripts ?? []).flatMap((script) => script.matches),
-  ];
   const justifications = justificationsSection(listing);
-  return tokens.flatMap((token) => [
+  return manifestTokens(manifest).flatMap((token) => [
     ...(privacy.includes(token) ? [] : [`${token} is not named in PRIVACY.md`]),
     ...(justifications.includes(token)
       ? []
@@ -63,6 +67,6 @@ it("a permission added to the manifest and not to the texts is reported for both
 it("a listing without a justifications section justifies nothing", () => {
   const withoutSection = listing().replace(JUSTIFICATIONS_HEADING, "## Permissions");
   expect(missingMentions(manifest(), privacy(), withoutSection)).toHaveLength(
-    (manifest().permissions?.length ?? 0) + (manifest().content_scripts?.[0]?.matches.length ?? 0),
+    manifestTokens(manifest()).length,
   );
 });
