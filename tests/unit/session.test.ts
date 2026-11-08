@@ -152,6 +152,24 @@ describe("Field is the truth", () => {
   });
 });
 
+describe("Mode", () => {
+  it("names linewise and blockwise Visual after V and Ctrl-v", () => {
+    keys("V");
+    expect(session.mode).toBe("visual-line");
+    keydown("Escape");
+    keydown("v", { ctrlKey: true });
+    expect(session.mode).toBe("visual-block");
+  });
+
+  it("is command-line while the : input is open, and Normal again once Esc closes it", () => {
+    keys(":");
+    expect(session.mode).toBe("command-line");
+    const input = session.status.statusbar.querySelector("input")!;
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", keyCode: 27, bubbles: true }));
+    expect(session.mode).toBe("normal");
+  });
+});
+
 describe("Visual mode and text objects", () => {
   it("vee selects two words; d deletes them", () => {
     keys("vee");

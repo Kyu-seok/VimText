@@ -2,6 +2,7 @@ import { EditorSelection, type Text } from "@codemirror/state";
 import type { Field } from "../field/Field";
 import { diffText } from "../field/diff";
 import { Mirror, Vim, type KeyLike } from "../engine/mirror";
+import type { Mode } from "../engine/mode";
 import { StatusLine } from "../ui/StatusLine";
 
 interface SessionConfig {
@@ -135,8 +136,9 @@ export class Session {
     this.render();
   }
 
-  get mode(): string {
-    return this.mirror.vim.mode ?? "normal";
+  /** The engine has no Command-line mode of its own: it is the `:` `/` `?` input being open. */
+  get mode(): Mode {
+    return this.mirror.commandLineOpen() ? "command-line" : this.mirror.mode;
   }
 
   private get nativeInsert(): boolean {

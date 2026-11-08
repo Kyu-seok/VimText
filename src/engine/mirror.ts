@@ -3,6 +3,7 @@ import { EditorView } from "@codemirror/view";
 import { history } from "@codemirror/commands";
 import { vim, getCM, Vim } from "@replit/codemirror-vim";
 import type { WrappingStyle } from "../field/Field";
+import { modeFromEngine, type Mode } from "./mode";
 
 /** The slice of the adapter's CM5-style object the bridge relies on. */
 interface VimCM {
@@ -115,6 +116,11 @@ export class Mirror {
     const v = this.cm.state.vim;
     if (!v) throw new Error("VimText: vim state missing");
     return v;
+  }
+
+  /** The engine's Mode; Command-line is the bridge's call (see `commandLineOpen`). */
+  get mode(): Mode {
+    return modeFromEngine(this.vim.mode);
   }
 
   /** Copies the Field's wrapping-relevant styles so display lines match. */
