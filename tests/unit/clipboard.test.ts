@@ -95,3 +95,24 @@ describe("Clipboard registers", () => {
     expect(ta.value).toMatch(/^he quick/);
   });
 });
+
+describe("Without a clipboard API (a plain http page: insecure context)", () => {
+  beforeEach(() => {
+    vi.stubGlobal("navigator", { ...navigator, clipboard: undefined });
+  });
+
+  it('"+p says so on the Status Line and leaves the text', async () => {
+    keys('"+p');
+    await expect.poll(() => statusText()).toContain("clipboard");
+    expect(ta.value).toMatch(/^the quick brown fox\n/);
+  });
+
+  it('"+y says so too and is not an engine error; the next key is a plain one', () => {
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    keys('"+y');
+    expect(statusText()).toContain("clipboard");
+    expect(errors).not.toHaveBeenCalled();
+    keys("x");
+    expect(ta.value).toMatch(/^he quick/);
+  });
+});

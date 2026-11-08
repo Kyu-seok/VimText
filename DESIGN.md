@@ -228,7 +228,8 @@ push/PR · MIT · version restarts at 0.1.0. Upstream engine tests are not re-ru
   Field left focused in a background frame can be the one reported.
 - In a cross-origin frame whose embedding page's permissions policy denies clipboard access,
   `"+p`/`"*p` show a Status Line message and leave the text untouched; `"+y` still fills the
-  register but the clipboard does not change.
+  register but the clipboard does not change. On a plain `http://` page (not a secure context)
+  there is no clipboard API at all: every `"+`/`"*` command beeps with a Status Line message.
 
 ## Milestones
 

@@ -206,6 +206,17 @@ export class Session {
       return;
     }
 
+    if (this.mirror.vim.inputState.registerName === "+" && !navigator.clipboard) {
+      // A plain http page has no clipboard API at all (DESIGN.md "Accepted
+      // limitations"): the engine's `"+` yank would throw inside its register
+      // write, so the command is a beep with a reason instead.
+      this.beep();
+      this.mirror.notify("VimText: no clipboard on this page (not a secure context)");
+      e.preventDefault();
+      e.stopPropagation();
+      this.render();
+      return;
+    }
     if (this.isClipboardPaste(e)) {
       this.pasteFromClipboard(e);
       return;
@@ -238,8 +249,7 @@ export class Session {
   private pasteFromClipboard(e: KeyboardEvent): void {
     e.preventDefault();
     e.stopPropagation();
-    const read = navigator.clipboard?.readText() ?? Promise.reject(new Error("no clipboard"));
-    read.then(
+    navigator.clipboard.readText().then(
       () => {
         if (this.destroyed) return;
         this.syncFromField();
