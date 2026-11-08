@@ -311,9 +311,19 @@ push/PR · MIT · version restarts at 0.1.0. Upstream engine tests are not re-ru
   of `"+`) and Session State across tabs (a minimal service worker grants content scripts
   session storage; last writer wins) plus vimrc error reporting in the options page and
   mappings that replace rather than accumulate; part 2 Plugins (surround with the Plugin key hook first, then targets; decided in the grill
-  of 2026-11-08, ADR 0006); part 3 Web Store release (package script, privacy policy in the repo,
-  listing, dogfooding on GitHub, Reddit, Hacker News, Stack Overflow). 0.3.0 is tagged at
-  the store submission.
-- **M4** contenteditable Field (own planning session first).
+  of 2026-11-08, ADR 0006); part 3 Web Store release, decided in the grill of 2026-11-09: a
+  package script and a tag-driven GitHub Release (the store upload itself is manual), the
+  privacy policy and the store listing texts in the repo, screenshots generated from a fixture,
+  the README for a public install, and a dogfooding pass as the submission gate: writing a
+  comment on GitHub, Hacker News, Stack Overflow and Reddit's Markdown editor (its rich-text
+  composer is contenteditable, M4) in Normal, Insert and Visual with `u` and `"+p`. A finding
+  blocks the release only if it corrupts text, traps the page (a key the site needs never
+  arrives, the form cannot be submitted or left) or throws; anything else is filed. 0.3.0 is
+  tagged at the store upload; a resubmission after a rejection is a new patch version, never
+  a re-cut tag. Announcements (Show HN, r/vim, r/chrome_extensions, Stack Overflow answers with
+  affiliation disclosed, a GitHub Discussion) go out after approval, not at upload. Not in
+  this part: Firefox/AMO, a CHANGELOG file (GitHub Release notes are the changelog), #12, #23.
+- **M4** contenteditable Field (own planning session first). Reddit's rich-text comment
+  composer is one of its cases.
 
 Each milestone is a usable release.
