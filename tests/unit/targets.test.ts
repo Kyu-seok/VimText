@@ -204,3 +204,55 @@ describe("in Visual, the object becomes the selection", () => {
     expect(text()).toBe("x () y");
   });
 });
+
+describe("quote objects count the quotes from the start of the line (targets.txt 'quote text objects')", () => {
+  it("di' inside the quotes, and da' takes the quotes and no surrounding whitespace", () => {
+    open("a ' bbbbbbbb ' c ' d ' e", 6);
+    feed("d", "i", "'");
+    expect(text()).toBe("a '' c ' d ' e");
+    open("a ' bbbbbbbb ' c ' d ' e", 6);
+    feed("d", "a", "'");
+    expect(text()).toBe("a  c ' d ' e");
+  });
+
+  it('ci" on the comma between two strings skips the false quotes and changes the next string (targets.txt)', () => {
+    open('join("hello", "world")', 12);
+    feed("c", "i", '"');
+    expect(text()).toBe('join("hello", "")');
+    expect(insertMode()).toBe(true);
+  });
+
+  it('di" from before any quote on the line changes the next string', () => {
+    open('say "a" and "b"', 0);
+    feed("d", "i", '"');
+    expect(text()).toBe('say "" and "b"');
+  });
+
+  it('di" from after the last quote on the line seeks back to the last string', () => {
+    open('"a" "b" tail', 10);
+    feed("d", "i", '"');
+    expect(text()).toBe('"a" "" tail');
+  });
+
+  it("on an opening quote the string it opens is the one; on a closing quote the string it closes", () => {
+    open('"a" "b"', 4);
+    feed("d", "i", '"');
+    expect(text()).toBe('"a" ""');
+    open('"a" "b"', 2);
+    feed("d", "i", '"');
+    expect(text()).toBe('"" "b"');
+  });
+
+  it("the Seek for a quote stays on the cursor's line: a string on the next line is not found", () => {
+    open('none\n"a"', 1);
+    feed("d", "i", '"', "x");
+    expect(text()).toBe('nne\n"a"');
+    expect(insertMode()).toBe(false);
+  });
+
+  it("the back tick is a quote too, and in Visual the string becomes the selection", () => {
+    open("x `code` y", 0);
+    feed("v", "i", "`");
+    expect(selected()).toBe("code");
+  });
+});

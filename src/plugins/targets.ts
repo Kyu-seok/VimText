@@ -185,9 +185,77 @@ function findPair(
   ]);
 }
 
+// --- Quote objects (targets.txt "quote text objects") ---
+
+const QUOTES = new Set(['"', "'", "`"]);
+
+/** The proper strings of a line: its quotes paired from the start, as the offsets of both quotes in the line. */
+function quotePairs(line: string, quote: string): Array<[number, number]> {
+  const pairs: Array<[number, number]> = [];
+  let open = -1;
+  for (let i = 0; i < line.length; i++) {
+    if (line[i] !== quote) continue;
+    if (open < 0) open = i;
+    else {
+      pairs.push([open, i]);
+      open = -1;
+    }
+  }
+  return pairs;
+}
+
+/** `a"` takes the quotes and, unlike Vim's, no surrounding whitespace (targets.txt). */
+function quoteTarget(base: number, pair: [number, number] | undefined): Target | null {
+  return pair ? pairTarget([base + pair[0], base + pair[1]]) : null;
+}
+
+/**
+ * The implicit Seek for a quote stays on the cursor's line (targets.txt
+ * "quote seek"); `n`/`l` walk the lines after or before it, the `count`-th
+ * string counting.
+ */
+function findQuote(cm: CodeMirrorV, q: Query, quote: string, which: Which): Target | null {
+  const { line, ch } = cm.posFromIndex(q.cursor);
+  const base = q.cursor - ch;
+  const here = quotePairs(cm.getLine(line), quote);
+  if (which === "seek") {
+    return seek(cm, q.cursor, [
+      quoteTarget(
+        base,
+        here.find(([o, c]) => o <= ch && ch <= c),
+      ),
+      quoteTarget(
+        base,
+        here.find(([o]) => o > ch),
+      ),
+      quoteTarget(base, here.filter(([, c]) => c < ch).pop()),
+    ]);
+  }
+  let count = q.count;
+  if (which === "next") {
+    let candidates = here.filter(([o]) => o > ch);
+    for (let l = line, lineBase = base; ;) {
+      if (count <= candidates.length) return quoteTarget(lineBase, candidates[count - 1]);
+      count -= candidates.length;
+      if (++l > cm.lastLine()) return null;
+      lineBase = cm.indexFromPos({ line: l, ch: 0 });
+      candidates = quotePairs(cm.getLine(l), quote);
+    }
+  }
+  let candidates = here.filter(([, c]) => c < ch);
+  for (let l = line, lineBase = base; ;) {
+    if (count <= candidates.length) return quoteTarget(lineBase, candidates[candidates.length - count]);
+    count -= candidates.length;
+    if (--l < 0) return null;
+    lineBase = cm.indexFromPos({ line: l, ch: 0 });
+    candidates = quotePairs(cm.getLine(l), quote);
+  }
+}
+
 function findTarget(cm: CodeMirrorV, q: Query, char: string, which: Which, inner: boolean): Target | null {
   const pair = PAIRS[char];
   if (pair) return findPair(cm, q, pair[0], pair[1], which, inner);
+  if (QUOTES.has(char)) return findQuote(cm, q, char, which);
   return null;
 }
 
@@ -220,7 +288,7 @@ function objectMotion(which: Which): MotionFn {
 // --- Bindings ---
 
 /** Every key `i`/`a` is bound for: the four pairs by both brackets and their alias, the quotes, the argument. */
-const OBJECT_KEYS = Object.keys(PAIRS);
+const OBJECT_KEYS = [...Object.keys(PAIRS), ...QUOTES];
 
 const BINDINGS: vimKey[] = [
   ...OBJECT_KEYS.flatMap((key): vimKey[] => [
