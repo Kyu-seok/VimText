@@ -252,10 +252,148 @@ function findQuote(cm: CodeMirrorV, q: Query, quote: string, which: Which): Targ
   }
 }
 
+// --- Argument objects (targets.txt "argument text objects": `(`/`[` open a list, `,` separates) ---
+
+const ARGUMENT = "a";
+const ARG_OPEN = "([";
+const ARG_CLOSE = ")]";
+const ARG_SEP = ",";
+
+/** Scans back from `at` for an argument's opening delimiter (a separator or an opening bracket at depth 0); -1 at the text's start. */
+function argOpenBefore(text: string, at: number): number {
+  let depth = 0;
+  for (let i = at; i >= 0; i--) {
+    const c = text[i]!;
+    if (ARG_CLOSE.includes(c)) depth++;
+    else if (ARG_OPEN.includes(c)) {
+      if (depth === 0) return i;
+      depth--;
+    } else if (c === ARG_SEP && depth === 0) return i;
+  }
+  return -1;
+}
+
+/** Scans forward from `at` for an argument's closing delimiter (a separator or a closing bracket at depth 0); -1 at the text's end. */
+function argCloseAfter(text: string, at: number): number {
+  let depth = 0;
+  for (let i = at; i < text.length; i++) {
+    const c = text[i]!;
+    if (ARG_OPEN.includes(c)) depth++;
+    else if (ARG_CLOSE.includes(c)) {
+      if (depth === 0) return i;
+      depth--;
+    } else if (c === ARG_SEP && depth === 0) return i;
+  }
+  return -1;
+}
+
+/** The brackets of the list an argument with these delimiters belongs to; null when it is in none. */
+function listBrackets(text: string, open: number, close: number): [number, number] | null {
+  let i = open;
+  while (i >= 0 && !ARG_OPEN.includes(text[i]!)) i = argOpenBefore(text, i - 1);
+  let j = close;
+  while (j >= 0 && !ARG_CLOSE.includes(text[j]!)) j = argCloseAfter(text, j + 1);
+  return i < 0 || j < 0 ? null : [i, j];
+}
+
+/**
+ * The argument between the delimiters `open` and `close`. `ia` is everything
+ * between them; `aa` leaves a proper list behind: an argument after a
+ * separator takes that separator and its own trailing whitespace, the first
+ * argument of a list starts at its first non-blank and takes the separator and
+ * the whitespace after it instead (targets.txt's argument chart).
+ */
+function argumentTarget(text: string, found: Found): Target | null {
+  if (!found || !listBrackets(text, found[0], found[1])) return null;
+  const [open, close] = found;
+  let around: Span;
+  if (text[open] === ARG_SEP) around = { from: open, to: close };
+  else {
+    let from = open + 1;
+    while (from < close && /\s/.test(text[from]!)) from++;
+    let to = close;
+    if (text[close] === ARG_SEP) {
+      to = close + 1;
+      while (to < text.length && /\s/.test(text[to]!)) to++;
+    }
+    around = { from, to };
+  }
+  return { raw: { from: open, to: close + 1 }, inner: { from: open + 1, to: close }, around };
+}
+
+/** The argument at `at`: on a delimiter, the argument it opens (a separator or opening bracket) or closes. */
+function argumentAround(text: string, at: number): Found {
+  const c = text[at] ?? "";
+  let open: number;
+  let close: number;
+  if (c === ARG_SEP || ARG_OPEN.includes(c)) {
+    open = at;
+    close = argCloseAfter(text, at + 1);
+  } else if (ARG_CLOSE.includes(c)) {
+    close = at;
+    open = argOpenBefore(text, at - 1);
+  } else {
+    open = argOpenBefore(text, at - 1);
+    close = argCloseAfter(text, at + 1);
+  }
+  return open < 0 || close < 0 ? null : [open, close];
+}
+
+/** The argument whose list holds the argument `found`: one count bigger. */
+function argumentEnclosing(text: string, found: Found): Found {
+  const list = found && listBrackets(text, found[0], found[1]);
+  if (!list) return null;
+  const open = argOpenBefore(text, list[0] - 1);
+  const close = argCloseAfter(text, list[1] + 1);
+  return open < 0 || close < 0 ? null : [open, close];
+}
+
+/** The `count`-th argument opening after `at` (at a separator or an opening bracket) that is in a list. */
+function argumentNext(text: string, at: number, count: number): Target | null {
+  for (let d = at + 1; d < text.length; d++) {
+    const c = text[d]!;
+    if (c !== ARG_SEP && !ARG_OPEN.includes(c)) continue;
+    const close = argCloseAfter(text, d + 1);
+    const target = close < 0 ? null : argumentTarget(text, [d, close]);
+    if (target && --count === 0) return target;
+  }
+  return null;
+}
+
+/** The `count`-th argument closing before `at` (at a separator or a closing bracket) that is in a list. */
+function argumentLast(text: string, at: number, count: number): Target | null {
+  for (let d = at - 1; d >= 0; d--) {
+    const c = text[d]!;
+    if (c !== ARG_SEP && !ARG_CLOSE.includes(c)) continue;
+    const open = argOpenBefore(text, d - 1);
+    const target = open < 0 ? null : argumentTarget(text, [open, d]);
+    if (target && --count === 0) return target;
+  }
+  return null;
+}
+
+function findArgument(cm: CodeMirrorV, q: Query, which: Which, inner: boolean): Target | null {
+  const { text, cursor } = q;
+  if (which === "next") return argumentNext(text, cursor, q.count);
+  if (which === "last") return argumentLast(text, cursor, q.count);
+  const grow = (found: Found, count: number): Found => {
+    for (let n = 1; found && n < count; n++) found = argumentEnclosing(text, found);
+    return found;
+  };
+  let count = q.count;
+  let around = argumentTarget(text, grow(argumentAround(text, cursor), count));
+  while (around && q.selection && contains(q.selection, inner ? around.inner : around.around)) {
+    around = argumentTarget(text, grow(argumentAround(text, cursor), ++count));
+  }
+  if (q.count > 1) return around;
+  return seek(cm, cursor, [around, argumentNext(text, cursor, 1), argumentLast(text, cursor, 1)]);
+}
+
 function findTarget(cm: CodeMirrorV, q: Query, char: string, which: Which, inner: boolean): Target | null {
   const pair = PAIRS[char];
   if (pair) return findPair(cm, q, pair[0], pair[1], which, inner);
   if (QUOTES.has(char)) return findQuote(cm, q, char, which);
+  if (char === ARGUMENT) return findArgument(cm, q, which, inner);
   return null;
 }
 
@@ -288,7 +426,7 @@ function objectMotion(which: Which): MotionFn {
 // --- Bindings ---
 
 /** Every key `i`/`a` is bound for: the four pairs by both brackets and their alias, the quotes, the argument. */
-const OBJECT_KEYS = [...Object.keys(PAIRS), ...QUOTES];
+const OBJECT_KEYS = [...Object.keys(PAIRS), ...QUOTES, ARGUMENT];
 
 const BINDINGS: vimKey[] = [
   ...OBJECT_KEYS.flatMap((key): vimKey[] => [

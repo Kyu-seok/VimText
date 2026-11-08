@@ -342,3 +342,101 @@ describe("n and l reach the next and last object (targets.txt 'next and last pai
     expect(text()).toBe("(a) () ()");
   });
 });
+
+describe("argument objects (targets.txt 'argument text objects' and its chart)", () => {
+  it("ia is the text between the argument's delimiters; aa leaves a proper list behind (targets.txt example)", () => {
+    open("a , b ( cccccccc , d ) e", 9);
+    feed("d", "i", "a");
+    expect(text()).toBe("a , b (, d ) e");
+    open("a , b ( cccccccc , d ) e", 9);
+    feed("d", "a", "a");
+    expect(text()).toBe("a , b ( d ) e");
+  });
+
+  it("daa on the first, a middle and the last argument leaves a proper list each time", () => {
+    open("f(a, b, c)", 2);
+    feed("d", "a", "a");
+    expect(text()).toBe("f(b, c)");
+    open("f(a, b, c)", 5);
+    feed("d", "a", "a");
+    expect(text()).toBe("f(a, c)");
+    open("f(a, b, c)", 8);
+    feed("d", "a", "a");
+    expect(text()).toBe("f(a, b)");
+  });
+
+  it("cia on the only argument changes it", () => {
+    open("f( x )", 3);
+    feed("c", "i", "a");
+    expect(text()).toBe("f()");
+    expect(insertMode()).toBe(true);
+  });
+
+  // The argument chart's line, the cursor on eeeeee.
+  const CHART = "a ( bbbbbb , ccccccc , d ( eeeeee , fffffff ) , gggggg ) h";
+  const E = 28;
+
+  it("ia and aa on a nested argument; 2ia and 2aa on the argument enclosing it", () => {
+    open(CHART, E);
+    feed("d", "i", "a");
+    expect(text()).toBe("a ( bbbbbb , ccccccc , d (, fffffff ) , gggggg ) h");
+    open(CHART, E);
+    feed("d", "a", "a");
+    expect(text()).toBe("a ( bbbbbb , ccccccc , d ( fffffff ) , gggggg ) h");
+    open(CHART, E);
+    feed("d", "2", "i", "a");
+    expect(text()).toBe("a ( bbbbbb , ccccccc ,, gggggg ) h");
+    open(CHART, E);
+    feed("d", "2", "a", "a");
+    expect(text()).toBe("a ( bbbbbb , ccccccc , gggggg ) h");
+  });
+
+  it("ina and ana are the argument after; 2ina the one after the enclosing list closes", () => {
+    open(CHART, E);
+    feed("d", "TargetsIn", "a");
+    expect(text()).toBe("a ( bbbbbb , ccccccc , d ( eeeeee ,) , gggggg ) h");
+    open(CHART, E);
+    feed("d", "TargetsAn", "a");
+    expect(text()).toBe("a ( bbbbbb , ccccccc , d ( eeeeee ) , gggggg ) h");
+    open(CHART, E);
+    feed("d", "2", "TargetsIn", "a");
+    expect(text()).toBe("a ( bbbbbb , ccccccc , d ( eeeeee , fffffff ) ,) h");
+  });
+
+  it("ila and ala are the argument before; 2ala the one before that", () => {
+    open(CHART, E);
+    feed("d", "TargetsIl", "a");
+    expect(text()).toBe("a ( bbbbbb ,, d ( eeeeee , fffffff ) , gggggg ) h");
+    open(CHART, E);
+    feed("d", "TargetsAl", "a");
+    expect(text()).toBe("a ( bbbbbb , d ( eeeeee , fffffff ) , gggggg ) h");
+    open(CHART, E);
+    feed("d", "2", "TargetsAl", "a");
+    expect(text()).toBe("a ( ccccccc , d ( eeeeee , fffffff ) , gggggg ) h");
+  });
+
+  it("ia from outside any brackets Seeks the next argument on the line", () => {
+    open("x f(a, b)", 0);
+    feed("d", "i", "a");
+    expect(text()).toBe("x f(, b)");
+  });
+
+  it("a comma outside brackets is no argument: nothing changes", () => {
+    open("a, b", 0);
+    feed("d", "i", "a", "x");
+    expect(text()).toBe(", b");
+    expect(insertMode()).toBe(false);
+  });
+
+  it("an argument spanning lines: daa on the last one takes its separator and the line break", () => {
+    open("f(\n  a,\n  b\n)", 9);
+    feed("d", "a", "a");
+    expect(text()).toBe("f(\n  a)");
+  });
+
+  it("via selects the argument", () => {
+    open("f(a, bb, c)", 5);
+    feed("v", "i", "a");
+    expect(selected()).toBe(" bb");
+  });
+});
