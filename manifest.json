@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "VimText",
   "version": "0.2.0",
-  "description": "Vim modal editing for the text fields of ordinary web pages.",
+  "description": "Vim modal editing for the text fields of ordinary web pages: edits the page's own field in place, no native host.",
   "permissions": ["storage", "clipboardRead", "clipboardWrite"],
   "icons": { "16": "icons/icon16.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
   "action": {
