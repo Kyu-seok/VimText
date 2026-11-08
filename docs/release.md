@@ -72,6 +72,7 @@ choices to keep in mind when touching the manifest.
 
 ## What the machine checks and what it does not
 
-The Node project checks the version agreement and the package script's refusals and zip layout.
-The workflow's only logic is in the package script, so its proof is the first tag run; the
-dashboard submission, the listing prose and the privacy policy are reviewed by a human.
+What `npm test` checks of a release (the Node project's entries) is inventoried under
+"Mechanical" in `CODING_STANDARDS.md` and summarised in `DESIGN.md` "Tooling". The workflow's
+only logic is in the package script, so its proof is the first tag run; the dashboard
+submission, the listing prose and the privacy policy are reviewed by a human.
