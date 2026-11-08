@@ -1,5 +1,5 @@
 import type { CodeMirrorV, EngineApi, MotionFn, vimKey } from "../engine/pluginApi";
-import { enclosingPair, matchingClose, matchingOpen } from "./pairs";
+import { BRACKETS, enclosingPair, matchingClose, matchingOpen, type Pair, type Span } from "./pairs";
 import type { Plugin, PluginContext } from "./Plugin";
 
 /**
@@ -13,13 +13,7 @@ import type { Plugin, PluginContext } from "./Plugin";
  * operator, Visual mode, a count and `.` are the engine's.
  */
 
-// --- Spans and targets ---
-
-/** A span of the document, by offsets, end exclusive. */
-interface Span {
-  from: number;
-  to: number;
-}
+// --- Targets ---
 
 /**
  * One text object candidate: `raw` is the whole object with its delimiters
@@ -46,49 +40,24 @@ function pairTarget(found: Found): Target | null {
 
 // --- Pair objects (targets.txt "pair text objects") ---
 
-/** The bracket pairs by trigger character; `b` is the parentheses (Vim's alias; targets' any-block is not in v1) and `B` the braces. */
-const PAIRS: Record<string, readonly [string, string]> = {
-  "(": ["(", ")"],
-  ")": ["(", ")"],
-  b: ["(", ")"],
-  "{": ["{", "}"],
-  "}": ["{", "}"],
-  B: ["{", "}"],
-  "[": ["[", "]"],
-  "]": ["[", "]"],
-  "<": ["<", ">"],
-  ">": ["<", ">"],
-};
-
-/** The `count`-th pair around `at`, growing outward; the bracket under the cursor counts as its own pair. */
-function pairAround(text: string, at: number, open: string, close: string, count: number): Found {
-  let found: Found = null;
-  for (let n = 0; n < count; n++) {
-    found = enclosingPair(text, at, open, close);
-    if (!found) return null;
-    at = found[0] - 1;
-  }
-  return found;
-}
-
 /** The `count`-th balanced pair opening after `at`. */
-function pairNext(text: string, at: number, open: string, close: string, count: number): Found {
+function pairNext(text: string, at: number, pair: Pair, count: number): Found {
   let i = at;
   for (;;) {
-    i = text.indexOf(open, i + 1);
+    i = text.indexOf(pair.open, i + 1);
     if (i < 0) return null;
-    const j = matchingClose(text, i, open, close);
+    const j = matchingClose(text, i, pair);
     if (j >= 0 && --count === 0) return [i, j];
   }
 }
 
 /** The `count`-th balanced pair closing before `at`. */
-function pairLast(text: string, at: number, open: string, close: string, count: number): Found {
+function pairLast(text: string, at: number, pair: Pair, count: number): Found {
   let j = at;
   for (;;) {
-    j = j <= 0 ? -1 : text.lastIndexOf(close, j - 1);
+    j = j <= 0 ? -1 : text.lastIndexOf(pair.close, j - 1);
     if (j < 0) return null;
-    const i = matchingOpen(text, j, open, close);
+    const i = matchingOpen(text, j, pair);
     if (i >= 0 && --count === 0) return [i, j];
   }
 }
@@ -160,28 +129,21 @@ function contains(outer: Span, inner: Span): boolean {
   return outer.from <= inner.from && inner.to <= outer.to;
 }
 
-function findPair(
-  cm: CodeMirrorV,
-  q: Query,
-  open: string,
-  close: string,
-  which: Which,
-  inner: boolean,
-): Target | null {
+function findPair(cm: CodeMirrorV, q: Query, pair: Pair, which: Which, inner: boolean): Target | null {
   const { text, cursor } = q;
-  if (which === "next") return pairTarget(pairNext(text, cursor, open, close, q.count));
-  if (which === "last") return pairTarget(pairLast(text, cursor, open, close, q.count));
+  if (which === "next") return pairTarget(pairNext(text, cursor, pair, q.count));
+  if (which === "last") return pairTarget(pairLast(text, cursor, pair, q.count));
   let count = q.count;
-  let around = pairTarget(pairAround(text, cursor, open, close, count));
+  let around = pairTarget(enclosingPair(text, cursor, pair, count));
   // In Visual the same object typed again grows to the enclosing one.
   while (around && q.selection && contains(q.selection, inner ? around.inner : around.around)) {
-    around = pairTarget(pairAround(text, cursor, open, close, ++count));
+    around = pairTarget(enclosingPair(text, cursor, pair, ++count));
   }
   if (q.count > 1) return around;
   return seek(cm, cursor, [
     around,
-    pairTarget(pairNext(text, cursor, open, close, 1)),
-    pairTarget(pairLast(text, cursor, open, close, 1)),
+    pairTarget(pairNext(text, cursor, pair, 1)),
+    pairTarget(pairLast(text, cursor, pair, 1)),
   ]);
 }
 
@@ -389,9 +351,10 @@ function findArgument(cm: CodeMirrorV, q: Query, which: Which, inner: boolean): 
   return seek(cm, cursor, [around, argumentNext(text, cursor, 1), argumentLast(text, cursor, 1)]);
 }
 
+/** `b` is the parentheses here, as in Vim; targets' any-block is not in v1 (DESIGN.md accepted limitations). */
 function findTarget(cm: CodeMirrorV, q: Query, char: string, which: Which, inner: boolean): Target | null {
-  const pair = PAIRS[char];
-  if (pair) return findPair(cm, q, pair[0], pair[1], which, inner);
+  const pair = BRACKETS[char];
+  if (pair) return findPair(cm, q, pair, which, inner);
   if (QUOTES.has(char)) return findQuote(cm, q, char, which);
   if (char === ARGUMENT) return findArgument(cm, q, which, inner);
   return null;
@@ -426,7 +389,7 @@ function objectMotion(which: Which): MotionFn {
 // --- Bindings ---
 
 /** Every key `i`/`a` is bound for: the four pairs by both brackets and their alias, the quotes, the argument. */
-const OBJECT_KEYS = [...Object.keys(PAIRS), ...QUOTES, ARGUMENT];
+const OBJECT_KEYS = [...Object.keys(BRACKETS), ...QUOTES, ARGUMENT];
 
 const BINDINGS: vimKey[] = [
   ...OBJECT_KEYS.flatMap((key): vimKey[] => [
@@ -454,7 +417,8 @@ const BINDINGS: vimKey[] = [
   { keys: "<TargetsAl><character>", type: "motion", motion: "targetsLastObject" },
 ];
 
-const SEEK_RULES = (context: PluginContext) => [
+/** The `n`/`l` prefix rules for the hook: `in` `an` `il` `al` become the next/last Plugin Keys in one context. */
+const PREFIX_RULES = (context: PluginContext) => [
   { context, typed: "in", key: "TargetsIn" },
   { context, typed: "an", key: "TargetsAn" },
   { context, typed: "il", key: "TargetsIl" },
@@ -464,7 +428,7 @@ const SEEK_RULES = (context: PluginContext) => [
 let defined = false;
 
 export const targets: Plugin = {
-  keys: [...SEEK_RULES("operator-pending"), ...SEEK_RULES("visual")],
+  keys: [...PREFIX_RULES("operator-pending"), ...PREFIX_RULES("visual")],
 
   define(engine: EngineApi) {
     if (defined) return;

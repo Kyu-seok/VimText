@@ -1,5 +1,5 @@
 import type { CodeMirrorV, EngineApi, OperatorFn, Pos, vimKey } from "../engine/pluginApi";
-import { enclosingPair } from "./pairs";
+import { BRACKETS, enclosingPair, type Pair, type Span } from "./pairs";
 import type { Plugin } from "./Plugin";
 
 /**
@@ -18,21 +18,8 @@ import type { Plugin } from "./Plugin";
 
 // --- Targets and replacements (surround.txt "TARGETS", "REPLACEMENTS") ---
 
-/** The bracket pairs, each reachable by either character and by its alias (`b` `B` `r` `a`). */
-const BRACKETS: Record<string, readonly [string, string]> = {
-  "(": ["(", ")"],
-  ")": ["(", ")"],
-  b: ["(", ")"],
-  "{": ["{", "}"],
-  "}": ["{", "}"],
-  B: ["{", "}"],
-  "[": ["[", "]"],
-  "]": ["[", "]"],
-  r: ["[", "]"],
-  "<": ["<", ">"],
-  ">": ["<", ">"],
-  a: ["<", ">"],
-};
+/** The bracket pairs as surround names them: either character, Vim's `b` `B`, and vim-surround's own aliases `r` `a`. */
+const SURROUND_BRACKETS: Record<string, Pair> = { ...BRACKETS, r: BRACKETS["["]!, a: BRACKETS["<"]! };
 
 /** The opening bracket as a target trims the inner whitespace; as a replacement it adds a space inside. */
 const OPENING = new Set(["(", "{", "[", "<"]);
@@ -42,15 +29,15 @@ const OPENING = new Set(["(", "{", "[", "<"]);
  * for one this version leaves alone: `<` and `t` prompt for a tag in Vim (not
  * in v1, DESIGN.md accepted limitations) and a letter wraps with nothing.
  */
-function delimiters(char: string): [string, string] | null {
+function delimiters(char: string): Pair | null {
   if (char === "<" || char === "t" || char === "T") return null;
-  const pair = BRACKETS[char];
+  const pair = SURROUND_BRACKETS[char];
   if (pair) {
     const space = OPENING.has(char) ? " " : "";
-    return [pair[0] + space, space + pair[1]];
+    return { open: pair.open + space, close: space + pair.close };
   }
   if (/[\p{L}\p{N}]/u.test(char) || char === " ") return null;
-  return [char, char];
+  return { open: char, close: char };
 }
 
 /**
@@ -85,18 +72,8 @@ function sameCharPair(line: string, ch: number, char: string): [number, number] 
 
 /** Offsets of the target pair's two delimiters for `ds`/`cs`, `count` pairs out for brackets; null when absent. */
 function findTarget(cm: CodeMirrorV, head: Pos, char: string, count: number): [number, number] | null {
-  const bracket = BRACKETS[char];
-  if (bracket) {
-    const text = cm.getValue();
-    let at = cm.indexFromPos(head);
-    let found: [number, number] | null = null;
-    for (let n = 0; n < count; n++) {
-      found = enclosingPair(text, at, bracket[0], bracket[1]);
-      if (!found) return null;
-      at = found[0] - 1;
-    }
-    return found;
-  }
+  const bracket = SURROUND_BRACKETS[char];
+  if (bracket) return enclosingPair(cm.getValue(), cm.indexFromPos(head), bracket, count);
   // A letter names a word, sentence, paragraph or tag target: none in v1.
   if (/[\p{L}\p{N}]/u.test(char)) return null;
   const pair = sameCharPair(cm.getLine(head.line), head.ch, char);
@@ -106,12 +83,6 @@ function findTarget(cm: CodeMirrorV, head: Pos, char: string, count: number): [n
 }
 
 // --- The one wait the engine cannot express: the character after ys{motion} and cs{old} ---
-
-/** A span of the document, by offsets, end exclusive. */
-interface Span {
-  from: number;
-  to: number;
-}
 
 interface Wait {
   cm: CodeMirrorV;
@@ -195,14 +166,14 @@ function wrapSpans(
     let wrapped: string;
     if (linewise) {
       const indent = /^[ \t]*/.exec(text)![0];
-      wrapped = `${indent}${d[0].trimEnd()}\n${text}\n${indent}${d[1].trimStart()}`;
+      wrapped = `${indent}${d.open.trimEnd()}\n${text}\n${indent}${d.close.trimStart()}`;
     } else {
       let trailing = "";
       if (keepTrailing) {
         trailing = /[ \t]*$/.exec(text)![0];
         text = text.slice(0, text.length - trailing.length);
       }
-      wrapped = d[0] + text + d[1] + trailing;
+      wrapped = d.open + text + d.close + trailing;
     }
     cursor = replaceSpan(cm, span, wrapped);
   }
@@ -272,7 +243,7 @@ const changeSurroundings: OperatorFn = (cm, args, ranges, oldAnchor) => {
   const text = inner(cm, span, args.selectedCharacter ?? "");
   const change = (char: string): Pos | null => {
     const d = delimiters(char);
-    return d ? replaceSpan(cm, span, d[0] + text + d[1]) : null;
+    return d ? replaceSpan(cm, span, d.open + text + d.close) : null;
   };
   if (repeating(cm, args)) {
     return lastChangeChar !== undefined ? (change(lastChangeChar) ?? oldAnchor) : oldAnchor;
