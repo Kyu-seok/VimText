@@ -37,9 +37,9 @@ Or load it unpacked from a clone: see [Develop](#develop).
   `E486`. It is never shown on a Field that was not Activated; after
   Activation it shows a dim `-- INSERT --`.
 - **Clipboard registers.** `"+` is the system clipboard and `"*` is an alias of
-  it. The clipboard is read only on a `"+`/`"*` paste and written only on a
-  `"+`/`"*` yank; the unnamed register never touches it. `Cmd+V` in Normal is
-  a Pass-through.
+  it. The clipboard is read only on a `"+`/`"*` paste and written only when a
+  yank, delete or change stores text into `"+`/`"*`; the unnamed register never
+  touches it. `Cmd+V` in Normal is a Pass-through.
 - **Session State across tabs.** Registers (the macros they hold included),
   search and command history and the last `f`/`t` search are shared by every
   Field in every tab for as long as the browser runs, and gone when it closes.

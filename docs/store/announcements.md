@@ -34,12 +34,13 @@ Source, issues, design and the accepted limitations: https://github.com/Kyu-seok
 new since 0.2.0:
 
 Clipboard registers
-- "+ is the system clipboard: "+y writes it, "+p reads it. "* is an alias
-  of "+. The unnamed register never touches the clipboard.
-- The clipboard is read only for a "+ or "* paste and written only for a
-  "+ or "* yank. A denied read shows a message on the Status Line and
-  leaves the text alone. A plain http:// page has no clipboard API, so
-  every "+ and "* command beeps there, with a message.
+- "+ is the system clipboard: "+p reads it; "+y, "+d and "+c write it. "*
+  is an alias of "+. The unnamed register never touches the clipboard.
+- The clipboard is read only for a "+ or "* paste and written only when a
+  yank, delete or change stores text into "+ or "*. A denied read shows a
+  message on the Status Line and leaves the text alone. A plain http://
+  page has no clipboard API, so every "+ and "* command beeps there, with
+  a message.
 
 Session State across tabs
 - Registers (the macros they hold included), search and command history
@@ -216,7 +217,7 @@ Source (MIT): https://github.com/Kyu-seok/VimText
 **Permissions, and why**
 
 - `storage`: Site Policies, the vimrc and the plugin toggles in `storage.sync` (carried by Chrome Sync when you have it on, otherwise on the device); registers and history in `storage.session`, gone when the browser closes.
-- `clipboardRead` / `clipboardWrite`: for Vim's `"+` and `"*` registers only. The clipboard is read only on a `"+`/`"*` paste and written only on a `"+`/`"*` yank; the unnamed register never touches it.
+- `clipboardRead` / `clipboardWrite`: for Vim's `"+` and `"*` registers only. The clipboard is read only on a `"+`/`"*` paste and written only when a yank, delete or change stores text into `"+`/`"*`; the unnamed register never touches it.
 - Content script on `http://*/*` and `https://*/*`, all frames. This is what Chrome shows as "read and change all your data on all websites". `activeTab` cannot work here: an extension that is inert until you press Esc inside a field needs something listening for that Esc before you have clicked anything. The script reads only the field you activated.
 - No `tabs`, no `scripting`, no remote code, no network requests, no analytics. The service worker does one thing: grant content scripts access to session storage. The policy is PRIVACY.md in the repo and is linked from the store page.
 
@@ -311,7 +312,7 @@ VimText 0.3.0 is the first version you can install from the Chrome Web Store: <C
 
 The release and the zip the store received are at https://github.com/Kyu-seok/VimText/releases/tag/v0.3.0; the release notes there are the full list of what changed since 0.2.0. In short, M3 is closed:
 
-- **Clipboard registers.** `"+` is the system clipboard, `"*` its alias; read only on a `"+`/`"*` paste, written only on a `"+`/`"*` yank. A denied read is a Status Line message, not an error.
+- **Clipboard registers.** `"+` is the system clipboard, `"*` its alias; read only on a `"+`/`"*` paste, written only when a yank, delete or change stores text into them. A denied read is a Status Line message, not an error.
 - **Session State across tabs.** Registers (macros included), search and command history and the last `f`/`t` search are shared by every Field in every tab for the life of the browser session, in session storage. Last writer wins.
 - **vimrc.** Failing lines are listed under the box in the options page; the saved vimrc is the whole truth about your mappings, re-run on every Activation, so a deleted mapping is gone everywhere at the next Activation.
 - **Plugins**, off by default: surround (`ys` `yss` `cs` `ds`, Visual `S`, `.` repeats) and targets (Seek, the `n`/`l` prefixes, `ia`/`aa`). A vimrc mapping on a key a Plugin also binds wins.

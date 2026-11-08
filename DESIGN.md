@@ -131,7 +131,8 @@ Visual = native selection. No overlay. Visual block edits apply correctly but on
 primary range is highlighted.
 
 **Registers & clipboard.** `"+` is the system clipboard (`clipboardRead`/`clipboardWrite`;
-the engine writes on yank and reads at paste time). `"*` is an alias of `"+`: the engine
+the engine writes when a yank, delete or change stores text into the register and reads at
+paste time). `"*` is an alias of `"+`: the engine
 knows no `*` register, so the bridge rewrites the register name before the engine sees the
 key, where its other key decisions live. Before a `"+p`/`"*p` the bridge reads the clipboard
 itself: a denied read drops the pending register and shows a Status Line message; the
