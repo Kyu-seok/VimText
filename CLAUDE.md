@@ -4,6 +4,7 @@
 - Before touching `src/bridge` or `src/engine`, read `docs/engine-seams.md`: it caches the engine gotchas the bridge depends on.
 - Reviewing a diff: `CODING_STANDARDS.md`.
 - One gate: `npm run check` (typecheck, import check, unused-code check, unit tests in Chromium, build, e2e against the built extension).
+- A fresh clone or worktree gets `npm ci` first: it installs the git hooks (pre-commit runs the fast checks, pre-push runs the gate). Without it git skips them silently.
 
 ## Agent skills
 
