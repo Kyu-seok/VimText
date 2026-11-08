@@ -69,6 +69,21 @@ export function statusText(page: Page | Frame): Promise<string> {
   });
 }
 
+/** Toggles a Plugin in the options page; it applies at the next Activation, the rule the vimrc follows. */
+export async function setPlugin(page: Page, plugin: "surround" | "targets", on: boolean): Promise<void> {
+  await page.goto(`chrome-extension://${extensionId}/options/options.html`);
+  const toggle = page.locator(`#plugin-${plugin}`);
+  await toggle.setChecked(on);
+  await base.expect(toggle).toBeChecked({ checked: on });
+}
+
+/** Opens the textarea fixture with VimText Activated on `#ta`, the caret at its start. */
+export async function openActivated(page: Page): Promise<void> {
+  await page.goto("/textarea.html");
+  await ready(page);
+  await activateAtStart(page, "#ta");
+}
+
 /** Focuses a Field, parks the caret at its start and Activates VimText with Esc. */
 export async function activateAtStart(page: Page, selector = "#in"): Promise<void> {
   const field = page.locator(selector);

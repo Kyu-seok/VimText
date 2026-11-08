@@ -30,7 +30,7 @@ src/
   bridge/        sync: Field <-> mirror, key routing, ownership rules, self-heal
   ui/            Status Line (shadow root): mode, pending keys, recording, command line, messages
   settings/      Site Policy, vimrc, Plugin toggles (storage.sync); Session State (storage.session)
-  plugins/       surround, targets — engine commands via define*/mapCommand, reached through
+  plugins/       surround, targets — engine commands via define*/_mapCommand, reached through
                  the bridge's Plugin key hook (ADR 0006), never a fork
   content.ts     entry: capture-phase keydown → bridge
 popup/ options/  plain HTML + TS
@@ -188,9 +188,10 @@ access to session storage (`setAccessLevel`). Nothing else runs there.
 
 **Plugins** (`src/plugins/`, one module per Plugin; its oracle is the upstream plugin's own
 documentation, GLOSSARY.md **Plugin**). A Plugin defines its operators, motions and actions
-once at module load through the engine's `define*` API, and binds its keys through
-`mapCommand` on every Activation, because those bindings land in the same keymap partition
-as the vimrc's and the Activation's `mapclear` wipes them.
+once at module load through the engine's `define*` API, and binds its keys through the
+engine's `_mapCommand` (the public `mapCommand` cannot express an `operatorMotion` entry) on
+every Activation, because those bindings land in the same keymap partition as the vimrc's
+and the Activation's `mapclear` wipes them.
 
 The engine's matcher takes a full match over a partial one and never waits (the `timeoutlen`
 deviation under accepted limitations): `d`, `c`, `y` are complete operators and `in` is a
@@ -210,7 +211,8 @@ macros) is the engine's, running the Plugin's commands. A Plugin key is Key Poli
 The second literal of `ys{motion}{char}` and `cs{old}{new}` is a one-shot catch-all
 `<character>` binding the Plugin arms from inside the engine: it survives Pass-through keys
 like a pending operator and is cancelled by Esc or any non-printable key the engine
-receives. `.` repeats `ys`, `cs` and `ds` with the same characters (the Plugin keeps the last
+receives. The Field losing focus cancels it too and discards the hook's held keys, so a
+wait armed in one Field never takes a key typed in another. `.` repeats `ys`, `cs` and `ds` with the same characters (the Plugin keeps the last
 ones and tells a `.` replay from a macro replay by the engine's input state being the
 recorded one). Macros record Plugin Keys and replay through the engine unaided.
 
@@ -267,15 +269,33 @@ push/PR · MIT · version restarts at 0.1.0. Upstream engine tests are not re-ru
 - The popup's Mode comes from any frame holding a Session on its active element, so a
   Field left focused in a background frame can be the one reported.
 - Plugins (M3 part 2): a held key (`d` while the hook waits for `s`) is invisible on the Status
-  Line for that keystroke. Macros record Plugin Keys, so `:reg` and `"qp` show `<SurroundDs>(`
+  Line until the sequence resolves (one key for `d`, two for `ys`, which may still become
+  `yss`). Macros record Plugin Keys, so `:reg` and `"qp` show `<SurroundDs>(`
   where `ds(` was typed; they replay correctly. A vimrc `nnoremap` cannot expand into a Plugin
   key (the engine resolves `noremap` against its own defaults only); `nmap` can. With targets
-  on, `cin` followed by a key that is not an object runs `c` on the failed object, which
-  enters Insert mode where Vim beeps; the stock engine does the same for `cix`. Linewise
+  on, `cin` followed by a key that is not an object cancels the `c` and stays in Normal mode
+  where Vim beeps, as the stock engine does for `cix` (a failed text object ends the operator;
+  the hook has no special case). targets' Seek ranks candidates by the default
+  `g:targets_seekRanges` with every line taken as on screen (the hidden mirror has no
+  viewport), so a next object below always beats a last object above; the implicit Seek for
+  a quote stays on the cursor's line (`in"`/`il"` cross lines), and a count on `i"` is the
+  count of `n`/`l` only. `ib` is the parentheses pair (Vim's alias), not targets' any-block.
+  A pair whose brackets end and start lines of their own is charwise (`ci{` leaves `{}`),
+  where Vim's inner block is linewise; `aa` on a sole argument takes its trailing whitespace
+  (`( x )` leaves `( )`).
+  In Visual, an object typed again grows only when the selection is wider than one
+  character (a one-character inner cannot be told from a fresh `v`). Linewise
   Visual `S)` on a Single-line Field yields `(text)` (the newline strip). Visual `S` is not
-  `.`-repeatable. Not in v1: the tag and function targets (`ysiw<div>`, `cst`, `dst`; own
-  follow-up issue), `yS` `ySS` `cS` `gS`, Insert-mode `Ctrl-s`; targets' separator objects,
-  `I`/`A`, any-block `ib` and any-quote `iq`, tag seeking and `g:targets_*` configuration.
+  `.`-repeatable (vim-surround does not promise it). While `ys{motion}` or `cs{old}` waits for its character, a
+  digit `1`-`9` is a count for the key after it, not the character (`ysiw3)` wraps with `)`;
+  `0` and every other printable key are taken as typed). After a cancelled wait (Esc), `.`
+  repeats that `ys`/`cs` with the last character it completed with, where Vim repeats the
+  edit before it. A letter or a space as the replacement wraps with nothing, and `<` or `t`
+  (a tag prompt in Vim) does nothing; a linewise wrap is not re-indented (vim-surround's
+  `g:surround_indent`). Not in v1: the tag and function targets (`ysiw<div>`, `cst`, `dst`;
+  own follow-up issue), `yS` `ySS` `cS` `gS`, Insert-mode `Ctrl-s`; targets' separator
+  objects, `I`/`A`, any-block `ib` and any-quote `iq`, tag seeking and `g:targets_*`
+  configuration.
 - In a cross-origin frame whose embedding page's permissions policy denies clipboard access,
   `"+p`/`"*p` show a Status Line message and leave the text untouched; `"+y` still fills the
   register but the clipboard does not change. On a plain `http://` page (not a secure context)

@@ -152,6 +152,18 @@ export class Mirror {
     return this.plugin.handleKey(e, this.view);
   }
 
+  /**
+   * The Status Line shows the keys as typed, never a Plugin Key's name
+   * (DESIGN.md "Plugins"): the adapter appends every key name it receives to
+   * `vim.status`, the pending-keys text it renders until the command is done.
+   */
+  showTypedKeys(pluginKey: string, typed: string): void {
+    const vim = this.vim;
+    if (!vim.status.includes(pluginKey)) return;
+    vim.status = vim.status.split(pluginKey).join(typed);
+    this.plugin.updateStatus();
+  }
+
   /** Runs an ex command line (without the leading colon). */
   handleEx(line: string): void {
     (Vim as unknown as { handleEx(cm: VimCM, input: string): void }).handleEx(this.cm, line);

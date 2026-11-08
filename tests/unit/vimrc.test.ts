@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Sessions, type PluginRegistry } from "../../src/content/Sessions";
 import type { Settings, SitePolicy } from "../../src/settings/settings";
 import { checkVimrc } from "../../src/engine/vimrc";
+import { surround } from "../../src/plugins/surround";
+import { targets } from "../../src/plugins/targets";
 import { keydown, keys, settle, statusText } from "./dom";
 import { controlledPort, settingsFor } from "./settings-port";
 
@@ -68,9 +70,15 @@ describe("vimrc mappings replace rather than accumulate", () => {
   });
 });
 
-describe("Plugin mappings", () => {
-  // No Plugin exists yet (M3 part 2); a fake one stands in at the hook.
-  const plugins: PluginRegistry = { surround: (ex) => ex("nnoremap \\s dd") };
+describe("Plugin bindings", () => {
+  // A fake Plugin stands in at the registry: one binding, no typed sequences to hold.
+  const plugins: PluginRegistry = {
+    surround: {
+      keys: [],
+      define() {},
+      bind: (engine) => engine.bindKey({ keys: "\\s", type: "keyToKey", toKeys: "dd" }),
+    },
+  };
 
   function withSurround(policy: SitePolicy | null, vimrc: string, enabled = true): Settings {
     return { ...settingsFor(policy, vimrc), plugins: { surround: enabled, targets: false } };
@@ -109,6 +117,95 @@ describe("Plugin mappings", () => {
     expect(ta.value).toBe(TEXT);
     keys(ta, "s");
     expect(ta.value).toBe("he quick brown fox\njumps over");
+  });
+});
+
+describe('the surround Plugin through the Settings (DESIGN.md "Settings": clear, bind Plugins, run the vimrc)', () => {
+  const PARENS = "(the) quick\nsecond";
+
+  function withSurround(policy: SitePolicy | null, vimrc: string, enabled: boolean): Settings {
+    return { ...settingsFor(policy, vimrc), plugins: { surround: enabled, targets: false } };
+  }
+
+  beforeEach(() => {
+    sessions.destroy();
+    sessions = new Sessions(document, port.port, location.origin, null, { surround });
+    ta.value = PARENS;
+  });
+
+  it("bindings are applied before the vimrc, so a vimrc mapping on a Plugin Key wins: nnoremap <SurroundDs> dd", async () => {
+    port.arrive(withSurround(null, "nnoremap <SurroundDs> dd", true));
+    await settle();
+    activateAtStart();
+    keys(ta, "ds(");
+    expect(ta.value).toBe("second"); // the line went, not the parentheses
+  });
+
+  it("enabled, ds( deletes the parentheses; disabled at the next Activation, the same keys are the Baseline", async () => {
+    port.arrive(withSurround(null, "", true));
+    await settle();
+    activateAtStart();
+    keys(ta, "ds(");
+    expect(ta.value).toBe("the quick\nsecond");
+
+    ta.value = PARENS;
+    port.change(withSurround("off", "", false));
+    port.change(withSurround(null, "", false));
+    activateAtStart();
+    keys(ta, "ds(");
+    expect(ta.value).toBe(PARENS); // d then s: no such command, the engine clears; ( is a motion
+    keys(ta, "s");
+    expect(ta.value).toBe("the) quick\nsecond");
+    expect(statusText()).toContain("INSERT");
+  });
+});
+
+describe("the targets Plugin through the Settings: bound before the vimrc, nothing bound when off", () => {
+  // The cursor lands after the pair, where the engine's own i( finds nothing and targets Seeks back.
+  const AFTER = "(the) quick\nsecond";
+
+  function withTargets(policy: SitePolicy | null, vimrc: string, enabled: boolean): Settings {
+    return { ...settingsFor(policy, vimrc), plugins: { surround: false, targets: enabled } };
+  }
+
+  /** Activates `ta` with the cursor on the q of quick. */
+  function activateAfterPair(): void {
+    ta.focus();
+    ta.setSelectionRange(6, 6);
+    keydown(ta, "Escape");
+    expect(statusText()).toContain("NORMAL");
+  }
+
+  beforeEach(() => {
+    sessions.destroy();
+    sessions = new Sessions(document, port.port, location.origin, null, { targets });
+    ta.value = AFTER;
+  });
+
+  it("bindings are applied before the vimrc, so a vimrc mapping on a key the Plugin binds wins: onoremap i( iw", async () => {
+    port.arrive(withTargets(null, "onoremap i( iw", true));
+    await settle();
+    activateAfterPair();
+    keys(ta, "ci(");
+    expect(ta.value).toBe("(the) \nsecond"); // the word went, not the parentheses' inside
+    expect(statusText()).toContain("INSERT");
+  });
+
+  it("enabled, ci( after the pair changes inside it; disabled at the next Activation, the same keys are the stock engine's: nothing found, the operator cancelled", async () => {
+    port.arrive(withTargets(null, "", true));
+    await settle();
+    activateAfterPair();
+    keys(ta, "ci(");
+    expect(ta.value).toBe("() quick\nsecond");
+    expect(statusText()).toContain("INSERT");
+
+    ta.value = AFTER;
+    port.change(withTargets("off", "", false));
+    port.change(withTargets(null, "", false));
+    activateAfterPair();
+    keys(ta, "ci(");
+    expect(ta.value).toBe(AFTER);
+    expect(statusText()).toContain("NORMAL");
   });
 });
 
