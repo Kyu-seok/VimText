@@ -29,7 +29,13 @@ interface VimState {
   insertModeReturn: boolean;
   mode?: string;
   status: string;
-  inputState: { keyBuffer: string[]; operator: string | null | undefined; prefixRepeat: string[] };
+  inputState: {
+    keyBuffer: string[];
+    operator: string | null | undefined;
+    prefixRepeat: string[];
+    /** The register named by a `"x` prefix, until the command completes. */
+    registerName?: string | null;
+  };
 }
 
 interface VimPlugin {

@@ -128,8 +128,12 @@ sandboxed frames) and falls back to its own origin on a browser without that pro
 Visual = native selection. No overlay. Visual block edits apply correctly but only the
 primary range is highlighted.
 
-**Registers & clipboard.** `"+`/`"*` are the system clipboard (`clipboardRead`/`clipboardWrite`;
-write on yank, read at paste time). The unnamed register never touches the clipboard.
+**Registers & clipboard.** `"+` is the system clipboard (`clipboardRead`/`clipboardWrite`;
+the engine writes on yank and reads at paste time). `"*` is an alias of `"+`: the engine
+knows no `*` register, so the bridge rewrites the register name before the engine sees the
+key, where its other key decisions live. Before a `"+p`/`"*p` the bridge reads the clipboard
+itself: a denied read drops the pending register and shows a Status Line message; the
+engine's own read then only ever succeeds. The unnamed register never touches the clipboard.
 Cmd+V in Normal is a Pass-through.
 
 **Ex extras.** `:w` → notification no-op, never submits. `:q`/`:q!` → blur the Field.
@@ -210,6 +214,9 @@ push/PR · MIT · version restarts at 0.1.0. Upstream engine tests are not re-ru
   to its own origin as the Site, so the top page's policy does not reach it.
 - The popup's Mode comes from any frame holding a Session on its active element, so a
   Field left focused in a background frame can be the one reported.
+- In a cross-origin frame whose embedding page's permissions policy denies clipboard access,
+  `"+p`/`"*p` show a Status Line message and leave the text untouched; `"+y` still fills the
+  register but the clipboard does not change.
 
 ## Milestones
 
