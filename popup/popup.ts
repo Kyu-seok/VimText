@@ -1,4 +1,5 @@
 import { loadSettings, setSitePolicy, updateSettings, type SitePolicy } from "../src/settings/settings";
+import { isMode, modeLabel, type Mode } from "../src/engine/mode";
 
 const enabled = document.getElementById("enabled") as HTMLInputElement;
 const policy = document.getElementById("policy") as HTMLSelectElement;
@@ -9,7 +10,7 @@ const optionsLink = document.getElementById("options")!;
 interface Status {
   origin: string;
   /** Mode of the focused Field, or null when no Field is activated. */
-  mode: string | null;
+  mode: Mode | null;
 }
 
 async function currentStatus(): Promise<Status | null> {
@@ -17,8 +18,8 @@ async function currentStatus(): Promise<Status | null> {
   if (!tab?.id) return null;
   try {
     const res = (await chrome.tabs.sendMessage(tab.id, { type: "vimtext:status" })) as
-      Partial<Status> | undefined;
-    return res?.origin ? { origin: res.origin, mode: res.mode ?? null } : null;
+      { origin?: string; mode?: unknown } | undefined;
+    return res?.origin ? { origin: res.origin, mode: isMode(res.mode) ? res.mode : null } : null;
   } catch {
     return null;
   }
@@ -34,7 +35,7 @@ async function init(): Promise<void> {
     policy.disabled = true;
   } else {
     originEl.textContent = origin;
-    modeEl.textContent = status?.mode ? status.mode.toUpperCase() : "No Field activated";
+    modeEl.textContent = status?.mode ? modeLabel(status.mode) : "No Field activated";
     policy.value = settings.sites[origin] ?? "insert";
   }
   enabled.addEventListener(

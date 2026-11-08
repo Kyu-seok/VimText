@@ -7,6 +7,7 @@ import { createHash } from "node:crypto";
 const dist = resolve("dist");
 
 import { fixtureOrigin } from "./fixture-port";
+import type { Mode } from "../../src/engine/mode";
 
 export { fixtureOrigin };
 
@@ -73,7 +74,7 @@ export async function activateAtStart(page: Page, selector = "#in"): Promise<voi
 /** What the content script reports about a tab (the popup's `vimtext:status` query). */
 export interface ContentStatus {
   origin: string;
-  mode: string | null;
+  mode: Mode | null;
   /** True while the lifecycle MutationObserver is connected (only while a Session exists). */
   observing: boolean;
 }

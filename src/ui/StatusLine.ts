@@ -1,4 +1,5 @@
 import type { Field } from "../field/Field";
+import type { Mode } from "../engine/mode";
 
 const CSS = `
 :host { all: initial; }
@@ -66,7 +67,7 @@ export class StatusLine {
     window.addEventListener("resize", this.reposition, { passive: true });
   }
 
-  setMode(mode: string): void {
+  setMode(mode: Mode): void {
     this.bar.classList.toggle("insert", mode === "insert");
   }
 
