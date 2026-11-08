@@ -183,6 +183,11 @@ export class Session {
       return;
     }
 
+    if (this.isClipboardPaste(e)) {
+      this.pasteFromClipboard(e);
+      return;
+    }
+
     this.dispatchToEngine(e);
     if (isEscape(e)) {
       // The engine reports Esc in Normal as unhandled even when it cancelled a
@@ -190,6 +195,40 @@ export class Session {
       e.preventDefault();
       e.stopPropagation();
     }
+  }
+
+  /** `p` or `P` with the clipboard register selected (`"+` or its alias `"*`). */
+  private isClipboardPaste(e: KeyboardEvent): boolean {
+    if (e.ctrlKey || e.metaKey || e.altKey || (e.key !== "p" && e.key !== "P")) return false;
+    return this.mirror.vim.inputState.registerName === "+";
+  }
+
+  /**
+   * The engine's `"+p` reads the clipboard asynchronously and never catches a
+   * rejected read (a cross-origin frame whose embedding page's permissions
+   * policy denies clipboard access; DESIGN.md "Accepted limitations"), so the
+   * bridge reads first: on success the key goes to the engine, whose own read
+   * then succeeds; on failure the pending register is dropped as a beep and
+   * the Status Line says why. The paste was already asynchronous in the
+   * engine, so a key typed before the read resolves still lands first.
+   */
+  private pasteFromClipboard(e: KeyboardEvent): void {
+    e.preventDefault();
+    e.stopPropagation();
+    const read = navigator.clipboard?.readText() ?? Promise.reject(new Error("no clipboard"));
+    read.then(
+      () => {
+        if (this.destroyed) return;
+        this.syncFromField();
+        this.dispatchToEngine(e);
+      },
+      () => {
+        if (this.destroyed) return;
+        this.beep();
+        this.mirror.notify("VimText: the clipboard cannot be read here");
+        this.render();
+      },
+    );
   }
 
   /**
@@ -224,12 +263,34 @@ export class Session {
     this.mirror.handleKey(toEngineKey(new KeyboardEvent("keydown", { key: "Escape" })));
   }
 
+  /**
+   * True while the engine waits for a register name: after `"` in Normal or
+   * Visual (a count may precede it), after `Ctrl-r` in Insert.
+   */
+  private awaitingRegister(): boolean {
+    const buffer = this.mirror.vim.inputState.keyBuffer;
+    const last = buffer[buffer.length - 1];
+    return last === '"' || last === "<C-r>";
+  }
+
+  /**
+   * The key the engine gets. `"*` is an alias of `"+` (DESIGN.md "Registers &
+   * clipboard"): the engine knows only `+` as the clipboard register, so the
+   * bridge rewrites the register name before the engine sees it. Not an engine
+   * change (rule 3): the clipboard behaviour stays the engine's.
+   */
+  private engineKey(e: KeyboardEvent): KeyLike {
+    const key = toEngineKey(e);
+    if (key.key === "*" && !e.ctrlKey && !e.metaKey && !e.altKey && this.awaitingRegister()) key.key = "+";
+    return key;
+  }
+
   private dispatchToEngine(e: KeyboardEvent): void {
     const before = this.mirror.view.state;
     const wasInsert = this.mirror.vim.insertMode;
     let handled = false;
     try {
-      handled = this.mirror.handleKey(toEngineKey(e));
+      handled = this.mirror.handleKey(this.engineKey(e));
     } catch (err) {
       console.error("VimText engine error", err);
     }
