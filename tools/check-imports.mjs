@@ -7,7 +7,12 @@ const problems = [];
 const chromeApi = /\bchrome\./;
 // The only files under src/ that may touch the extension API; everything else stays
 // testable in a plain Chromium page (src/content/ exists for exactly that reason).
-const chromeAdapters = new Set(["src/content.ts", "src/settings/settings.ts"]);
+const chromeAdapters = new Set([
+  "src/content.ts",
+  "src/background.ts",
+  "src/settings/settings.ts",
+  "src/settings/sessionState.ts",
+]);
 const chromeProblems = [];
 
 function walk(dir) {
@@ -35,7 +40,7 @@ if (problems.length) {
 }
 if (chromeProblems.length) {
   console.error(
-    "chrome.* outside its adapters (src/content.ts, src/settings/settings.ts):\n" + chromeProblems.join("\n"),
+    "chrome.* outside its adapters (" + [...chromeAdapters].join(", ") + "):\n" + chromeProblems.join("\n"),
   );
   process.exit(1);
 }

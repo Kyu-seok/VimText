@@ -2,6 +2,8 @@ import { isTextControl, type TextControl } from "../field/Field";
 import { TextareaField } from "../field/TextareaField";
 import { Session, isActivationKey, type ExRunner } from "../bridge/Session";
 import { policyFor, type Settings, type SitePolicy } from "../settings/settings";
+import type { SessionState } from "../settings/sessionState";
+import { restoreGlobalState, snapshotGlobalState } from "../engine/globalState";
 
 /**
  * The Plugins VimText can enable, each registering its mappings through the
@@ -14,6 +16,13 @@ export type PluginRegistry = Partial<Record<keyof Settings["plugins"], (ex: ExRu
 export interface SettingsPort {
   load(): Promise<Settings>;
   watch(handler: (s: Settings) => void): () => void;
+}
+
+/** Where Session State lives: a one-time read, writes, and every tab's later writes. */
+export interface SessionStatePort {
+  load(): Promise<SessionState | null>;
+  save(state: SessionState): Promise<void>;
+  watch(handler: (s: SessionState) => void): () => void;
 }
 
 interface FieldSession {
@@ -70,16 +79,27 @@ export class Sessions {
   private remembered: TextControl | null = null;
   private lifecycleObserver: MutationObserver | null = null;
   private readonly stopWatching: () => void;
+  private readonly stopWatchingState: () => void;
+  /** The serialized Session State last written or restored; a snapshot equal to it is not written. */
+  private lastStateForm: string | null = null;
+  /** Serialized writes of ours whose storage change has not come back yet; the echo is not restored. */
+  private readonly inFlight: string[] = [];
+  private snapshotQueued = false;
 
   /**
    * `site` is the origin the Site Policy is keyed by: the top page's, which in
    * a frame is not the document's own (ADR 0005). Resolving it is the content
    * entry's job (`siteOrigin`), so this class never reads `ancestorOrigins`.
+   *
+   * `sessionState` is optional so a test of something else needs no storage;
+   * the content entry always passes one. `plugins` is the registry of
+   * Plugins that may be enabled; the content entry passes none yet.
    */
   constructor(
     private readonly document: Document,
     port: SettingsPort,
     private readonly site: string,
+    private readonly sessionState: SessionStatePort | null = null,
     private readonly plugins: PluginRegistry = {},
   ) {
     document.addEventListener("keydown", this.onKeydown, { capture: true });
@@ -90,6 +110,14 @@ export class Sessions {
     void port.load().then((s) => {
       if (!this.settings) this.onSettings(s);
     });
+    this.stopWatchingState = sessionState?.watch(this.onSessionState) ?? (() => {});
+    void sessionState
+      ?.load()
+      .then((s) => {
+        if (s && this.lastStateForm === null) this.onSessionState(s);
+      })
+      // Right after install the service worker may not have granted access yet; start empty.
+      .catch((err: unknown) => console.warn("VimText: Session State not read", err));
   }
 
   /** Mode of the Session on the focused Field, or null when it has none. */
@@ -166,6 +194,10 @@ export class Sessions {
   }
 
   private onKeydown = (e: KeyboardEvent): void => {
+    // Any key while a Session exists may change Session State, the keys that
+    // commit the command line (its input lives in our Status Line) included:
+    // the engine handles them synchronously, so a snapshot queued now sees the result.
+    if (this.sessions.size) this.queueSnapshot();
     const target = deepTarget(e);
     if (!isTextControl(target)) return;
     const entry = this.sessions.get(target);
@@ -232,10 +264,51 @@ export class Sessions {
     this.lifecycleObserver = null;
   }
 
+  // Session State (DESIGN.md "Session State"): after every key that changed
+  // the engine's global state, the snapshot is written; every write from any
+  // tab is restored before the next key. Last writer wins.
+
+  private queueSnapshot(): void {
+    if (!this.sessionState || this.snapshotQueued) return;
+    this.snapshotQueued = true;
+    queueMicrotask(() => {
+      this.snapshotQueued = false;
+      this.publishState();
+    });
+  }
+
+  private publishState(): void {
+    if (!this.sessionState) return;
+    const state = snapshotGlobalState();
+    const form = JSON.stringify(state);
+    if (form === this.lastStateForm) return;
+    this.lastStateForm = form;
+    this.inFlight.push(form);
+    this.sessionState.save(state).catch((err: unknown) => {
+      // Quota or a missing grant: this tab keeps its in-memory state.
+      console.warn("VimText: Session State not saved", err);
+      const i = this.inFlight.indexOf(form);
+      if (i >= 0) this.inFlight.splice(i, 1);
+    });
+  }
+
+  private onSessionState = (s: SessionState): void => {
+    const form = JSON.stringify(s);
+    const i = this.inFlight.indexOf(form);
+    if (i >= 0) {
+      // Our own write coming back; restoring it over newer local state would lose keys typed since.
+      this.inFlight.splice(i, 1);
+      return;
+    }
+    restoreGlobalState(s);
+    this.lastStateForm = form;
+  };
+
   /** Disposes every Session and stops listening; the content script never calls this, tests do. */
   destroy(): void {
     this.disposeAll();
     this.stopWatching();
+    this.stopWatchingState();
     this.document.removeEventListener("keydown", this.onKeydown, { capture: true });
     this.document.removeEventListener("focusin", this.onFocusin);
     this.document.removeEventListener("focusout", this.onFocusout);

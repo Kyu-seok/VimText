@@ -115,7 +115,7 @@ describe("Plugin mappings", () => {
 
   beforeEach(() => {
     sessions.destroy();
-    sessions = new Sessions(document, port.port, location.origin, plugins);
+    sessions = new Sessions(document, port.port, location.origin, null, plugins);
   });
 
   it("an enabled Plugin's mapping survives a vimrc change, while the dropped vimrc mapping does not", async () => {
