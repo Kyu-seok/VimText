@@ -46,10 +46,40 @@ third line here</textarea>
       <p><input id="in" type="text" value="hello world" /></p>
     </form>
     <p><button id="btn">button</button></p>
+    <!-- A login form's "show password" toggle: the input qualifies only while revealed. -->
+    <p>
+      <input id="pw" type="password" value="s3cret" />
+      <button
+        id="showpw"
+        type="button"
+        onclick="
+          const pw = document.getElementById('pw');
+          pw.type = pw.type === 'password' ? 'text' : 'password';
+        "
+      >
+        show password
+      </button>
+    </p>
+    <!-- A web component: its textarea lives in an open shadow root, where no document-level observer looks. -->
+    <p><shadow-field id="shadow"></shadow-field></p>
     <div id="log"></div>
     <script>
+      customElements.define(
+        "shadow-field",
+        class extends HTMLElement {
+          constructor() {
+            super();
+            this.attachShadow({ mode: "open" }).innerHTML =
+              '<textarea id="sta" style="width:320px;height:60px;font:14px Menlo,monospace">inside a shadow root</textarea>';
+          }
+        },
+      );
       document.addEventListener("keydown", (e) => {
         if (e.key === "Escape") document.getElementById("log").textContent += "page-esc\n";
+      });
+      // What a mask library or framework listener would read off each input event.
+      document.getElementById("ta").addEventListener("input", (e) => {
+        document.getElementById("log").textContent += `input:${e.inputType}:${e.data}\n`;
       });
     </script>
   </body>

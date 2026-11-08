@@ -1,5 +1,11 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "entry": ["src/content.ts", "popup/popup.ts", "options/options.ts", "tools/*.mjs"],
-  "project": ["src/**/*.ts", "popup/**/*.ts", "options/**/*.ts", "tools/**/*.mjs", "tests/**/*.ts"]
+  "entry": [
+    "src/content.ts",
+    "popup/popup.ts",
+    "options/options.ts",
+    "tools/*.mjs",
+    "tests/fixtures/react.tsx"
+  ],
+  "project": ["src/**/*.ts", "popup/**/*.ts", "options/**/*.ts", "tools/**/*.mjs", "tests/**/*.{ts,tsx}"]
 }

@@ -6,6 +6,9 @@ import { createHash } from "node:crypto";
 
 const dist = resolve("dist");
 
+/** The fixture server's origin (see playwright.config.ts for the port). */
+export const fixtureOrigin = `http://localhost:${process.env.VIMTEXT_E2E_PORT ?? "4173"}`;
+
 /** Launches Chromium with the built extension loaded (needs `npm run build` first). */
 export const test = base.extend<{ context: BrowserContext; page: Page }>({
   context: async ({}, use) => {
@@ -55,4 +58,48 @@ export function statusText(page: Page): Promise<string> {
     const bar = host?.shadowRoot?.querySelector(".bar") as HTMLElement | null;
     return bar && host!.style.display !== "none" ? (bar.textContent ?? "") : "";
   });
+}
+
+/** Focuses a Field, parks the caret at its start and Activates VimText with Esc. */
+export async function activateAtStart(page: Page, selector = "#in"): Promise<void> {
+  const field = page.locator(selector);
+  await field.focus();
+  await field.evaluate((el: HTMLInputElement | HTMLTextAreaElement) => el.setSelectionRange(0, 0));
+  await page.keyboard.press("Escape");
+  base.expect(await statusText(page)).toContain("NORMAL");
+}
+
+/** What the content script reports about a tab (the popup's `vimtext:status` query). */
+export interface ContentStatus {
+  origin: string;
+  mode: string | null;
+  /** True while the lifecycle MutationObserver is connected (only while a Session exists). */
+  observing: boolean;
+}
+
+/**
+ * Asks the content script of the fixture tab for its status, through an
+ * extension page (the only context with `chrome.tabs`). Tabs without the
+ * content script (extension pages themselves) do not answer and are skipped.
+ */
+export async function contentStatus(context: BrowserContext): Promise<ContentStatus> {
+  const page = await context.newPage();
+  await page.goto(`chrome-extension://${extensionId}/options/options.html`);
+  const statuses = await page.evaluate(async (origin) => {
+    const tabs = await chrome.tabs.query({});
+    const answers: ContentStatus[] = [];
+    for (const tab of tabs) {
+      if (!tab.id) continue;
+      try {
+        const res = (await chrome.tabs.sendMessage(tab.id, { type: "vimtext:status" })) as ContentStatus;
+        if (res?.origin === origin) answers.push(res);
+      } catch {
+        // no content script in this tab
+      }
+    }
+    return answers;
+  }, fixtureOrigin);
+  await page.close();
+  if (statuses.length !== 1) throw new Error(`expected one fixture tab, got ${statuses.length}`);
+  return statuses[0]!;
 }

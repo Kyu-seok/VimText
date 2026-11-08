@@ -21,6 +21,7 @@ function activate(el: TextControl): Session {
   const field = new TextareaField(el);
   const session = new Session(field, { vimrc: settings?.vimrc ?? "" });
   sessions.set(el, { field, session });
+  observeLifecycle(el.getRootNode());
   return session;
 }
 
@@ -30,10 +31,55 @@ function dispose(el: TextControl): void {
   entry.session.destroy();
   entry.field.destroy();
   sessions.delete(el);
+  if (sessions.size === 0) stopObservingLifecycle();
 }
 
-function sweep(): void {
-  for (const el of sessions.keys()) if (!el.isConnected) dispose(el);
+// Disposal is prompt (decision record on issue #8): a Session ends when its Field leaves
+// the page (framework re-mounts included) or stops qualifying (readonly,
+// disabled, type changed to password), not on the next focus change elsewhere.
+// The observer runs only while a Session exists, so an inert page costs nothing.
+let lifecycleObserver: MutationObserver | null = null;
+
+function isStatusHost(node: Node): boolean {
+  return node instanceof Element && node.localName === "vimtext-status";
+}
+
+/** True when a record can affect a Session; our own Status Line hosts coming and going cannot. */
+function concernsFields(record: MutationRecord): boolean {
+  if (record.type === "attributes") return true;
+  for (const n of record.addedNodes) if (!isStatusHost(n)) return true;
+  for (const n of record.removedNodes) if (!isStatusHost(n)) return true;
+  return false;
+}
+
+const lifecycleOptions: MutationObserverInit = {
+  childList: true,
+  subtree: true,
+  attributes: true,
+  attributeFilter: ["type", "readonly", "disabled"],
+};
+
+/**
+ * Starts the observer if it is not running and adds the new Field's root to
+ * it: records from inside a shadow tree never reach an observer on the
+ * document, so a Field in an open shadow root (reached through `composedPath`
+ * on activation) is watched at its own root. One observer may observe many
+ * targets; `disconnect()` drops them all.
+ */
+function observeLifecycle(root: Node): void {
+  if (!lifecycleObserver) {
+    lifecycleObserver = new MutationObserver((records) => {
+      if (!records.some(concernsFields)) return;
+      for (const el of [...sessions.keys()]) if (!el.isConnected || !isTextControl(el)) dispose(el);
+    });
+    lifecycleObserver.observe(document, lifecycleOptions);
+  }
+  if (root instanceof ShadowRoot) lifecycleObserver.observe(root, lifecycleOptions);
+}
+
+function stopObservingLifecycle(): void {
+  lifecycleObserver?.disconnect();
+  lifecycleObserver = null;
 }
 
 document.addEventListener(
@@ -55,7 +101,6 @@ document.addEventListener(
 );
 
 document.addEventListener("focusin", (e) => {
-  sweep();
   const target = deepTarget(e);
   if (!isTextControl(target)) return;
   const entry = sessions.get(target);
@@ -73,7 +118,13 @@ chrome.runtime.onMessage.addListener((msg: { type?: string }, _sender, sendRespo
   if (msg?.type === "vimtext:status") {
     const active = document.activeElement;
     const entry = isTextControl(active) ? sessions.get(active) : undefined;
-    sendResponse({ origin: location.origin, mode: entry?.session.mode ?? null, top: window === window.top });
+    sendResponse({
+      origin: location.origin,
+      mode: entry?.session.mode ?? null,
+      top: window === window.top,
+      // The e2e lifecycle spec checks the observer runs only while a Session exists.
+      observing: lifecycleObserver !== null,
+    });
   }
   return false;
 });
