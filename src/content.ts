@@ -1,5 +1,6 @@
 import { Sessions } from "./content/Sessions";
 import { surround } from "./plugins/surround";
+import { targets } from "./plugins/targets";
 import { loadSettings, siteOrigin, watchSettings } from "./settings/settings";
 import { loadSessionState, saveSessionState, watchSessionState } from "./settings/sessionState";
 
@@ -9,7 +10,7 @@ const sessions = new Sessions(
   { load: loadSettings, watch: watchSettings },
   site,
   { load: loadSessionState, save: saveSessionState, watch: watchSessionState },
-  { surround },
+  { surround, targets },
 );
 // Marks this document as attended, per frame; the e2e helper `ready` waits for it
 // instead of guessing when `document_idle` has passed.

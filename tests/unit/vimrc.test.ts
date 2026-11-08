@@ -3,6 +3,7 @@ import { Sessions, type PluginRegistry } from "../../src/content/Sessions";
 import type { Settings, SitePolicy } from "../../src/settings/settings";
 import { checkVimrc } from "../../src/engine/vimrc";
 import { surround } from "../../src/plugins/surround";
+import { targets } from "../../src/plugins/targets";
 import { keydown, keys, settle, statusText } from "./dom";
 import { controlledPort, settingsFor } from "./settings-port";
 
@@ -156,6 +157,55 @@ describe('the surround Plugin through the Settings (DESIGN.md "Settings": clear,
     keys(ta, "s");
     expect(ta.value).toBe("the) quick\nsecond");
     expect(statusText()).toContain("INSERT");
+  });
+});
+
+describe("the targets Plugin through the Settings: bound before the vimrc, nothing bound when off", () => {
+  // The cursor lands after the pair, where the engine's own i( finds nothing and targets Seeks back.
+  const AFTER = "(the) quick\nsecond";
+
+  function withTargets(policy: SitePolicy | null, vimrc: string, enabled: boolean): Settings {
+    return { ...settingsFor(policy, vimrc), plugins: { surround: false, targets: enabled } };
+  }
+
+  /** Activates `ta` with the cursor on the q of quick. */
+  function activateAfterPair(): void {
+    ta.focus();
+    ta.setSelectionRange(6, 6);
+    keydown(ta, "Escape");
+    expect(statusText()).toContain("NORMAL");
+  }
+
+  beforeEach(() => {
+    sessions.destroy();
+    sessions = new Sessions(document, port.port, location.origin, null, { targets });
+    ta.value = AFTER;
+  });
+
+  it("bindings are applied before the vimrc, so a vimrc mapping on a key the Plugin binds wins: onoremap i( iw", async () => {
+    port.arrive(withTargets(null, "onoremap i( iw", true));
+    await settle();
+    activateAfterPair();
+    keys(ta, "ci(");
+    expect(ta.value).toBe("(the) \nsecond"); // the word went, not the parentheses' inside
+    expect(statusText()).toContain("INSERT");
+  });
+
+  it("enabled, ci( after the pair changes inside it; disabled at the next Activation, the same keys are the stock engine's: nothing found, the operator cancelled", async () => {
+    port.arrive(withTargets(null, "", true));
+    await settle();
+    activateAfterPair();
+    keys(ta, "ci(");
+    expect(ta.value).toBe("() quick\nsecond");
+    expect(statusText()).toContain("INSERT");
+
+    ta.value = AFTER;
+    port.change(withTargets("off", "", false));
+    port.change(withTargets(null, "", false));
+    activateAfterPair();
+    keys(ta, "ci(");
+    expect(ta.value).toBe(AFTER);
+    expect(statusText()).toContain("NORMAL");
   });
 });
 
