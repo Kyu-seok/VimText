@@ -256,3 +256,89 @@ describe("quote objects count the quotes from the start of the line (targets.txt
     expect(selected()).toBe("code");
   });
 });
+
+describe("n and l reach the next and last object (targets.txt 'next and last pair', the pair chart)", () => {
+  // The chart's line, the cursor on dddddd (targets.txt "pair charts").
+  const CHART = "a ( bbbbbbbb ) ( ccccccc ) ( dddddd ) ( eeeeeee ) ( ffffffff ) g";
+  const D = 31;
+
+  it("cin( from before the pair changes inside the next one (targets.txt 'cin)' example)", () => {
+    open("This is example text (with a pair of parentheses)", 5);
+    feed("c", "TargetsIn", "(");
+    expect(text()).toBe("This is example text ()");
+    expect(insertMode()).toBe(true);
+  });
+
+  it("in) from inside a pair is the pair after it; 2in) the one after that", () => {
+    open(CHART, D);
+    feed("d", "TargetsIn", ")");
+    expect(text()).toBe("a ( bbbbbbbb ) ( ccccccc ) ( dddddd ) () ( ffffffff ) g");
+    open(CHART, D);
+    feed("d", "2", "TargetsIn", ")");
+    expect(text()).toBe("a ( bbbbbbbb ) ( ccccccc ) ( dddddd ) ( eeeeeee ) () g");
+  });
+
+  it("il) is the pair before; 2il) the one before that; al) takes its brackets", () => {
+    open(CHART, D);
+    feed("d", "TargetsIl", ")");
+    expect(text()).toBe("a ( bbbbbbbb ) () ( dddddd ) ( eeeeeee ) ( ffffffff ) g");
+    open(CHART, D);
+    feed("d", "2", "TargetsIl", ")");
+    expect(text()).toBe("a () ( ccccccc ) ( dddddd ) ( eeeeeee ) ( ffffffff ) g");
+    open(CHART, D);
+    feed("d", "TargetsAl", ")");
+    expect(text()).toBe("a ( bbbbbbbb )  ( dddddd ) ( eeeeeee ) ( ffffffff ) g");
+  });
+
+  it("with nested pairs, in) is the next pair opening after the cursor and il) the last one closing before it (the nested chart)", () => {
+    // The cursor on ffffff.
+    const NESTED = "a ( b ( cccccccc ) d ) ( e ( ffffff ) g ) ( h ( iiiiiiii ) j ) k";
+    open(NESTED, 29);
+    feed("d", "TargetsIn", ")");
+    expect(text()).toBe("a ( b ( cccccccc ) d ) ( e ( ffffff ) g ) () k");
+    open(NESTED, 29);
+    feed("d", "TargetsIl", ")");
+    expect(text()).toBe("a () ( e ( ffffff ) g ) ( h ( iiiiiiii ) j ) k");
+    open(NESTED, 29);
+    feed("d", "2", "TargetsIl", ")");
+    expect(text()).toBe("a ( b () d ) ( e ( ffffff ) g ) ( h ( iiiiiiii ) j ) k");
+  });
+
+  it('dil" deletes inside the last string, across a line when the cursor line has none', () => {
+    open('"a" "b"\nnone here', 10);
+    feed("d", "TargetsIl", '"');
+    expect(text()).toBe('"a" ""\nnone here');
+  });
+
+  it('in" skips the string the cursor is in', () => {
+    open('"a" "b" "c"', 5);
+    feed("d", "TargetsIn", '"');
+    expect(text()).toBe('"a" "b" ""');
+  });
+
+  it("vin( selects inside the next pair", () => {
+    open("(a) (b)", 1);
+    feed("v", "TargetsIn", "(");
+    expect(selected()).toBe("b");
+  });
+
+  it("no next object: the operator is cancelled and Normal mode stays", () => {
+    open("(a) tail", 5);
+    feed("c", "TargetsIn", "(", "x");
+    expect(text()).toBe("(a) til");
+    expect(insertMode()).toBe(false);
+  });
+
+  it("a key that is no object after in cancels the operator too, as the engine's own failed text object does (DESIGN.md limitations)", () => {
+    open("one two", 0);
+    feed("c", "TargetsIn", "w", "x");
+    expect(text()).toBe("ne two");
+    expect(insertMode()).toBe(false);
+  });
+
+  it(". repeats din( on the next pair from where the cursor ended", () => {
+    open("(a) (b) (c)", 0);
+    feed("d", "TargetsIn", "(", ".");
+    expect(text()).toBe("(a) () ()");
+  });
+});
