@@ -2,17 +2,17 @@ import { EditorSelection, type Text } from "@codemirror/state";
 import type { Field } from "../field/Field";
 import { diffText } from "../field/diff";
 import { Mirror, Vim, type KeyLike } from "../engine/mirror";
+import { engineApi } from "../engine/pluginApi";
 import { vimrcLines } from "../engine/vimrc";
 import type { Mode } from "../engine/mode";
+import type { Plugin, PluginContext } from "../plugins/Plugin";
 import { StatusLine } from "../ui/StatusLine";
-
-/** Runs ex command lines (`nnoremap …`), as a Plugin registers its mappings with. */
-export type ExRunner = (line: string) => void;
+import { PluginKeyHook } from "./PluginKeyHook";
 
 interface SessionConfig {
   vimrc: string;
-  /** Each enabled Plugin's mappings, applied after the vimrc on every Activation. */
-  plugins?: Array<(ex: ExRunner) => void>;
+  /** The enabled Plugins: bound on every Activation, before the vimrc, so a vimrc mapping wins. */
+  plugins?: Plugin[];
   /**
    * The engine opened or closed its dialog. The command line commits its
    * history as it closes, inside its own input's keydown listener in the
@@ -66,6 +66,23 @@ function toEngineKey(e: KeyboardEvent): KeyLike {
   };
 }
 
+/**
+ * A key the bridge feeds on its own: a released held key, or a Plugin Key by
+ * name (`SurroundDs`; the engine brackets any multi-character name). Never
+ * shifted: a shifted multi-character name would become `<S-SurroundS>`.
+ */
+function syntheticKey(key: string): KeyLike {
+  return {
+    key,
+    ctrlKey: false,
+    altKey: false,
+    metaKey: false,
+    shiftKey: false,
+    preventDefault: () => {},
+    stopPropagation: () => {},
+  };
+}
+
 /** Normal-mode cursors sit on a character, never past the end of a non-empty line. */
 function clipToLine(doc: Text, pos: number): number {
   pos = Math.max(0, Math.min(doc.length, pos));
@@ -116,6 +133,8 @@ export class Session {
   /** The Field text the bridge last wrote or agreed with; anything else means the page changed the Field. */
   private lastText: string | null = null;
   private readonly onDialog: (() => void) | undefined;
+  /** The Plugin key hook: turns the typed sequences the enabled Plugins claim into Plugin Keys. */
+  private readonly pluginKeys: PluginKeyHook;
 
   constructor(
     readonly field: Field,
@@ -123,6 +142,7 @@ export class Session {
   ) {
     defineExCommands();
     this.onDialog = config.onDialog;
+    this.pluginKeys = new PluginKeyHook((config.plugins ?? []).flatMap((p) => p.keys));
     this.status = new StatusLine(field);
     const sel = field.getSelection();
     this.mirror = new Mirror({
@@ -163,12 +183,18 @@ export class Session {
   /**
    * The saved vimrc is the whole truth about user mappings: engine mappings
    * are global per frame and would otherwise outlive their vimrc line until
-   * the tab reloads (see the mapping seam in docs/engine-seams.md). Errors are
-   * not reported here; the options page runs the same lines on save. Enabled
-   * Plugins re-apply their mappings afterwards (the hook M3 part 2 fills).
+   * the tab reloads (see the mapping seam in docs/engine-seams.md). The clear
+   * wipes the enabled Plugins' bindings too, so they bind again first, and
+   * the vimrc runs last so that a vimrc mapping on a key a Plugin also binds
+   * wins (DESIGN.md "Settings", ADR 0006). Errors are not reported here; the
+   * options page runs the same lines on save.
    */
   private runVimrc(config: SessionConfig): void {
     this.mirror.clearUserMappings();
+    for (const plugin of config.plugins ?? []) {
+      plugin.define(engineApi);
+      plugin.bind(engineApi);
+    }
     for (const { text } of vimrcLines(config.vimrc)) {
       try {
         this.mirror.handleEx(text);
@@ -176,8 +202,6 @@ export class Session {
         // Reported by the options page on save.
       }
     }
-    // A Plugin's mappings come after the vimrc: a vimrc save must never disable one.
-    for (const apply of config.plugins ?? []) apply((line) => this.mirror.handleEx(line));
   }
 
   /** Called from the document-level capture listener for keys targeted at this Field. */
@@ -203,6 +227,12 @@ export class Session {
       this.beep();
       e.preventDefault();
       e.stopPropagation();
+      return;
+    }
+    if (this.applyPluginKeys(e) === "consumed") {
+      e.preventDefault();
+      e.stopPropagation();
+      this.render();
       return;
     }
 
@@ -273,7 +303,8 @@ export class Session {
     const vim = this.mirror.vim;
     const buffered = vim.inputState.keyBuffer.join(""); // a count ("3") or a partial key ("g", '"')
     const operatorPending = !!vim.inputState.operator;
-    const pending = buffered.length > 0 || operatorPending;
+    // A key the Plugin key hook holds is pending input too: the Esc that discards it is ours.
+    const pending = buffered.length > 0 || operatorPending || this.pluginKeys.holding;
     const normal = !vim.insertMode && !vim.visualMode;
     const plainNormal = normal && !pending;
     const unmodified = !e.ctrlKey && !e.metaKey && !e.altKey;
@@ -294,6 +325,53 @@ export class Session {
   /** Vim's beep: the pending count is dropped and the Status Line's pending keys clear. */
   private beep(): void {
     this.mirror.handleKey(toEngineKey(new KeyboardEvent("keydown", { key: "Escape" })));
+  }
+
+  /**
+   * The engine's context as the Plugin key hook sees it (DESIGN.md "Plugins"):
+   * null when a partial key (`g`, `"`, `z`) is pending, which no Plugin claims.
+   * A count in the buffer or a register already taken is fine.
+   */
+  private pluginContext(): PluginContext | null {
+    const vim = this.mirror.vim;
+    if (vim.visualMode) return "visual";
+    if (vim.inputState.operator) return "operator-pending";
+    return /^\d*$/.test(vim.inputState.keyBuffer.join("")) ? "normal" : null;
+  }
+
+  /**
+   * The Plugin key hook (Key Policy row 1; DESIGN.md "Plugins", ADR 0006): a
+   * typed sequence an enabled Plugin claims reaches the engine as one Plugin
+   * Key, keys held for a sequence that does not complete are released in
+   * order, Esc discards them and goes on to the engine as pending input.
+   * Released keys and Plugin Keys go through the mirror directly so macro
+   * recording sees them; "consumed" means this key is now spent.
+   */
+  private applyPluginKeys(e: KeyboardEvent): "consumed" | "continue" {
+    const hook = this.pluginKeys;
+    if (isEscape(e)) {
+      hook.discard();
+      return "continue";
+    }
+    const typed = !e.ctrlKey && !e.metaKey && !e.altKey && e.key.length === 1 ? e.key : null;
+    // A Plugin Key changes the context for the key after it (`ys` followed by a
+    // targets sequence), so that key is looked at again in the new context.
+    for (;;) {
+      const step = hook.step(this.pluginContext(), typed);
+      switch (step.kind) {
+        case "pass":
+          return "continue";
+        case "hold":
+          return "consumed";
+        case "release":
+          for (const key of step.held) this.mirror.handleKey(syntheticKey(key));
+          return "continue";
+        case "plugin-key":
+          this.mirror.handleKey(syntheticKey(step.key));
+          this.mirror.showTypedKeys(`<${step.key}>`, step.typed);
+          if (step.consumed) return "consumed";
+      }
+    }
   }
 
   /**

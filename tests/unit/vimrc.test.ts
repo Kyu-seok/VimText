@@ -68,9 +68,15 @@ describe("vimrc mappings replace rather than accumulate", () => {
   });
 });
 
-describe("Plugin mappings", () => {
-  // No Plugin exists yet (M3 part 2); a fake one stands in at the hook.
-  const plugins: PluginRegistry = { surround: (ex) => ex("nnoremap \\s dd") };
+describe("Plugin bindings", () => {
+  // A fake Plugin stands in at the registry: one binding, no typed sequences to hold.
+  const plugins: PluginRegistry = {
+    surround: {
+      keys: [],
+      define() {},
+      bind: (engine) => engine.bindKey({ keys: "\\s", type: "keyToKey", toKeys: "dd" }),
+    },
+  };
 
   function withSurround(policy: SitePolicy | null, vimrc: string, enabled = true): Settings {
     return { ...settingsFor(policy, vimrc), plugins: { surround: enabled, targets: false } };
