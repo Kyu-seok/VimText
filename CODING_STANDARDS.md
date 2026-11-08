@@ -18,5 +18,5 @@ Read during review. Terms as defined in `GLOSSARY.md`.
 Enforced in `npm run check`, listed here so the reviewer knows it is covered:
 
 - `tools/check-imports.mjs`: `@replit/codemirror-vim` and `@codemirror/{view,commands,language,search}` are imported only under `src/engine/`. `@codemirror/state` is shared vocabulary (positions, selections) and may be used anywhere in `src/`.
-- `tools/check-imports.mjs`: `chrome.*` appears under `src/` only in `src/content.ts` and `src/settings/settings.ts`. Everything else, `src/content/` included, runs in a plain Chromium page so the unit suite can drive it.
+- `tools/check-imports.mjs`: `chrome.*` appears under `src/` only in `src/content.ts`, `src/background.ts`, `src/settings/settings.ts` and `src/settings/sessionState.ts`. Everything else, `src/content/` included, runs in a plain Chromium page so the unit suite can drive it.
 - `knip` (`knip.json`): no unused files, exports, exported types, or dependencies. It does not see unused interface or class members; those stay a reviewer's call.

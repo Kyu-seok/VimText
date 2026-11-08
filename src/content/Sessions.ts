@@ -1,7 +1,15 @@
 import { isTextControl, type TextControl } from "../field/Field";
 import { TextareaField } from "../field/TextareaField";
-import { Session, isActivationKey } from "../bridge/Session";
+import { Session, isActivationKey, type ExRunner } from "../bridge/Session";
 import { policyFor, type Settings, type SitePolicy } from "../settings/settings";
+import { SessionStateSync, type SessionStatePort } from "./SessionStateSync";
+
+/**
+ * The Plugins VimText can enable, each registering its mappings through the
+ * ex runner on every Activation after the vimrc. M3 part 2 fills this; the
+ * content entry passes none yet.
+ */
+export type PluginRegistry = Partial<Record<keyof Settings["plugins"], (ex: ExRunner) => void>>;
 
 /** Where settings come from: a one-time read, then every later change. */
 export interface SettingsPort {
@@ -62,17 +70,24 @@ export class Sessions {
   /** The Field an Activation key was pressed on while the policy was unknown; the last one only. */
   private remembered: TextControl | null = null;
   private lifecycleObserver: MutationObserver | null = null;
+  private readonly stateSync: SessionStateSync | null;
   private readonly stopWatching: () => void;
 
   /**
    * `site` is the origin the Site Policy is keyed by: the top page's, which in
    * a frame is not the document's own (ADR 0005). Resolving it is the content
    * entry's job (`siteOrigin`), so this class never reads `ancestorOrigins`.
+   *
+   * `sessionState` is optional so a test of something else needs no storage;
+   * the content entry always passes one. `plugins` is the registry of
+   * Plugins that may be enabled; the content entry passes none yet.
    */
   constructor(
     private readonly document: Document,
     port: SettingsPort,
     private readonly site: string,
+    sessionState: SessionStatePort | null = null,
+    private readonly plugins: PluginRegistry = {},
   ) {
     document.addEventListener("keydown", this.onKeydown, { capture: true });
     document.addEventListener("focusin", this.onFocusin);
@@ -82,6 +97,7 @@ export class Sessions {
     void port.load().then((s) => {
       if (!this.settings) this.onSettings(s);
     });
+    this.stateSync = sessionState ? new SessionStateSync(sessionState) : null;
   }
 
   /** Mode of the Session on the focused Field, or null when it has none. */
@@ -105,9 +121,22 @@ export class Sessions {
     if (this.sessions.has(el)) return;
     if (this.remembered === el) this.remembered = null;
     const field = new TextareaField(el);
-    const session = new Session(field, { vimrc: this.settings?.vimrc ?? "" });
+    const session = new Session(field, {
+      vimrc: this.settings?.vimrc ?? "",
+      plugins: this.enabledPlugins(),
+      onDialog: () => this.stateSync?.queueSnapshot(),
+    });
     this.sessions.set(el, { field, session });
     this.observeLifecycle(el.getRootNode());
+  }
+
+  /** The registered Plugins the settings enable, in registry order. */
+  private enabledPlugins(): Array<(ex: ExRunner) => void> {
+    const toggles = this.settings?.plugins;
+    if (!toggles) return [];
+    return (Object.keys(this.plugins) as Array<keyof PluginRegistry>)
+      .filter((name) => toggles[name])
+      .map((name) => this.plugins[name]!);
   }
 
   private dispose(el: TextControl): void {
@@ -146,6 +175,11 @@ export class Sessions {
   }
 
   private onKeydown = (e: KeyboardEvent): void => {
+    // Any key on a Field with a Session may change Session State; the engine
+    // handles it synchronously inside this listener, so a snapshot queued now
+    // sees the result. Keys inside the command line are handled by its own
+    // input's listener, after this one: those are caught by `onDialog`.
+    if (this.sessions.size) this.stateSync?.queueSnapshot();
     const target = deepTarget(e);
     if (!isTextControl(target)) return;
     const entry = this.sessions.get(target);
@@ -216,6 +250,7 @@ export class Sessions {
   destroy(): void {
     this.disposeAll();
     this.stopWatching();
+    this.stateSync?.destroy();
     this.document.removeEventListener("keydown", this.onKeydown, { capture: true });
     this.document.removeEventListener("focusin", this.onFocusin);
     this.document.removeEventListener("focusout", this.onFocusout);

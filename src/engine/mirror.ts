@@ -29,7 +29,13 @@ interface VimState {
   insertModeReturn: boolean;
   mode?: string;
   status: string;
-  inputState: { keyBuffer: string[]; operator: string | null | undefined; prefixRepeat: string[] };
+  inputState: {
+    keyBuffer: string[];
+    operator: string | null | undefined;
+    prefixRepeat: string[];
+    /** The register named by a `"x` prefix, until the command completes. */
+    registerName?: string | null;
+  };
 }
 
 interface VimPlugin {
@@ -149,6 +155,11 @@ export class Mirror {
   /** Runs an ex command line (without the leading colon). */
   handleEx(line: string): void {
     (Vim as unknown as { handleEx(cm: VimCM, input: string): void }).handleEx(this.cm, line);
+  }
+
+  /** Removes every user mapping in every context; mappings are global per frame, not per mirror. */
+  clearUserMappings(): void {
+    (Vim as unknown as { mapclear(ctx?: string): void }).mapclear();
   }
 
   /** The engine's open command line or notice, if any. */

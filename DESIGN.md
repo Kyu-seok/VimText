@@ -128,15 +128,31 @@ sandboxed frames) and falls back to its own origin on a browser without that pro
 Visual = native selection. No overlay. Visual block edits apply correctly but only the
 primary range is highlighted.
 
-**Registers & clipboard.** `"+`/`"*` are the system clipboard (`clipboardRead`/`clipboardWrite`;
-write on yank, read at paste time). The unnamed register never touches the clipboard.
+**Registers & clipboard.** `"+` is the system clipboard (`clipboardRead`/`clipboardWrite`;
+the engine writes on yank and reads at paste time). `"*` is an alias of `"+`: the engine
+knows no `*` register, so the bridge rewrites the register name before the engine sees the
+key, where its other key decisions live. Before a `"+p`/`"*p` the bridge reads the clipboard
+itself: a denied read drops the pending register and shows a Status Line message; the
+engine's own read then only ever succeeds. The unnamed register never touches the clipboard.
 Cmd+V in Normal is a Pass-through.
 
 **Ex extras.** `:w` → notification no-op, never submits. `:q`/`:q!` → blur the Field.
 `:wq`/`:x` → `:w` then `:q`; the Status Line stays until the `:w` notice closes. VimText never discards Field text.
 
-**Session State** (`chrome.storage.session`, shared by all tabs/frames): registers, macros,
-search + command history. Per Field: marks, undo. vimrc mappings are not stored here: every Activation re-runs the vimrc from Settings.
+**Session State** (`chrome.storage.session`, shared by all tabs/frames): registers (the
+macros and search queries they carry included), search + command history, the last `f`/`t`
+search. Per Field: marks, undo, the jump list. vimrc mappings are not stored here: every
+Activation re-runs the vimrc from Settings. One key holds a plain-data snapshot of the
+engine's global state (`src/engine/globalState.ts`). After every key pressed while a Session
+exists, and when the command line closes (it commits its history inside its own input's
+listener, after the key has passed the document), the frame snapshots that state and writes it when the
+serialized form differs from the last one written or restored; a tab's own write coming back
+as a storage change is skipped, every other change is restored into the engine before the next
+key. Last writer wins: two tabs editing registers at the same moment end with whichever wrote
+last, never a merge. A write the storage rejects (quota, or a read or write before the service
+worker's grant) is logged and ignored; the tab keeps its in-memory state. The service worker
+(`src/background.ts`) has one job, on install and on browser startup: grant content scripts
+access to session storage (`setAccessLevel`). Nothing else runs there.
 
 **Settings** (`chrome.storage.sync`):
 
@@ -152,7 +168,14 @@ search + command history. Per Field: marks, undo. vimrc mappings are not stored 
   remembered key was pressed on it. This also catches an `autofocus` Field, which is
   focused before the content script runs, and a popup switch to "normal" while a Field is
   focused. A key pressed before the content script runs at all is lost.
-- vimrc: a text box of ex commands (`map`, `noremap`, `set`, …) run through the engine on every Activation.
+- vimrc: a text box of ex commands (`map`, `noremap`, `set`, …) run through the engine on every
+  Activation. The saved vimrc is the whole truth about user mappings: an Activation first clears
+  every user mapping (engine mappings are global per frame), then runs the vimrc, then re-applies
+  the mappings of each enabled Plugin, so a mapping deleted from the vimrc is gone at the next
+  Activation in every tab and a vimrc save never disables a Plugin. On save (and on open) the
+  options page runs the text through a scratch mirror line by line and lists each failing line
+  with the engine's message under the text box; a clean vimrc lists nothing. The content script
+  reports nothing for a bad line.
 - Plugin toggles (surround, targets), off by default.
 - Popup: global on/off, Site Policy for the current Site, Mode of the focused Field. Two
   queries to the content script: the Site origin from the top frame only (which also
@@ -203,6 +226,10 @@ push/PR · MIT · version restarts at 0.1.0. Upstream engine tests are not re-ru
   to its own origin as the Site, so the top page's policy does not reach it.
 - The popup's Mode comes from any frame holding a Session on its active element, so a
   Field left focused in a background frame can be the one reported.
+- In a cross-origin frame whose embedding page's permissions policy denies clipboard access,
+  `"+p`/`"*p` show a Status Line message and leave the text untouched; `"+y` still fills the
+  register but the clipboard does not change. On a plain `http://` page (not a secure context)
+  there is no clipboard API at all: every `"+`/`"*` command beeps with a Status Line message.
 
 ## Milestones
 

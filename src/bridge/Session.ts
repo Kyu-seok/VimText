@@ -2,11 +2,24 @@ import { EditorSelection, type Text } from "@codemirror/state";
 import type { Field } from "../field/Field";
 import { diffText } from "../field/diff";
 import { Mirror, Vim, type KeyLike } from "../engine/mirror";
+import { vimrcLines } from "../engine/vimrc";
 import type { Mode } from "../engine/mode";
 import { StatusLine } from "../ui/StatusLine";
 
+/** Runs ex command lines (`nnoremap …`), as a Plugin registers its mappings with. */
+export type ExRunner = (line: string) => void;
+
 interface SessionConfig {
   vimrc: string;
+  /** Each enabled Plugin's mappings, applied after the vimrc on every Activation. */
+  plugins?: Array<(ex: ExRunner) => void>;
+  /**
+   * The engine opened or closed its dialog. The command line commits its
+   * history as it closes, inside its own input's keydown listener in the
+   * Status Line, after the keydown has passed the document: a Session State
+   * snapshot taken from the document's listener misses it, one taken here does not.
+   */
+  onDialog?: () => void;
 }
 
 /** `Esc` or its Vim twin `Ctrl+[`. */
@@ -102,12 +115,14 @@ export class Session {
   private lastRendered: { anchor: number; head: number } | null = null;
   /** The Field text the bridge last wrote or agreed with; anything else means the page changed the Field. */
   private lastText: string | null = null;
+  private readonly onDialog: (() => void) | undefined;
 
   constructor(
     readonly field: Field,
     config: SessionConfig,
   ) {
     defineExCommands();
+    this.onDialog = config.onDialog;
     this.status = new StatusLine(field);
     const sel = field.getSelection();
     this.mirror = new Mirror({
@@ -130,7 +145,7 @@ export class Session {
       this.scheduleRender();
     });
     this.stopInput = field.onInput(this.onFieldInput);
-    this.runVimrc(config.vimrc);
+    this.runVimrc(config);
     this.status.show();
     this.status.setMode(this.mode);
     this.render();
@@ -145,16 +160,24 @@ export class Session {
     return this.mirror.vim.insertMode && !this.mirror.cm.state.overwrite;
   }
 
-  private runVimrc(vimrc: string): void {
-    for (const raw of vimrc.split("\n")) {
-      const line = raw.replace(/^\s*:?/, "").trim();
-      if (!line || line.startsWith('"')) continue;
+  /**
+   * The saved vimrc is the whole truth about user mappings: engine mappings
+   * are global per frame and would otherwise outlive their vimrc line until
+   * the tab reloads (see the mapping seam in docs/engine-seams.md). Errors are
+   * not reported here; the options page runs the same lines on save. Enabled
+   * Plugins re-apply their mappings afterwards (the hook M3 part 2 fills).
+   */
+  private runVimrc(config: SessionConfig): void {
+    this.mirror.clearUserMappings();
+    for (const { text } of vimrcLines(config.vimrc)) {
       try {
-        this.mirror.handleEx(line);
-      } catch (err) {
-        console.warn("VimText vimrc:", line, err);
+        this.mirror.handleEx(text);
+      } catch {
+        // Reported by the options page on save.
       }
     }
+    // A Plugin's mappings come after the vimrc: a vimrc save must never disable one.
+    for (const apply of config.plugins ?? []) apply((line) => this.mirror.handleEx(line));
   }
 
   /** Called from the document-level capture listener for keys targeted at this Field. */
@@ -183,6 +206,22 @@ export class Session {
       return;
     }
 
+    if (this.mirror.vim.inputState.registerName === "+" && !navigator.clipboard) {
+      // A plain http page has no clipboard API at all (DESIGN.md "Accepted
+      // limitations"): the engine's `"+` yank would throw inside its register
+      // write, so the command is a beep with a reason instead.
+      this.beep();
+      this.mirror.notify("VimText: no clipboard on this page (not a secure context)");
+      e.preventDefault();
+      e.stopPropagation();
+      this.render();
+      return;
+    }
+    if (this.isClipboardPaste(e)) {
+      this.pasteFromClipboard(e);
+      return;
+    }
+
     this.dispatchToEngine(e);
     if (isEscape(e)) {
       // The engine reports Esc in Normal as unhandled even when it cancelled a
@@ -190,6 +229,39 @@ export class Session {
       e.preventDefault();
       e.stopPropagation();
     }
+  }
+
+  /** `p` or `P` with the clipboard register selected (`"+` or its alias `"*`). */
+  private isClipboardPaste(e: KeyboardEvent): boolean {
+    if (e.ctrlKey || e.metaKey || e.altKey || (e.key !== "p" && e.key !== "P")) return false;
+    return this.mirror.vim.inputState.registerName === "+";
+  }
+
+  /**
+   * The engine's `"+p` reads the clipboard asynchronously and never catches a
+   * rejected read (a cross-origin frame whose embedding page's permissions
+   * policy denies clipboard access; DESIGN.md "Accepted limitations"), so the
+   * bridge reads first: on success the key goes to the engine, whose own read
+   * then succeeds; on failure the pending register is dropped as a beep and
+   * the Status Line says why. The paste was already asynchronous in the
+   * engine, so a key typed before the read resolves still lands first.
+   */
+  private pasteFromClipboard(e: KeyboardEvent): void {
+    e.preventDefault();
+    e.stopPropagation();
+    navigator.clipboard.readText().then(
+      () => {
+        if (this.destroyed) return;
+        this.syncFromField();
+        this.dispatchToEngine(e);
+      },
+      () => {
+        if (this.destroyed) return;
+        this.beep();
+        this.mirror.notify("VimText: the clipboard cannot be read here");
+        this.render();
+      },
+    );
   }
 
   /**
@@ -224,12 +296,34 @@ export class Session {
     this.mirror.handleKey(toEngineKey(new KeyboardEvent("keydown", { key: "Escape" })));
   }
 
+  /**
+   * True while the engine waits for a register name: after `"` in Normal or
+   * Visual (a count may precede it), after `Ctrl-r` in Insert.
+   */
+  private awaitingRegister(): boolean {
+    const buffer = this.mirror.vim.inputState.keyBuffer;
+    const last = buffer[buffer.length - 1];
+    return last === '"' || last === "<C-r>";
+  }
+
+  /**
+   * The key the engine gets. `"*` is an alias of `"+` (DESIGN.md "Registers &
+   * clipboard"): the engine knows only `+` as the clipboard register, so the
+   * bridge rewrites the register name before the engine sees it. Not an engine
+   * change (rule 3): the clipboard behaviour stays the engine's.
+   */
+  private engineKey(e: KeyboardEvent): KeyLike {
+    const key = toEngineKey(e);
+    if (key.key === "*" && !e.ctrlKey && !e.metaKey && !e.altKey && this.awaitingRegister()) key.key = "+";
+    return key;
+  }
+
   private dispatchToEngine(e: KeyboardEvent): void {
     const before = this.mirror.view.state;
     const wasInsert = this.mirror.vim.insertMode;
     let handled = false;
     try {
-      handled = this.mirror.handleKey(toEngineKey(e));
+      handled = this.mirror.handleKey(this.engineKey(e));
     } catch (err) {
       console.error("VimText engine error", err);
     }
@@ -266,7 +360,9 @@ export class Session {
 
   /** After `:wq`, the `:w` notice outlives the Field's focus; the bar hides once it closes. */
   private onDialogChange = (): void => {
-    if (this.destroyed || !this.noticeOutlivesBlur || this.mirror.dialog) return;
+    if (this.destroyed) return;
+    this.onDialog?.();
+    if (!this.noticeOutlivesBlur || this.mirror.dialog) return;
     this.noticeOutlivesBlur = false;
     if (!this.field.hasFocus()) this.status.hide();
   };

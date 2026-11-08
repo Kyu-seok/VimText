@@ -22,6 +22,7 @@ const ctx = await esbuild.context({
   ...common,
   entryPoints: {
     content: "src/content.ts",
+    background: "src/background.ts",
     "popup/popup": "popup/popup.ts",
     "options/options": "options/options.ts",
   },

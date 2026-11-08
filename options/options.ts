@@ -6,10 +6,12 @@ import {
   type Settings,
   type SitePolicy,
 } from "../src/settings/settings";
+import { checkVimrc, type VimrcError } from "../src/engine/vimrc";
 
 const vimrc = document.getElementById("vimrc") as HTMLTextAreaElement;
 const saveVimrc = document.getElementById("save-vimrc") as HTMLButtonElement;
 const vimrcStatus = document.getElementById("vimrc-status")!;
+const vimrcErrors = document.getElementById("vimrc-errors") as HTMLUListElement;
 const surround = document.getElementById("plugin-surround") as HTMLInputElement;
 const targets = document.getElementById("plugin-targets") as HTMLInputElement;
 const sitesBody = document.querySelector("#sites tbody") as HTMLTableSectionElement;
@@ -55,8 +57,19 @@ function renderSites(settings: Settings): void {
   }
 }
 
+/** The failing lines of a vimrc under the text box; nothing when it is clean. */
+function renderVimrcErrors(errors: VimrcError[]): void {
+  vimrcErrors.textContent = "";
+  for (const { line, text, error } of errors) {
+    const li = document.createElement("li");
+    li.textContent = `line ${line}: ${text} — ${error}`;
+    vimrcErrors.appendChild(li);
+  }
+}
+
 function render(settings: Settings): void {
   if (document.activeElement !== vimrc) vimrc.value = settings.vimrc;
+  renderVimrcErrors(checkVimrc(settings.vimrc));
   surround.checked = settings.plugins.surround;
   targets.checked = settings.plugins.targets;
   renderSites(settings);
@@ -66,6 +79,7 @@ saveVimrc.addEventListener("click", () => {
   void updateSettings((s) => {
     s.vimrc = vimrc.value;
   }).then(() => {
+    // The errors render from the storage change the save triggers (`watchSettings`).
     vimrcStatus.textContent = "Saved. Applies on the next Field activation.";
     setTimeout(() => (vimrcStatus.textContent = ""), 3000);
   });
