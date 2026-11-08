@@ -2,11 +2,17 @@ import { EditorSelection, type Text } from "@codemirror/state";
 import type { Field } from "../field/Field";
 import { diffText } from "../field/diff";
 import { Mirror, Vim, type KeyLike } from "../engine/mirror";
+import { vimrcLines } from "../engine/vimrc";
 import type { Mode } from "../engine/mode";
 import { StatusLine } from "../ui/StatusLine";
 
+/** Runs ex command lines (`nnoremap …`), as a Plugin registers its mappings with. */
+export type ExRunner = (line: string) => void;
+
 interface SessionConfig {
   vimrc: string;
+  /** Each enabled Plugin's mappings, applied after the vimrc on every Activation. */
+  plugins?: Array<(ex: ExRunner) => void>;
 }
 
 /** `Esc` or its Vim twin `Ctrl+[`. */
@@ -130,7 +136,7 @@ export class Session {
       this.scheduleRender();
     });
     this.stopInput = field.onInput(this.onFieldInput);
-    this.runVimrc(config.vimrc);
+    this.runVimrc(config);
     this.status.show();
     this.status.setMode(this.mode);
     this.render();
@@ -145,16 +151,24 @@ export class Session {
     return this.mirror.vim.insertMode && !this.mirror.cm.state.overwrite;
   }
 
-  private runVimrc(vimrc: string): void {
-    for (const raw of vimrc.split("\n")) {
-      const line = raw.replace(/^\s*:?/, "").trim();
-      if (!line || line.startsWith('"')) continue;
+  /**
+   * The saved vimrc is the whole truth about user mappings: engine mappings
+   * are global per frame and would otherwise outlive their vimrc line until
+   * the tab reloads (see the mapping seam in docs/engine-seams.md). Errors are
+   * not reported here; the options page runs the same lines on save. Enabled
+   * Plugins re-apply their mappings afterwards (the hook M3 part 2 fills).
+   */
+  private runVimrc(config: SessionConfig): void {
+    this.mirror.clearUserMappings();
+    for (const { text } of vimrcLines(config.vimrc)) {
       try {
-        this.mirror.handleEx(line);
-      } catch (err) {
-        console.warn("VimText vimrc:", line, err);
+        this.mirror.handleEx(text);
+      } catch {
+        // Reported by the options page on save.
       }
     }
+    // A Plugin's mappings come after the vimrc: a vimrc save must never disable one.
+    for (const apply of config.plugins ?? []) apply((line) => this.mirror.handleEx(line));
   }
 
   /** Called from the document-level capture listener for keys targeted at this Field. */

@@ -156,7 +156,14 @@ search + command history. Per Field: marks, undo. vimrc mappings are not stored 
   remembered key was pressed on it. This also catches an `autofocus` Field, which is
   focused before the content script runs, and a popup switch to "normal" while a Field is
   focused. A key pressed before the content script runs at all is lost.
-- vimrc: a text box of ex commands (`map`, `noremap`, `set`, …) run through the engine on every Activation.
+- vimrc: a text box of ex commands (`map`, `noremap`, `set`, …) run through the engine on every
+  Activation. The saved vimrc is the whole truth about user mappings: an Activation first clears
+  every user mapping (engine mappings are global per frame), then runs the vimrc, then re-applies
+  the mappings of each enabled Plugin, so a mapping deleted from the vimrc is gone at the next
+  Activation in every tab and a vimrc save never disables a Plugin. On save (and on open) the
+  options page runs the text through a scratch mirror line by line and lists each failing line
+  with the engine's message under the text box; a clean vimrc lists nothing. The content script
+  reports nothing for a bad line.
 - Plugin toggles (surround, targets), off by default.
 - Popup: global on/off, Site Policy for the current Site, Mode of the focused Field. Two
   queries to the content script: the Site origin from the top frame only (which also

@@ -43,6 +43,18 @@
         color: #666;
         font-size: 12px;
       }
+      .errors {
+        margin: 6px 0 0;
+        padding-left: 20px;
+        color: #b3261e;
+        font:
+          12px ui-monospace,
+          Menlo,
+          monospace;
+      }
+      .errors:empty {
+        display: none;
+      }
       button {
         font: inherit;
       }
@@ -55,7 +67,8 @@
     <p class="muted">
       Ex commands run on every Field activation: <code>map</code>, <code>noremap</code>, <code>set</code>, …
     </p>
-    <textarea id="vimrc" spellcheck="false" placeholder="nnoremap Y y$&#10;set ignorecase"></textarea>
+    <textarea id="vimrc" spellcheck="false" placeholder="nnoremap Y y$&#10;nnoremap \x dd"></textarea>
+    <ul id="vimrc-errors" class="errors"></ul>
     <p><button id="save-vimrc">Save vimrc</button> <span id="vimrc-status" class="muted"></span></p>
 
     <h2>Plugins</h2>

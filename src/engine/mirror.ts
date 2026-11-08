@@ -157,6 +157,11 @@ export class Mirror {
     (Vim as unknown as { handleEx(cm: VimCM, input: string): void }).handleEx(this.cm, line);
   }
 
+  /** Removes every user mapping in every context; mappings are global per frame, not per mirror. */
+  clearUserMappings(): void {
+    (Vim as unknown as { mapclear(ctx?: string): void }).mapclear();
+  }
+
   /** The engine's open command line or notice, if any. */
   get dialog(): HTMLElement | null {
     return this.cm.state.dialog ?? null;

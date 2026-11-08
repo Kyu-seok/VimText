@@ -1,7 +1,14 @@
 import { isTextControl, type TextControl } from "../field/Field";
 import { TextareaField } from "../field/TextareaField";
-import { Session, isActivationKey } from "../bridge/Session";
+import { Session, isActivationKey, type ExRunner } from "../bridge/Session";
 import { policyFor, type Settings, type SitePolicy } from "../settings/settings";
+
+/**
+ * The Plugins VimText can enable, each registering its mappings through the
+ * ex runner on every Activation after the vimrc. M3 part 2 fills this; the
+ * content entry passes none yet.
+ */
+export type PluginRegistry = Partial<Record<keyof Settings["plugins"], (ex: ExRunner) => void>>;
 
 /** Where settings come from: a one-time read, then every later change. */
 export interface SettingsPort {
@@ -73,6 +80,7 @@ export class Sessions {
     private readonly document: Document,
     port: SettingsPort,
     private readonly site: string,
+    private readonly plugins: PluginRegistry = {},
   ) {
     document.addEventListener("keydown", this.onKeydown, { capture: true });
     document.addEventListener("focusin", this.onFocusin);
@@ -105,9 +113,21 @@ export class Sessions {
     if (this.sessions.has(el)) return;
     if (this.remembered === el) this.remembered = null;
     const field = new TextareaField(el);
-    const session = new Session(field, { vimrc: this.settings?.vimrc ?? "" });
+    const session = new Session(field, {
+      vimrc: this.settings?.vimrc ?? "",
+      plugins: this.enabledPlugins(),
+    });
     this.sessions.set(el, { field, session });
     this.observeLifecycle(el.getRootNode());
+  }
+
+  /** The registered Plugins the settings enable, in registry order. */
+  private enabledPlugins(): Array<(ex: ExRunner) => void> {
+    const toggles = this.settings?.plugins;
+    if (!toggles) return [];
+    return (Object.keys(this.plugins) as Array<keyof PluginRegistry>)
+      .filter((name) => toggles[name])
+      .map((name) => this.plugins[name]!);
   }
 
   private dispose(el: TextControl): void {
