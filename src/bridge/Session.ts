@@ -329,12 +329,14 @@ export class Session {
 
   /**
    * The engine's context as the Plugin key hook sees it (DESIGN.md "Plugins"):
-   * null when a partial key (`g`, `"`, `z`, an operator's `f`) is pending,
-   * which no Plugin claims: the key that completes it is the engine's. A count
-   * in the buffer or a register already taken is fine.
+   * null in Insert and Replace (`insertMode` with overwrite), where every typed
+   * character is text, and null when a partial key (`g`, `"`, `z`, an
+   * operator's `f`) is pending, which no Plugin claims: the key that completes
+   * it is the engine's. A count in the buffer or a register already taken is fine.
    */
   private pluginContext(): PluginContext | null {
     const vim = this.mirror.vim;
+    if (vim.insertMode) return null;
     if (!/^\d*$/.test(vim.inputState.keyBuffer.join(""))) return null;
     if (vim.visualMode) return "visual";
     return vim.inputState.operator ? "operator-pending" : "normal";

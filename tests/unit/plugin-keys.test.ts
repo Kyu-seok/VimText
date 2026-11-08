@@ -15,9 +15,11 @@ import { statusText } from "./dom";
  * commands whose effect on the Field is visible (`r` makes the character
  * that follows visible, `d`/`x` show the count), so this file proves the
  * grammar and nothing of surround's semantics (tests/unit/surround.test.ts).
- * Coverage (rule 5): Normal, Visual and operator-pending on a textarea; the
- * hook sits inside the Session, so Field placement is the Sessions class's
- * concern.
+ * Coverage (rule 5): Normal, Visual and operator-pending on a textarea, and
+ * Replace on a textarea and on a Field inside an open shadow root (a key held
+ * there would take a typed character from the Field); Insert never reaches
+ * the hook (`nativeInsert` returns first; session.test.ts). Blur is covered
+ * on textareas, with the Sessions class routing the focus events.
  */
 
 const TEXT = "the quick brown fox\njumps over the lazy dog\nthird line here";
@@ -28,11 +30,11 @@ let field: TextareaField;
 let session: Session;
 const { keydown, keys } = keyDriver(() => session);
 
-function activate(vimrc: string, plugins = [surround], text = TEXT): void {
+function activate(vimrc: string, plugins = [surround], text = TEXT, root: ParentNode = document.body): void {
   ta = document.createElement("textarea");
   ta.value = text;
   ta.style.cssText = "width:400px;height:120px;font:14px/1.4 monospace";
-  document.body.appendChild(ta);
+  root.appendChild(ta);
   ta.focus();
   ta.setSelectionRange(0, 0);
   field = new TextareaField(ta);
@@ -104,6 +106,26 @@ describe("with surround on, in Normal", () => {
     keys(">ds(");
     expect(ta.value).toMatch(/^he quick/); // >d clears, s substitutes the t
     expect(session.mode).toBe("insert");
+  });
+});
+
+describe("with surround on, in Replace", () => {
+  afterEach(() => document.body.replaceChildren());
+
+  it("d is not held: R then d overwrites the first character and the Status Line shows REPLACE", () => {
+    activate(VIMRC);
+    keys("Rd");
+    expect(ta.value).toMatch(/^dhe quick/);
+    expect(statusText()).toContain("REPLACE");
+  });
+
+  it("the same on a Field inside an open shadow root", () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    activate(VIMRC, [surround], TEXT, host.attachShadow({ mode: "open" }));
+    keys("Rd");
+    expect(ta.value).toMatch(/^dhe quick/);
+    expect(statusText()).toContain("REPLACE");
   });
 });
 
