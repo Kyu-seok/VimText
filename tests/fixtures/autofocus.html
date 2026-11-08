@@ -1,0 +1,30 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>VimText fixture: autofocus</title>
+    <style>
+      body {
+        font-family: system-ui;
+        margin: 40px;
+      }
+      textarea {
+        width: 480px;
+        height: 160px;
+        font:
+          14px/1.4 Menlo,
+          monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>VimText fixture: autofocus</h1>
+    <!-- Focused by the browser before the content script runs at document_idle:
+         no focusin ever reaches VimText, only the settings arrival can Activate it. -->
+    <p>
+      <textarea id="ta" autofocus>
+the quick brown fox
+jumps over the lazy dog</textarea>
+    </p>
+  </body>
+</html>
