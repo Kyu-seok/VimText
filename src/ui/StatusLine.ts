@@ -13,6 +13,7 @@ const CSS = `
   box-shadow: 0 2px 6px rgba(0,0,0,.25);
 }
 .bar.insert { opacity: .55; }
+.host.above .bar { border-radius: 4px 4px 0 0; box-shadow: 0 -2px 6px rgba(0,0,0,.25); }
 .bar span { white-space: pre; }
 .bar > div { display: flex; align-items: center; gap: 6px; flex: 1; }
 .bar input {
@@ -82,12 +83,20 @@ export class StatusLine {
     this.host.style.display = "none";
   }
 
+  /**
+   * Below the Field when the strip fits in the viewport there, above it
+   * otherwise (a Field flush with the bottom of a short iframe), and below
+   * again when neither fits.
+   */
   reposition = (): void => {
     if (!this.visible) return;
     const r = this.field.element.getBoundingClientRect();
     const wrap = this.bar.parentElement!;
+    const height = this.bar.offsetHeight;
+    const above = r.bottom + height > window.innerHeight && r.top - height >= 0;
+    wrap.classList.toggle("above", above);
     wrap.style.left = `${r.left}px`;
-    wrap.style.top = `${r.bottom}px`;
+    wrap.style.top = `${above ? r.top - height : r.bottom}px`;
     wrap.style.width = `${r.width}px`;
     this.mirrorContainer.style.height = `${Math.max(16, r.height)}px`;
   };

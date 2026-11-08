@@ -1,4 +1,4 @@
-import { test as base, chromium, type BrowserContext, type Page } from "@playwright/test";
+import { test as base, chromium, type BrowserContext, type Frame, type Page } from "@playwright/test";
 import { resolve } from "node:path";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -7,7 +7,6 @@ import { createHash } from "node:crypto";
 const dist = resolve("dist");
 
 import { fixtureOrigin } from "./fixture-port";
-import type { Mode } from "../../src/engine/mode";
 
 export { fixtureOrigin };
 
@@ -53,8 +52,8 @@ export async function setSettings(context: BrowserContext, settings: object): Pr
   await page.close();
 }
 
-/** The Status Line host VimText injects next to an activated Field. */
-export function statusText(page: Page): Promise<string> {
+/** The Status Line host VimText injects next to an activated Field, in that page or frame. */
+export function statusText(page: Page | Frame): Promise<string> {
   return page.evaluate(() => {
     const host = document.querySelector("vimtext-status") as HTMLElement | null;
     const bar = host?.shadowRoot?.querySelector(".bar") as HTMLElement | null;
@@ -71,18 +70,19 @@ export async function activateAtStart(page: Page, selector = "#in"): Promise<voi
   base.expect(await statusText(page)).toContain("NORMAL");
 }
 
-/** What the content script reports about a tab (the popup's `vimtext:status` query). */
+/** What the content script of a tab's top frame reports (the popup's `vimtext:status` query). */
 export interface ContentStatus {
+  /** The Site origin: the top page's. */
   origin: string;
-  mode: Mode | null;
-  /** True while the lifecycle MutationObserver is connected (only while a Session exists). */
+  /** True while the top frame's lifecycle MutationObserver is connected (only while a Session exists). */
   observing: boolean;
 }
 
 /**
- * Asks the content script of the fixture tab for its status, through an
- * extension page (the only context with `chrome.tabs`). Tabs without the
- * content script (extension pages themselves) do not answer and are skipped.
+ * Asks the content script of the fixture tab's top frame for its status,
+ * through an extension page (the only context with `chrome.tabs`). Pinned to
+ * frame 0: without it every frame answers and the first one wins. Tabs without
+ * the content script (extension pages themselves) do not answer and are skipped.
  */
 export async function contentStatus(context: BrowserContext): Promise<ContentStatus> {
   const page = await context.newPage();
@@ -93,7 +93,11 @@ export async function contentStatus(context: BrowserContext): Promise<ContentSta
     for (const tab of tabs) {
       if (!tab.id) continue;
       try {
-        const res = (await chrome.tabs.sendMessage(tab.id, { type: "vimtext:status" })) as ContentStatus;
+        const res = (await chrome.tabs.sendMessage(
+          tab.id,
+          { type: "vimtext:status" },
+          { frameId: 0 },
+        )) as ContentStatus;
         if (res?.origin === origin) answers.push(res);
       } catch {
         // no content script in this tab

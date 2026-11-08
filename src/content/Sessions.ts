@@ -62,14 +62,18 @@ export class Sessions {
   /** The Field an Activation key was pressed on while the policy was unknown; the last one only. */
   private remembered: TextControl | null = null;
   private lifecycleObserver: MutationObserver | null = null;
-  private readonly origin: string;
   private readonly stopWatching: () => void;
 
+  /**
+   * `site` is the origin the Site Policy is keyed by: the top page's, which in
+   * a frame is not the document's own (ADR 0005). Resolving it is the content
+   * entry's job (`siteOrigin`), so this class never reads `ancestorOrigins`.
+   */
   constructor(
     private readonly document: Document,
     port: SettingsPort,
+    private readonly site: string,
   ) {
-    this.origin = document.location?.origin ?? "";
     document.addEventListener("keydown", this.onKeydown, { capture: true });
     document.addEventListener("focusin", this.onFocusin);
     document.addEventListener("focusout", this.onFocusout);
@@ -92,9 +96,9 @@ export class Sessions {
     return this.lifecycleObserver !== null;
   }
 
-  /** The Site Policy for this origin, or null while settings have not arrived. */
+  /** The Site Policy for this Site, or null while settings have not arrived. */
   private policy(): SitePolicy | null {
-    return this.settings ? policyFor(this.settings, this.origin) : null;
+    return this.settings ? policyFor(this.settings, this.site) : null;
   }
 
   private activate(el: TextControl): void {
@@ -121,7 +125,7 @@ export class Sessions {
 
   private onSettings = (s: Settings): void => {
     this.settings = s;
-    const policy = policyFor(s, this.origin);
+    const policy = policyFor(s, this.site);
     if (policy === "off") this.disposeAll();
     else this.reconcile(policy);
     // The arrival has decided what the remembered key was; a later change must not Activate from it.

@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>VimText fixture: frames</title>
+    <style>
+      body {
+        font-family: system-ui;
+        margin: 40px;
+      }
+      iframe {
+        display: block;
+        margin: 12px 0;
+        border: 1px solid #999;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>VimText fixture: frames</h1>
+    <p><textarea id="top">top-level text</textarea></p>
+    <!-- Same origin as this page. -->
+    <iframe id="same" src="/single-line.html" width="520" height="300"></iframe>
+    <!-- Cross-origin: the same server answers on 127.0.0.1, a different origin from localhost. -->
+    <iframe id="cross" width="520" height="300"></iframe>
+    <!-- A short frame whose Field is flush with its bottom edge. -->
+    <iframe id="short" src="/bottom.html" width="400" height="100"></iframe>
+    <script>
+      document.getElementById("cross").src = "http://127.0.0.1:" + location.port + "/single-line.html";
+    </script>
+  </body>
+</html>

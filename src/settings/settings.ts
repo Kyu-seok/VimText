@@ -23,6 +23,16 @@ export function policyFor(settings: Settings, origin: string): SitePolicy {
   return settings.sites[origin] ?? "insert";
 }
 
+/**
+ * The Site a document belongs to (GLOSSARY.md **Site**): the top page's origin,
+ * read by a frame as the last of its `ancestorOrigins` (ADR 0005). A top-level
+ * document, or a browser without that list (Firefox), yields its own origin.
+ */
+export function siteOrigin(location: { origin: string; ancestorOrigins: ArrayLike<string> }): string {
+  const ancestors = location.ancestorOrigins;
+  return ancestors.length ? ancestors[ancestors.length - 1]! : location.origin;
+}
+
 /** "insert" is the default, so choosing it forgets the origin rather than storing it. */
 export function setSitePolicy(settings: Settings, origin: string, policy: SitePolicy): void {
   if (policy === "insert") delete settings.sites[origin];

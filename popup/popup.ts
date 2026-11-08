@@ -13,16 +13,28 @@ interface Status {
   mode: Mode | null;
 }
 
+/** Sends a message to the tab's frames (one frame when `frameId` is given); no answer or no script → undefined. */
+async function ask<T>(tabId: number, type: string, frameId?: number): Promise<T | undefined> {
+  try {
+    const options = frameId === undefined ? undefined : { frameId };
+    return (await chrome.tabs.sendMessage(tabId, { type }, options)) as T | undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The Site comes from the top frame only, which also proves VimText runs there.
+ * The Mode comes from whichever frame holds a Session on its active element
+ * (DESIGN.md "Settings"), so a Field focused inside an iframe is reported.
+ */
 async function currentStatus(): Promise<Status | null> {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) return null;
-  try {
-    const res = (await chrome.tabs.sendMessage(tab.id, { type: "vimtext:status" })) as
-      { origin?: string; mode?: unknown } | undefined;
-    return res?.origin ? { origin: res.origin, mode: isMode(res.mode) ? res.mode : null } : null;
-  } catch {
-    return null;
-  }
+  const top = await ask<{ origin?: string }>(tab.id, "vimtext:status", 0);
+  if (!top?.origin) return null;
+  const focused = await ask<{ mode?: unknown }>(tab.id, "vimtext:focused-mode");
+  return { origin: top.origin, mode: isMode(focused?.mode) ? focused.mode : null };
 }
 
 async function init(): Promise<void> {
