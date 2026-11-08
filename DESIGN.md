@@ -270,8 +270,18 @@ push/PR · MIT · version restarts at 0.1.0. Upstream engine tests are not re-ru
   Line for that keystroke. Macros record Plugin Keys, so `:reg` and `"qp` show `<SurroundDs>(`
   where `ds(` was typed; they replay correctly. A vimrc `nnoremap` cannot expand into a Plugin
   key (the engine resolves `noremap` against its own defaults only); `nmap` can. With targets
-  on, `cin` followed by a key that is not an object runs `c` on the failed object, which
-  enters Insert mode where Vim beeps; the stock engine does the same for `cix`. Linewise
+  on, `cin` followed by a key that is not an object cancels the `c` and stays in Normal mode
+  where Vim beeps, as the stock engine does for `cix` (a failed text object ends the operator;
+  the hook has no special case). targets' Seek ranks candidates by the default
+  `g:targets_seekRanges` with every line taken as on screen (the hidden mirror has no
+  viewport), so a next object below always beats a last object above; the implicit Seek for
+  a quote stays on the cursor's line (`in"`/`il"` cross lines), and a count on `i"` is the
+  count of `n`/`l` only. `ib` is the parentheses pair (Vim's alias), not targets' any-block.
+  A pair whose brackets end and start lines of their own is charwise (`ci{` leaves `{}`),
+  where Vim's inner block is linewise; `aa` on a sole argument takes its trailing whitespace
+  (`( x )` leaves `( )`).
+  In Visual, an object typed again grows only when the selection is wider than one
+  character (a one-character inner cannot be told from a fresh `v`). Linewise
   Visual `S)` on a Single-line Field yields `(text)` (the newline strip). `.` after Visual
   `S` wraps a same-sized region from the cursor, as the engine replays any Visual operator
   (Vim's `.` does not repeat it). While `ys{motion}` or `cs{old}` waits for its character, a

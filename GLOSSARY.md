@@ -52,7 +52,7 @@ A key name private to a Plugin that no keyboard produces, which VimText substitu
 _Avoid_: internal key, synthetic key, pseudo-key
 
 **Seek**:
-What targets does when the cursor is not inside the requested text object: it looks ahead on the line for the next one, then behind for the last.
+What targets does when the cursor is not inside the requested text object: it looks ahead on the line for the next one, then behind for the last; for a pair, other lines after that (targets.vim's default seek ranges).
 _Avoid_: search, jump, scan
 
 **Pass-through**:

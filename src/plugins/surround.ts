@@ -1,4 +1,5 @@
 import type { CodeMirrorV, EngineApi, OperatorFn, Pos, vimKey } from "../engine/pluginApi";
+import { enclosingPair } from "./pairs";
 import type { Plugin } from "./Plugin";
 
 /**
@@ -50,41 +51,6 @@ function delimiters(char: string): [string, string] | null {
   }
   if (/[\p{L}\p{N}]/u.test(char) || char === " ") return null;
   return [char, char];
-}
-
-/**
- * The enclosing `open`…`close` pair of offset `at` in `text`, nesting
- * respected, the bracket under the cursor counting as its own pair (Vim's
- * `a(` on the bracket itself); null when there is none.
- */
-function enclosingPair(text: string, at: number, open: string, close: string): [number, number] | null {
-  let openAt = -1;
-  if (text[at] === open) openAt = at;
-  else {
-    let depth = 0;
-    for (let i = at - 1; i >= 0; i--) {
-      const c = text[i];
-      if (c === close) depth++;
-      else if (c === open) {
-        if (depth === 0) {
-          openAt = i;
-          break;
-        }
-        depth--;
-      }
-    }
-    if (openAt < 0) return null;
-  }
-  let depth = 0;
-  for (let j = openAt + 1; j < text.length; j++) {
-    const c = text[j];
-    if (c === open) depth++;
-    else if (c === close) {
-      if (depth === 0) return [openAt, j];
-      depth--;
-    }
-  }
-  return null;
 }
 
 /**

@@ -329,14 +329,15 @@ export class Session {
 
   /**
    * The engine's context as the Plugin key hook sees it (DESIGN.md "Plugins"):
-   * null when a partial key (`g`, `"`, `z`) is pending, which no Plugin claims.
-   * A count in the buffer or a register already taken is fine.
+   * null when a partial key (`g`, `"`, `z`, an operator's `f`) is pending,
+   * which no Plugin claims: the key that completes it is the engine's. A count
+   * in the buffer or a register already taken is fine.
    */
   private pluginContext(): PluginContext | null {
     const vim = this.mirror.vim;
+    if (!/^\d*$/.test(vim.inputState.keyBuffer.join(""))) return null;
     if (vim.visualMode) return "visual";
-    if (vim.inputState.operator) return "operator-pending";
-    return /^\d*$/.test(vim.inputState.keyBuffer.join("")) ? "normal" : null;
+    return vim.inputState.operator ? "operator-pending" : "normal";
   }
 
   /**
@@ -354,8 +355,11 @@ export class Session {
       return "continue";
     }
     const typed = !e.ctrlKey && !e.metaKey && !e.altKey && e.key.length === 1 ? e.key : null;
-    // A Plugin Key changes the context for the key after it (`ys` followed by a
-    // targets sequence), so that key is looked at again in the new context.
+    // Keys fed to the engine change the context for the key after them: a
+    // released `c` leaves an operator pending for the `i` that released it, a
+    // Plugin Key (`ys`) may be followed by a targets sequence. So the key is
+    // looked at again in the new context; with nothing held any more, the
+    // second look can only hold it, pass it or complete a Plugin Key with it.
     for (;;) {
       const step = hook.step(this.pluginContext(), typed);
       switch (step.kind) {
@@ -365,7 +369,7 @@ export class Session {
           return "consumed";
         case "release":
           for (const key of step.held) this.mirror.handleKey(syntheticKey(key));
-          return "continue";
+          break;
         case "plugin-key":
           this.mirror.handleKey(syntheticKey(step.key));
           this.mirror.showTypedKeys(`<${step.key}>`, step.typed);

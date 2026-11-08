@@ -3,7 +3,7 @@ import type { ActionFn, CodeMirrorV, MotionFn, OperatorFn, Pos, vimKey } from "@
 
 // The engine types a Plugin module writes its commands against; the engine
 // package itself is imported only here (tools/check-imports.mjs).
-export type { CodeMirrorV, OperatorFn, Pos, vimKey };
+export type { CodeMirrorV, MotionFn, OperatorFn, Pos, vimKey };
 
 /**
  * The slice of the engine API a Plugin defines and binds through (see the
