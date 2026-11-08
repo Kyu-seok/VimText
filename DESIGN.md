@@ -272,10 +272,18 @@ push/PR · MIT · version restarts at 0.1.0. Upstream engine tests are not re-ru
   key (the engine resolves `noremap` against its own defaults only); `nmap` can. With targets
   on, `cin` followed by a key that is not an object runs `c` on the failed object, which
   enters Insert mode where Vim beeps; the stock engine does the same for `cix`. Linewise
-  Visual `S)` on a Single-line Field yields `(text)` (the newline strip). Visual `S` is not
-  `.`-repeatable. Not in v1: the tag and function targets (`ysiw<div>`, `cst`, `dst`; own
-  follow-up issue), `yS` `ySS` `cS` `gS`, Insert-mode `Ctrl-s`; targets' separator objects,
-  `I`/`A`, any-block `ib` and any-quote `iq`, tag seeking and `g:targets_*` configuration.
+  Visual `S)` on a Single-line Field yields `(text)` (the newline strip). `.` after Visual
+  `S` wraps a same-sized region from the cursor, as the engine replays any Visual operator
+  (Vim's `.` does not repeat it). While `ys{motion}` or `cs{old}` waits for its character, a
+  digit `1`-`9` is a count for the key after it, not the character (`ysiw3)` wraps with `)`;
+  `0` and every other printable key are taken as typed). After a cancelled wait (Esc), `.`
+  repeats that `ys`/`cs` with the last character it completed with, where Vim repeats the
+  edit before it. A letter or a space as the replacement wraps with nothing, and `<` or `t`
+  (a tag prompt in Vim) does nothing; a linewise wrap is not re-indented (vim-surround's
+  `g:surround_indent`). Not in v1: the tag and function targets (`ysiw<div>`, `cst`, `dst`;
+  own follow-up issue), `yS` `ySS` `cS` `gS`, Insert-mode `Ctrl-s`; targets' separator
+  objects, `I`/`A`, any-block `ib` and any-quote `iq`, tag seeking and `g:targets_*`
+  configuration.
 - In a cross-origin frame whose embedding page's permissions policy denies clipboard access,
   `"+p`/`"*p` show a Status Line message and leave the text untouched; `"+y` still fills the
   register but the clipboard does not change. On a plain `http://` page (not a secure context)

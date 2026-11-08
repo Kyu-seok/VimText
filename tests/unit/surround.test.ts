@@ -268,6 +268,12 @@ describe(". repeats with the same characters", () => {
     expect(text()).toBe("'a' 'b'");
   });
 
+  it(". after Visual S] wraps a same-sized region from the cursor: the engine replays a Visual operator (DESIGN.md limitation)", () => {
+    open("one two", 0);
+    feed("v", "i", "w", "SurroundS", "]", "W", ".");
+    expect(text()).toBe("[one] [two]");
+  });
+
   it(". after ds( deletes the next pair", () => {
     open("(a) (b)", 1);
     feed("SurroundDs", "(", "f", "(", ".");
