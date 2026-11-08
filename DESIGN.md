@@ -236,7 +236,10 @@ Playwright) for the sync layer · Playwright e2e loading the unpacked extension 
 fixtures (textarea, single-line input, a React 19 controlled input bundled by esbuild into a
 gitignored fixture file, a hand-written rewriting Controlled Field standing in for masks and
 other frameworks, a page with same-origin, cross-origin and short frames) · GitHub Actions on
-push/PR · MIT · version restarts at 0.1.0. Upstream engine tests are not re-run here.
+push/PR · MIT · version restarts at 0.1.0. Upstream engine tests are not re-run here. A second
+Playwright project, `screenshots` (`npm run screenshots`), drives the same launcher at 1280×800
+against a comment-form fixture and rewrites the store screenshots under `docs/store/`; it is
+outside the gate, so PNG churn never fails `npm run check`.
 
 ## Accepted limitations (M1–M3)
 
