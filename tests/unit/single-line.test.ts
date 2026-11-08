@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { TextareaField } from "../../src/field/TextareaField";
 import { Session } from "../../src/bridge/Session";
+import { surround } from "../../src/plugins/surround";
 import { keyDriver } from "./keys";
 
 let input: HTMLInputElement;
@@ -161,6 +162,20 @@ describe("Key Policy row 7 yields to a partial key", () => {
     keys("go");
     expect(session.mode).toBe("insert");
     expect(input.selectionStart).toBe("hello world".length);
+  });
+});
+
+describe("surround on a Single-line Field", () => {
+  beforeEach(() => {
+    session.destroy();
+    session = new Session(field, { vimrc: "", plugins: [surround] });
+  });
+
+  it("linewise Visual S) yields (text): the delimiters' own lines lose their newlines to the strip", () => {
+    keys("VS)");
+    expect(input.value).toBe("(hello world)");
+    keys("u");
+    expect(input.value).toBe("hello world");
   });
 });
 

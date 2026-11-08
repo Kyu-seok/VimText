@@ -86,6 +86,19 @@ describe("with surround on, in Normal", () => {
     expect(statusText()).not.toContain("Surround");
   });
 
+  it("y s then another key feeds <SurroundYs> then that key; the Status Line shows ysi while the motion is pending", () => {
+    keys("ysi");
+    expect(statusText()).toContain("ysi");
+    expect(statusText()).not.toContain("Surround");
+  });
+
+  it("a Pass-through key (Tab) leaves the wait for the character armed", () => {
+    keys("ysiw");
+    expect(keydown("Tab").defaultPrevented).toBe(false);
+    keys(")");
+    expect(ta.value).toMatch(/^\(the\) quick/);
+  });
+
   it("with an operator pending, d is not held: > d s ( is the Baseline", () => {
     keys(">ds(");
     expect(ta.value).toMatch(/^he quick/); // >d clears, s substitutes the t
