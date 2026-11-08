@@ -96,7 +96,7 @@ Why these permissions and not narrower ones is also recorded in
 **`storage`:**
 
 > VimText keeps the user's settings (which sites it is enabled on and in which
-> start mode, the user's vimrc text, and two Plugin toggles) in
+> Start Mode, the user's vimrc text, and two Plugin toggles) in
 > `chrome.storage.sync`, so they follow the user's Chrome Sync when it is on and
 > otherwise stay on the device. It keeps Vim's registers, macros and command
 > history in `chrome.storage.session`, so they are shared by every tab and gone
