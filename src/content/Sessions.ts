@@ -102,9 +102,13 @@ export class Sessions {
       if (!this.settings) this.onSettings(s);
     });
     this.stopWatchingState = sessionState?.watch(this.onSessionState) ?? (() => {});
-    void sessionState?.load().then((s) => {
-      if (s && this.lastStateForm === null) this.onSessionState(s);
-    });
+    void sessionState
+      ?.load()
+      .then((s) => {
+        if (s && this.lastStateForm === null) this.onSessionState(s);
+      })
+      // Right after install the service worker may not have granted access yet; start empty.
+      .catch((err: unknown) => console.warn("VimText: Session State not read", err));
   }
 
   /** Mode of the Session on the focused Field, or null when it has none. */

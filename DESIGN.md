@@ -135,8 +135,19 @@ Cmd+V in Normal is a Pass-through.
 **Ex extras.** `:w` → notification no-op, never submits. `:q`/`:q!` → blur the Field.
 `:wq`/`:x` → `:w` then `:q`; the Status Line stays until the `:w` notice closes. VimText never discards Field text.
 
-**Session State** (`chrome.storage.session`, shared by all tabs/frames): registers, macros,
-search + command history. Per Field: marks, undo. vimrc mappings are not stored here: every Activation re-runs the vimrc from Settings.
+**Session State** (`chrome.storage.session`, shared by all tabs/frames): registers (the
+macros and search queries they carry included), search + command history, the last `f`/`t`
+search. Per Field: marks, undo, the jump list. vimrc mappings are not stored here: every
+Activation re-runs the vimrc from Settings. One key holds a plain-data snapshot of the
+engine's global state (`src/engine/globalState.ts`). After every key pressed while a Session
+exists (the command line's included), the frame snapshots that state and writes it when the
+serialized form differs from the last one written or restored; a tab's own write coming back
+as a storage change is skipped, every other change is restored into the engine before the next
+key. Last writer wins: two tabs editing registers at the same moment end with whichever wrote
+last, never a merge. A write the storage rejects (quota, or a read or write before the service
+worker's grant) is logged and ignored; the tab keeps its in-memory state. The service worker
+(`src/background.ts`) has one job, on install and on browser startup: grant content scripts
+access to session storage (`setAccessLevel`). Nothing else runs there.
 
 **Settings** (`chrome.storage.sync`):
 
