@@ -109,10 +109,20 @@ fresh Session, Start Mode per Site Policy, even when the id is the same. An elem
 stops qualifying (type changed to password, `readonly`, `disabled`) is destroyed the same
 way; a password input revealed as `type="text"` is an ordinary Single-line Field.
 
-**Status Line.** Shadow-rooted strip at the bottom edge of an activated Field: Mode,
+**Status Line.** Shadow-rooted strip at the edge of an activated Field: Mode,
 pending keys, `recording @q`, the command line for `:` `/` `?`, engine messages
 (e.g. `E486`). Never shown on a Field that was not activated; dim `-- INSERT --` after
-activation. No page-level bar.
+activation. No page-level bar. It sits below the Field when the strip fits in the
+viewport there and above it otherwise, so a Field flush with the bottom of a short
+iframe keeps a visible strip; when it fits neither side (a Field taller than the
+viewport) it stays below. A Field in an iframe gets its Status Line in that frame's
+own document, never in the top page (no cross-frame rendering).
+
+**Frames.** The content script runs in every frame; each frame owns its Fields, Sessions
+and Status Lines, and a Field is Activated only by keys and focus inside its own frame.
+A frame belongs to the Site of the page around it (GLOSSARY.md **Site**): it resolves the
+top origin from `location.ancestorOrigins` (last entry; also works for nested and
+sandboxed frames) and falls back to its own origin on a browser without that property (Firefox).
 
 **Cursor.** Normal mode block cursor = native selection of the char under the cursor;
 Visual = native selection. No overlay. Visual block edits apply correctly but only the
@@ -130,8 +140,9 @@ search + command history, vimrc mappings. Per Field: marks, undo.
 
 **Settings** (`chrome.storage.sync`):
 
-- Site Policy keyed by origin: disabled / enabled+Insert / enabled+Normal. Unknown origin →
-  enabled+Insert. No built-in deny list.
+- Site Policy keyed by the Site's origin (the top page's, ADR 0005): disabled /
+  enabled+Insert / enabled+Normal. Unknown origin → enabled+Insert. No built-in deny list.
+  One policy governs every Field on the page, in embedded frames too.
 - Settings arrive asynchronously (storage read at load, then every change). The content
   entry treats the Site Policy as unknown until then: nothing is activated, and an
   Activation key reaches the page as usual but is remembered for the Field it was pressed
@@ -143,7 +154,11 @@ search + command history, vimrc mappings. Per Field: marks, undo.
   focused. A key pressed before the content script runs at all is lost.
 - vimrc: a text box of ex commands (`map`, `noremap`, `set`, …) run through the engine on every Activation.
 - Plugin toggles (surround, targets), off by default.
-- Popup: global on/off, Site Policy for current origin, Mode of the focused Field.
+- Popup: global on/off, Site Policy for the current Site, Mode of the focused Field. Two
+  queries to the content script: the Site origin from the top frame only (which also
+  proves VimText runs there); the Mode from every frame, where only a frame holding a
+  Session on its own active element answers, so a Field focused inside an iframe is
+  reported. No answer → "No Field activated".
 
 **Manifest.** MV3. Permissions: `storage`, `clipboardRead`, `clipboardWrite`. Content script
 on `http://*/*`, `https://*/*`, `all_frames: true`, `run_at: document_idle`, one classic IIFE
@@ -155,7 +170,7 @@ TypeScript · esbuild (content, popup, options bundles) · Vitest browser mode (
 Playwright) for the sync layer · Playwright e2e loading the unpacked extension against local
 fixtures (textarea, single-line input, a React 19 controlled input bundled by esbuild into a
 gitignored fixture file, a hand-written rewriting Controlled Field standing in for masks and
-other frameworks, iframe) · GitHub Actions on
+other frameworks, a page with same-origin, cross-origin and short frames) · GitHub Actions on
 push/PR · MIT · version restarts at 0.1.0. Upstream engine tests are not re-run here.
 
 ## Accepted limitations (M1–M3)
@@ -181,6 +196,13 @@ push/PR · MIT · version restarts at 0.1.0. Upstream engine tests are not re-ru
   nothing (it undoes the rewrite, which the page applies again).
 - Fields that reformat in a `setTimeout` or set `.value` with no event are only reconciled on
   the next keystroke; the block cursor is gone until then.
+- No VimText in `about:blank` / `srcdoc` / `blob:` frames the page creates: the manifest
+  does not opt into `match_origin_as_fallback`. Text inputs there are rare (the common
+  case is contenteditable, M4).
+- On browsers without `location.ancestorOrigins` (Firefox) a cross-origin frame falls back
+  to its own origin as the Site, so the top page's policy does not reach it.
+- The popup's Mode comes from any frame holding a Session on its active element, so a
+  Field left focused in a background frame can be the one reported.
 
 ## Milestones
 

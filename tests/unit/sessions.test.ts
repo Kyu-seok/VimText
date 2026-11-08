@@ -94,7 +94,7 @@ function makeShadowTextarea(): HTMLTextAreaElement {
 
 beforeEach(() => {
   port = controlledPort();
-  sessions = new Sessions(document, port.port);
+  sessions = new Sessions(document, port.port, location.origin);
   ta = makeTextarea();
 });
 
@@ -267,6 +267,31 @@ describe("Once settings are known", () => {
     await settle();
     ta.focus();
     expect(keydown(ta, "Escape").defaultPrevented).toBe(false);
+    expect(hostCount()).toBe(0);
+  });
+});
+
+describe("Site keying", () => {
+  // A frame's Sessions is built with the Site's origin (the top page's), which
+  // need not be the document's own (ADR 0005).
+  const site = "https://top.test";
+
+  beforeEach(() => {
+    sessions.destroy();
+    sessions = new Sessions(document, port.port, site);
+  });
+
+  it("applies the policy stored under the Site origin, not the document's", async () => {
+    ta.focus();
+    port.arrive({ ...DEFAULT_SETTINGS, sites: { [site]: "normal" } });
+    await settle();
+    expect(statusText()).toContain("NORMAL");
+  });
+
+  it("ignores a policy stored under the document's own origin", async () => {
+    ta.focus();
+    port.arrive({ ...DEFAULT_SETTINGS, sites: { [location.origin]: "normal" } });
+    await settle();
     expect(hostCount()).toBe(0);
   });
 });

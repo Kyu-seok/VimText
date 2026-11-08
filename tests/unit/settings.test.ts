@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { DEFAULT_SETTINGS, policyFor, setSitePolicy, type Settings } from "../../src/settings/settings";
+import {
+  DEFAULT_SETTINGS,
+  policyFor,
+  setSitePolicy,
+  siteOrigin,
+  type Settings,
+} from "../../src/settings/settings";
 
 function settingsWith(sites: Settings["sites"]): Settings {
   return { ...DEFAULT_SETTINGS, sites };
@@ -18,5 +24,27 @@ describe("Site Policy", () => {
     setSitePolicy(s, "https://a.test", "insert");
     expect(s.sites).toEqual({});
     expect(policyFor(s, "https://a.test")).toBe("insert");
+  });
+});
+
+describe("Site origin", () => {
+  it("is a top-level document's own origin", () => {
+    expect(siteOrigin({ origin: "https://a.test", ancestorOrigins: [] })).toBe("https://a.test");
+  });
+
+  it("is the embedding page's origin for a frame, not the frame's own", () => {
+    expect(siteOrigin({ origin: "https://widget.test", ancestorOrigins: ["https://a.test"] })).toBe(
+      "https://a.test",
+    );
+  });
+
+  it("is the top page's origin for a nested frame: the last ancestor", () => {
+    expect(
+      siteOrigin({ origin: "https://inner.test", ancestorOrigins: ["https://mid.test", "https://a.test"] }),
+    ).toBe("https://a.test");
+  });
+
+  it("falls back to the frame's own origin on a browser without ancestorOrigins at all (Firefox)", () => {
+    expect(siteOrigin({ origin: "https://widget.test" })).toBe("https://widget.test");
   });
 });

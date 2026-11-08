@@ -1,4 +1,4 @@
-import { test, expect, statusText, contentStatus, activateAtStart } from "./extension";
+import { test, expect, statusText, contentStatus, activateAtStart, ready } from "./extension";
 import type { Page } from "@playwright/test";
 
 // Disposal is prompt: a Session ends the moment its Field leaves the page or
@@ -12,7 +12,7 @@ function hostCount(page: Page): Promise<number> {
 test.describe("textarea fixture", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/textarea.html");
-    await page.waitForTimeout(150); // content script runs at document_idle
+    await ready(page);
   });
 
   test("removing the activated element removes the Status Line host without a focus change", async ({
@@ -114,7 +114,7 @@ test.describe("textarea fixture", () => {
 test.describe("React fixture", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/react.html");
-    await page.waitForTimeout(150);
+    await ready(page);
     await expect(page.locator("#in")).toHaveValue("the quick brown fox"); // React mounted
   });
 
