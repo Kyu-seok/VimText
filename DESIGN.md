@@ -245,7 +245,10 @@ at the zip root into the gitignored `release/vimtext-<version>.zip`, refusing a 
 mismatch, a dirty tree or a tag that is not `v` plus the manifest version) · the `release`
 workflow on `v*` tag pushes (gate, package script with the pushed tag, GitHub Release with the
 tag message as notes and the zip attached; procedure in `docs/release.md`) · MIT · version
-restarts at 0.1.0. Upstream engine tests are not re-run here.
+restarts at 0.1.0. Upstream engine tests are not re-run here. A second Playwright project,
+`screenshots` (`npm run screenshots`), drives the same launcher at 1280×800 against a comment-form
+fixture and rewrites the store screenshots under `docs/store/`; it is outside the gate, so PNG
+churn never fails `npm run check`.
 
 ## Accepted limitations (M1–M3)
 
