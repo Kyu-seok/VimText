@@ -9,7 +9,7 @@ export interface SettingsPort {
   watch(handler: (s: Settings) => void): () => void;
 }
 
-interface Entry {
+interface FieldSession {
   field: TextareaField;
   session: Session;
 }
@@ -57,7 +57,7 @@ const lifecycleOptions: MutationObserverInit = {
  * reconciled against the policy.
  */
 export class Sessions {
-  private readonly sessions = new Map<TextControl, Entry>();
+  private readonly sessions = new Map<TextControl, FieldSession>();
   private settings: Settings | null = null;
   /** The Field an Activation key was pressed on while the policy was unknown; the last one only. */
   private remembered: TextControl | null = null;

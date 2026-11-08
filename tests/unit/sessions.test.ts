@@ -7,6 +7,11 @@ import { DEFAULT_SETTINGS, type Settings, type SitePolicy } from "../../src/sett
  * These tests drive the content entry's class through the settings port with
  * a load the test resolves by hand, and observe what the user sees: the
  * Status Line on the page and the Field's value.
+ *
+ * Coverage (CODING_STANDARDS rule 5): an arrival only ever Activates into
+ * Normal; a Session already in another Mode is left alone. Placements: a
+ * textarea, a Single-line Field and a Field inside an open shadow root, each
+ * on both the remembered-key path and the "normal" path.
  */
 
 /** Settings with this origin's Site Policy set; `null` leaves the origin unknown ("insert"). */
@@ -68,6 +73,25 @@ function makeTextarea(): HTMLTextAreaElement {
   return el;
 }
 
+function makeSingleLine(): HTMLInputElement {
+  const el = document.createElement("input");
+  el.type = "text";
+  el.value = "hello world";
+  document.body.appendChild(el);
+  el.setSelectionRange(0, 0);
+  return el;
+}
+
+/** A textarea inside an open shadow root, as a web component would hold one. */
+function makeShadowTextarea(): HTMLTextAreaElement {
+  const host = document.createElement("div");
+  const el = document.createElement("textarea");
+  el.value = "inside";
+  host.attachShadow({ mode: "open" }).appendChild(el);
+  document.body.appendChild(host);
+  return el;
+}
+
 beforeEach(() => {
   port = controlledPort();
   sessions = new Sessions(document, port.port);
@@ -110,6 +134,26 @@ describe("Activation key before settings arrive", () => {
     expect(statusText()).toContain("NORMAL");
   });
 
+  it("is remembered for a Single-line Field too", async () => {
+    const single = makeSingleLine();
+    single.focus();
+    keydown(single, "Escape");
+    port.arrive(settingsFor(null));
+    await settle();
+    expect(statusText()).toContain("NORMAL");
+    keydown(single, "x");
+    expect(single.value).toBe("ello world");
+  });
+
+  it("is remembered for a Field inside an open shadow root too", async () => {
+    const inner = makeShadowTextarea();
+    inner.focus();
+    keydown(inner, "Escape");
+    port.arrive(settingsFor(null));
+    await settle();
+    expect(statusText()).toContain("NORMAL");
+  });
+
   it("builds the Session with the settings that arrived: the vimrc applies", async () => {
     ta.focus();
     keydown(ta, "Escape");
@@ -145,12 +189,7 @@ describe("Settings arrival on a focused Field without an Activation key", () => 
   });
 
   it("'normal' reaches a Field inside an open shadow root", async () => {
-    const host = document.createElement("div");
-    const root = host.attachShadow({ mode: "open" });
-    const inner = document.createElement("textarea");
-    inner.value = "inside";
-    root.appendChild(inner);
-    document.body.appendChild(host);
+    const inner = makeShadowTextarea();
     inner.focus();
     port.arrive(settingsFor("normal"));
     await settle();
@@ -169,19 +208,27 @@ describe("Settings arrival on a focused Field without an Activation key", () => 
 
 describe("A later settings change", () => {
   it("switching this origin to 'normal' Activates the focused Single-line Field without refocusing", async () => {
-    const input = document.createElement("input");
-    input.type = "text";
-    input.value = "hello world";
-    document.body.appendChild(input);
+    const single = makeSingleLine();
     port.arrive(settingsFor(null));
     await settle();
-    input.focus();
-    input.setSelectionRange(0, 0);
+    single.focus();
     expect(hostCount()).toBe(0);
     port.change(settingsFor("normal"));
     expect(statusText()).toContain("NORMAL");
-    keydown(input, "x");
-    expect(input.value).toBe("ello world");
+    keydown(single, "x");
+    expect(single.value).toBe("ello world");
+  });
+
+  it("leaves a Field that already has a Session in its Mode: Insert stays Insert", async () => {
+    port.arrive(settingsFor(null));
+    await settle();
+    ta.focus();
+    keydown(ta, "Escape");
+    keydown(ta, "i");
+    expect(statusText()).toContain("INSERT");
+    port.change(settingsFor("normal"));
+    expect(statusText()).toContain("INSERT");
+    expect(hostCount()).toBe(1);
   });
 
   it("switching this origin to 'off' disposes the existing Session", async () => {

@@ -9,7 +9,7 @@ function settingsWith(policy: SitePolicy | null, vimrc = ""): object {
   return { enabled: true, sites: policy ? { [fixtureOrigin]: policy } : {}, vimrc, plugins: {} };
 }
 
-test("Site Policy 'normal' activates on focus", async ({ context, page }) => {
+test("Site Policy 'normal' Activates a Field on focus", async ({ context, page }) => {
   await setSettings(context, settingsWith("normal"));
   await page.goto("/textarea.html");
   await page.locator("#ta").focus();
@@ -18,10 +18,7 @@ test("Site Policy 'normal' activates on focus", async ({ context, page }) => {
   await expect(page.locator("#ta")).toHaveValue(/^he quick/);
 });
 
-test("Site Policy 'normal' Activates an autofocus Field, focused before the content script ran", async ({
-  context,
-  page,
-}) => {
+test("Site Policy 'normal' Activates an autofocus Field with no focus action", async ({ context, page }) => {
   await setSettings(context, settingsWith("normal"));
   await page.goto("/autofocus.html");
   await expect.poll(() => statusText(page)).toContain("NORMAL");
@@ -42,7 +39,7 @@ test("switching the Site Policy to 'normal' Activates the focused Field without 
   await expect(page.locator("#ta")).toHaveValue(/^he quick/);
 });
 
-test("Site Policy 'off' makes Esc a plain key", async ({ context, page }) => {
+test("Site Policy 'off' leaves Esc to the page", async ({ context, page }) => {
   await setSettings(context, settingsWith("off"));
   await page.goto("/textarea.html");
   await page.locator("#ta").focus();
