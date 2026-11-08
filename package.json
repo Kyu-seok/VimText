@@ -14,6 +14,7 @@
     "test": "vitest run",
     "test:e2e": "npm run build && playwright test --project e2e",
     "screenshots": "npm run build && playwright test --project screenshots",
+    "package": "node tools/package.mjs",
     "check": "npm run typecheck && npm run check:imports && npm run check:unused && npm test && npm run test:e2e",
     "icons": "node tools/make-icons.mjs",
     "prepare": "husky"

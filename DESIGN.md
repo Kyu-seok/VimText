@@ -34,7 +34,8 @@ src/
                  the bridge's Plugin key hook (ADR 0006), never a fork
   content.ts     entry: capture-phase keydown → bridge
 popup/ options/  plain HTML + TS
-tests/           Vitest browser mode (sync layer) · Playwright e2e (unpacked extension, fixtures)
+tests/           Vitest browser mode (sync layer) · Vitest in Node (repo-wide consistency checks) ·
+                 Playwright e2e (unpacked extension, fixtures)
 ```
 
 **Engine.** `@replit/codemirror-vim` (engine `@replit/codemirror-vim-core`) pinned to an
@@ -232,14 +233,22 @@ bundle (strict page CSPs block dynamic `import()`). No `activeTab`/`scripting`/`
 ## Tooling
 
 TypeScript · esbuild (content, popup, options bundles) · Vitest browser mode (Chromium via
-Playwright) for the sync layer · Playwright e2e loading the unpacked extension against local
+Playwright) for the sync layer · a second Vitest project in Node (`tests/node/*.test.ts`; one
+file per repo-wide consistency check: `manifest.json` and `package.json` agree on the version;
+the manifest's permissions, host match and `description` are reflected in `PRIVACY.md` and
+`docs/store/listing.md`) · Playwright e2e loading the unpacked extension against local
 fixtures (textarea, single-line input, a React 19 controlled input bundled by esbuild into a
 gitignored fixture file, a hand-written rewriting Controlled Field standing in for masks and
 other frameworks, a page with same-origin, cross-origin and short frames) · GitHub Actions on
-push/PR · MIT · version restarts at 0.1.0. Upstream engine tests are not re-run here. A second
-Playwright project, `screenshots` (`npm run screenshots`), drives the same launcher at 1280×800
-against a comment-form fixture and rewrites the store screenshots under `docs/store/`; it is
-outside the gate, so PNG churn never fails `npm run check`.
+push/PR · `npm run package` (`tools/package.mjs`: the production build zipped with the manifest
+at the zip root into the gitignored `release/vimtext-<version>.zip`, refusing a version
+mismatch, a dirty tree or a tag that is not `v` plus the manifest version) · the `release`
+workflow on `v*` tag pushes (gate, package script with the pushed tag, GitHub Release with the
+tag message as notes and the zip attached; procedure in `docs/release.md`) · MIT · version
+restarts at 0.1.0. Upstream engine tests are not re-run here. A second Playwright project,
+`screenshots` (`npm run screenshots`), drives the same launcher at 1280×800 against a comment-form
+fixture and rewrites the store screenshots under `docs/store/`; it is outside the gate, so PNG
+churn never fails `npm run check`.
 
 ## Accepted limitations (M1–M3)
 
