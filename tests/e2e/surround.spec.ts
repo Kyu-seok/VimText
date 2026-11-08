@@ -1,24 +1,10 @@
-import type { Page } from "@playwright/test";
-import { test, expect, extensionId, statusText, activateAtStart, ready } from "./extension";
+import { test, expect, statusText, setPlugin, openActivated } from "./extension";
 
 // The surround Plugin (DESIGN.md "Plugins"), end to end: its toggle in the
 // options page, real keys on the textarea fixture, the value the page sees.
-// A toggle applies at the next Activation, the rule the vimrc follows.
-
-async function setSurround(page: Page, on: boolean): Promise<void> {
-  await page.goto(`chrome-extension://${extensionId}/options/options.html`);
-  await page.locator("#plugin-surround").setChecked(on);
-  await expect(page.locator("#plugin-surround")).toBeChecked({ checked: on });
-}
-
-async function openActivated(page: Page): Promise<void> {
-  await page.goto("/textarea.html");
-  await ready(page);
-  await activateAtStart(page, "#ta");
-}
 
 test("toggled on, ysiw) and ds( typed as real keys change the value", async ({ page }) => {
-  await setSurround(page, true);
+  await setPlugin(page, "surround", true);
   await openActivated(page);
   const ta = page.locator("#ta");
   await page.keyboard.type("wysiw)");
@@ -31,8 +17,8 @@ test("toggled on, ysiw) and ds( typed as real keys change the value", async ({ p
 test("toggled off again, the same keys are the Baseline: d s clears, ( moves, s substitutes", async ({
   page,
 }) => {
-  await setSurround(page, true);
-  await setSurround(page, false);
+  await setPlugin(page, "surround", true);
+  await setPlugin(page, "surround", false);
   await openActivated(page);
   const ta = page.locator("#ta");
   await page.keyboard.type("ds(");

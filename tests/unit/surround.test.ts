@@ -1,76 +1,17 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { Mirror } from "../../src/engine/mirror";
-import { engineApi } from "../../src/engine/pluginApi";
 import { surround } from "../../src/plugins/surround";
+import { pluginMirror } from "./plugin-mirror";
 
 /**
  * surround's semantics (DESIGN.md "Plugins"; oracle: vim-surround's
- * surround.txt, whose examples these cases are). Spec #24 sanctions one
- * exception to rule 6 here: the Plugin is driven at the mirror, fed its Plugin
- * Keys directly, so that the hook's grammar (tests/unit/plugin-keys.test.ts)
- * and the Plugin's meaning are proven apart. Observed through the mirror's
- * document and cursor, which are what the Session renders into the Field.
+ * surround.txt, whose examples these cases are), driven at the mirror under
+ * spec #24's exception to rule 6 (tests/unit/plugin-mirror.ts) and observed
+ * through the mirror's document and cursor.
  */
 
-let mirror: Mirror | null = null;
-let scratch: HTMLElement | null = null;
+const { open, close, feed, rewrite, text, cursor } = pluginMirror(surround);
 
-/** A mirror over `doc` with the cursor at `cursor` and surround bound, as an Activation binds it. */
-function open(doc: string, cursor: number): void {
-  scratch = document.createElement("div");
-  scratch.style.cssText = "position:fixed;left:-100000px;top:0;visibility:hidden";
-  const input = document.createElement("textarea");
-  const statusbar = document.createElement("div");
-  scratch.append(input, statusbar);
-  document.body.appendChild(scratch);
-  mirror = new Mirror({
-    container: scratch,
-    inputField: input,
-    focus: () => {},
-    doc,
-    cursor,
-    style: {
-      font: "13px monospace",
-      letterSpacing: "normal",
-      lineHeight: "normal",
-      contentWidth: 400,
-      whiteSpace: "pre-wrap",
-      wordBreak: "normal",
-      overflowWrap: "normal",
-      tabSize: "8",
-    },
-    statusbar,
-  });
-  mirror.clearUserMappings();
-  surround.define(engineApi);
-  surround.bind(engineApi);
-}
-
-afterEach(() => {
-  mirror?.clearUserMappings();
-  mirror?.destroy();
-  scratch?.remove();
-  mirror = null;
-  scratch = null;
-});
-
-/** Feeds keys: a single character as typed, a longer name as a Plugin Key or special key. */
-function feed(...keys: string[]): void {
-  for (const key of keys) {
-    mirror!.handleKey({
-      key,
-      ctrlKey: false,
-      altKey: false,
-      metaKey: false,
-      shiftKey: false,
-      preventDefault() {},
-      stopPropagation() {},
-    });
-  }
-}
-
-const text = () => mirror!.view.state.doc.toString();
-const cursor = () => mirror!.view.state.selection.main.head;
+afterEach(close);
 
 describe("ys{motion}{char} wraps the motion's text", () => {
   it("ysiw) wraps the word in parentheses and leaves the cursor on the opening one", () => {
@@ -129,8 +70,7 @@ describe("ys{motion}{char} wraps the motion's text", () => {
   it("a page rewrite of the Field while the wait is armed voids it: the spans no longer fit the text", () => {
     open("Hello world!", 7);
     feed("SurroundYs", "i", "w");
-    // What the Session's sync dispatches when a Controlled Field rewrote its value.
-    mirror!.view.dispatch({ changes: { from: 0, to: 0, insert: "X" } });
+    rewrite(0, 0, "X");
     feed(")");
     expect(text()).toBe("XHello world!");
   });
