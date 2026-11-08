@@ -151,6 +151,11 @@ export class Mirror {
     (Vim as unknown as { handleEx(cm: VimCM, input: string): void }).handleEx(this.cm, line);
   }
 
+  /** Removes every user mapping in every context; mappings are global per frame, not per mirror. */
+  clearUserMappings(): void {
+    (Vim as unknown as { mapclear(ctx?: string): void }).mapclear();
+  }
+
   /** The engine's open command line or notice, if any. */
   get dialog(): HTMLElement | null {
     return this.cm.state.dialog ?? null;
@@ -170,6 +175,17 @@ export class Mirror {
   destroy(): void {
     this.view.destroy();
   }
+}
+
+/**
+ * The vimrc's runnable lines: the leading `:` and whitespace stripped, blank
+ * and `"` comment lines skipped, each paired with its 1-based line number.
+ */
+export function vimrcLines(vimrc: string): Array<{ line: number; text: string }> {
+  return vimrc
+    .split("\n")
+    .map((raw, i) => ({ line: i + 1, text: raw.replace(/^\s*:?/, "").trim() }))
+    .filter(({ text }) => text && !text.startsWith('"'));
 }
 
 export { Vim };
