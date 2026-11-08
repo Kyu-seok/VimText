@@ -55,8 +55,9 @@ test("2: a Visual selection", async ({ page }) => {
 test("3: the command line with a :s command typed", async ({ page }) => {
   await openCommentForm(page);
   await page.keyboard.type("wj:s/teh/the/");
-  // Not entered: the typo is still there.
+  // Not entered: the typo is still there, and the command line holds focus.
   await expect(page.locator("#comment")).toHaveValue(/teh/);
+  await expect(page.locator("#comment")).not.toBeFocused();
   await shoot(page, "3-command-line.png");
 });
 
