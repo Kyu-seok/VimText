@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Sessions, type SessionStatePort, type SettingsPort } from "../../src/content/Sessions";
 import { DEFAULT_SETTINGS, type Settings } from "../../src/settings/settings";
 import type { SessionState } from "../../src/settings/sessionState";
+import { keydown, keys, settle } from "./dom";
 
 /**
  * Session State (DESIGN.md "Session State", GLOSSARY.md **Session State**):
@@ -55,21 +56,6 @@ function fakeStorage(initial: SessionState | null = null, opts: { controlledLoad
     /** The storage read fails, as it does before the service worker's grant. */
     loadFailed: () => rejectLoad(new Error("Access to storage is not allowed from this context")),
   };
-}
-
-function keydown(el: Element, key: string, init: Partial<KeyboardEventInit> = {}): KeyboardEvent {
-  const e = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, composed: true, ...init });
-  el.dispatchEvent(e);
-  return e;
-}
-
-function keys(el: Element, seq: string): void {
-  for (const ch of seq) keydown(el, ch);
-}
-
-/** Enough turns of the microtask queue for a resolved load and a queued snapshot to be handled. */
-async function settle(): Promise<void> {
-  for (let i = 0; i < 4; i++) await Promise.resolve();
 }
 
 /** The text in the command line (the `:` or `/` input the engine opens in the Status Line). */

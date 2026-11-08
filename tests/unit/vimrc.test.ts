@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Sessions, type PluginRegistry, type SettingsPort } from "../../src/content/Sessions";
-import { DEFAULT_SETTINGS, type Settings, type SitePolicy } from "../../src/settings/settings";
+import { Sessions, type PluginRegistry } from "../../src/content/Sessions";
+import type { Settings, SitePolicy } from "../../src/settings/settings";
 import { checkVimrc } from "../../src/engine/vimrc";
+import { keydown, keys, settle, statusText } from "./dom";
+import { controlledPort, settingsFor } from "./settings-port";
 
 /**
  * The vimrc is a Setting that every Activation re-runs (GLOSSARY.md
@@ -10,47 +12,6 @@ import { checkVimrc } from "../../src/engine/vimrc";
  * frame with different vimrcs, and observe what the user sees: the Field's
  * value after the key that was (or was no longer) mapped.
  */
-
-function settingsFor(policy: SitePolicy | null, vimrc = ""): Settings {
-  return { ...DEFAULT_SETTINGS, vimrc, sites: policy ? { [location.origin]: policy } : {} };
-}
-
-function controlledPort() {
-  let resolveLoad: (s: Settings) => void = () => {};
-  let handler: ((s: Settings) => void) | null = null;
-  const port: SettingsPort = {
-    load: () => new Promise<Settings>((r) => (resolveLoad = r)),
-    watch: (h) => {
-      handler = h;
-      return () => (handler = null);
-    },
-  };
-  return {
-    port,
-    arrive: (s: Settings) => resolveLoad(s),
-    change: (s: Settings) => handler?.(s),
-  };
-}
-
-function statusText(): string {
-  const host = document.querySelector("vimtext-status") as HTMLElement | null;
-  const bar = host?.shadowRoot?.querySelector(".bar");
-  return bar && host!.style.display !== "none" ? (bar.textContent ?? "") : "";
-}
-
-function keydown(el: Element, key: string): KeyboardEvent {
-  const e = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, composed: true });
-  el.dispatchEvent(e);
-  return e;
-}
-
-function keys(el: Element, seq: string): void {
-  for (const ch of seq) keydown(el, ch);
-}
-
-async function settle(): Promise<void> {
-  for (let i = 0; i < 3; i++) await Promise.resolve();
-}
 
 const TEXT = "the quick brown fox\njumps over";
 

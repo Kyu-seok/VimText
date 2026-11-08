@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Sessions, type SettingsPort } from "../../src/content/Sessions";
-import { DEFAULT_SETTINGS, type Settings, type SitePolicy } from "../../src/settings/settings";
+import { Sessions } from "../../src/content/Sessions";
+import { DEFAULT_SETTINGS } from "../../src/settings/settings";
+import { hostCount, keydown, settle, statusText } from "./dom";
+import { controlledPort, settingsFor } from "./settings-port";
 
 /**
  * The Site Policy is unknown until settings arrive (DESIGN.md "Settings").
@@ -13,53 +15,6 @@ import { DEFAULT_SETTINGS, type Settings, type SitePolicy } from "../../src/sett
  * textarea, a Single-line Field and a Field inside an open shadow root, each
  * on both the remembered-key path and the "normal" path.
  */
-
-/** Settings with this origin's Site Policy set; `null` leaves the origin unknown ("insert"). */
-function settingsFor(policy: SitePolicy | null, vimrc = ""): Settings {
-  return { ...DEFAULT_SETTINGS, vimrc, sites: policy ? { [location.origin]: policy } : {} };
-}
-
-/** A settings port whose load and later deliveries the test controls. */
-function controlledPort() {
-  let resolveLoad: (s: Settings) => void = () => {};
-  let handler: ((s: Settings) => void) | null = null;
-  const port: SettingsPort = {
-    load: () => new Promise<Settings>((r) => (resolveLoad = r)),
-    watch: (h) => {
-      handler = h;
-      return () => (handler = null);
-    },
-  };
-  return {
-    port,
-    /** The storage read completes. */
-    arrive: (s: Settings) => resolveLoad(s),
-    /** A later change, as the popup or options page would make. */
-    change: (s: Settings) => handler?.(s),
-  };
-}
-
-/** What the user sees on the one Status Line host, "" when none is shown. */
-function statusText(): string {
-  const host = document.querySelector("vimtext-status") as HTMLElement | null;
-  const bar = host?.shadowRoot?.querySelector(".bar");
-  return bar && host!.style.display !== "none" ? (bar.textContent ?? "") : "";
-}
-
-function hostCount(): number {
-  return document.querySelectorAll("vimtext-status").length;
-}
-
-function keydown(el: Element, key: string, init: Partial<KeyboardEventInit> = {}): KeyboardEvent {
-  const e = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, composed: true, ...init });
-  el.dispatchEvent(e);
-  return e;
-}
-
-/** Enough turns of the microtask queue for a resolved load to be handled. */
-async function settle(): Promise<void> {
-  for (let i = 0; i < 3; i++) await Promise.resolve();
-}
 
 let sessions: Sessions;
 let ta: HTMLTextAreaElement;

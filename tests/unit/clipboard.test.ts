@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { TextareaField } from "../../src/field/TextareaField";
 import { Session } from "../../src/bridge/Session";
 import { keyDriver } from "./keys";
+import { statusText } from "./dom";
 
 /**
  * The clipboard registers (DESIGN.md "Registers & clipboard"): `"*` is an
@@ -23,13 +24,6 @@ let clipboard: string;
 let readText: () => Promise<string>;
 
 const { keydown, keys } = keyDriver(() => session);
-
-/** What the user sees on the Status Line, "" when it is hidden. */
-function statusText(): string {
-  const host = document.querySelector("vimtext-status") as HTMLElement | null;
-  const bar = host?.shadowRoot?.querySelector(".bar");
-  return bar && host!.style.display !== "none" ? (bar.textContent ?? "") : "";
-}
 
 beforeEach(() => {
   clipboard = "";
