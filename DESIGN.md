@@ -34,7 +34,8 @@ src/
                  the bridge's Plugin key hook (ADR 0006), never a fork
   content.ts     entry: capture-phase keydown → bridge
 popup/ options/  plain HTML + TS
-tests/           Vitest browser mode (sync layer) · Playwright e2e (unpacked extension, fixtures)
+tests/           Vitest browser mode (sync layer) · Vitest in Node (repo-wide consistency checks) ·
+                 Playwright e2e (unpacked extension, fixtures)
 ```
 
 **Engine.** `@replit/codemirror-vim` (engine `@replit/codemirror-vim-core`) pinned to an
@@ -232,7 +233,9 @@ bundle (strict page CSPs block dynamic `import()`). No `activeTab`/`scripting`/`
 ## Tooling
 
 TypeScript · esbuild (content, popup, options bundles) · Vitest browser mode (Chromium via
-Playwright) for the sync layer · Playwright e2e loading the unpacked extension against local
+Playwright) for the sync layer · a second Vitest project in Node (`tests/node/*.test.ts`; one
+file per repo-wide consistency check, the first being that `manifest.json` and `package.json`
+agree on the version) · Playwright e2e loading the unpacked extension against local
 fixtures (textarea, single-line input, a React 19 controlled input bundled by esbuild into a
 gitignored fixture file, a hand-written rewriting Controlled Field standing in for masks and
 other frameworks, a page with same-origin, cross-origin and short frames) · GitHub Actions on
