@@ -144,6 +144,7 @@ export class Sessions {
     const session = new Session(field, {
       vimrc: this.settings?.vimrc ?? "",
       plugins: this.enabledPlugins(),
+      onDialog: () => this.queueSnapshot(),
     });
     this.sessions.set(el, { field, session });
     this.observeLifecycle(el.getRootNode());
@@ -194,9 +195,10 @@ export class Sessions {
   }
 
   private onKeydown = (e: KeyboardEvent): void => {
-    // Any key while a Session exists may change Session State, the keys that
-    // commit the command line (its input lives in our Status Line) included:
-    // the engine handles them synchronously, so a snapshot queued now sees the result.
+    // Any key on a Field with a Session may change Session State; the engine
+    // handles it synchronously inside this listener, so a snapshot queued now
+    // sees the result. Keys inside the command line are handled by its own
+    // input's listener, after this one: those are caught by `onDialog`.
     if (this.sessions.size) this.queueSnapshot();
     const target = deepTarget(e);
     if (!isTextControl(target)) return;

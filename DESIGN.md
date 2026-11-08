@@ -144,7 +144,8 @@ macros and search queries they carry included), search + command history, the la
 search. Per Field: marks, undo, the jump list. vimrc mappings are not stored here: every
 Activation re-runs the vimrc from Settings. One key holds a plain-data snapshot of the
 engine's global state (`src/engine/globalState.ts`). After every key pressed while a Session
-exists (the command line's included), the frame snapshots that state and writes it when the
+exists, and when the command line closes (it commits its history inside its own input's
+listener, after the key has passed the document), the frame snapshots that state and writes it when the
 serialized form differs from the last one written or restored; a tab's own write coming back
 as a storage change is skipped, every other change is restored into the engine before the next
 key. Last writer wins: two tabs editing registers at the same moment end with whichever wrote

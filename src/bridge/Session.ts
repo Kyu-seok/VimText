@@ -13,6 +13,13 @@ interface SessionConfig {
   vimrc: string;
   /** Each enabled Plugin's mappings, applied after the vimrc on every Activation. */
   plugins?: Array<(ex: ExRunner) => void>;
+  /**
+   * The engine opened or closed its dialog. The command line commits its
+   * history as it closes, inside its own input's keydown listener in the
+   * Status Line, after the keydown has passed the document: a Session State
+   * snapshot taken from the document's listener misses it, one taken here does not.
+   */
+  onDialog?: () => void;
 }
 
 /** `Esc` or its Vim twin `Ctrl+[`. */
@@ -108,12 +115,14 @@ export class Session {
   private lastRendered: { anchor: number; head: number } | null = null;
   /** The Field text the bridge last wrote or agreed with; anything else means the page changed the Field. */
   private lastText: string | null = null;
+  private readonly onDialog: (() => void) | undefined;
 
   constructor(
     readonly field: Field,
     config: SessionConfig,
   ) {
     defineExCommands();
+    this.onDialog = config.onDialog;
     this.status = new StatusLine(field);
     const sel = field.getSelection();
     this.mirror = new Mirror({
@@ -341,7 +350,9 @@ export class Session {
 
   /** After `:wq`, the `:w` notice outlives the Field's focus; the bar hides once it closes. */
   private onDialogChange = (): void => {
-    if (this.destroyed || !this.noticeOutlivesBlur || this.mirror.dialog) return;
+    if (this.destroyed) return;
+    this.onDialog?.();
+    if (!this.noticeOutlivesBlur || this.mirror.dialog) return;
     this.noticeOutlivesBlur = false;
     if (!this.field.hasFocus()) this.status.hide();
   };
