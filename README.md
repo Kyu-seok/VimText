@@ -99,8 +99,10 @@ npm ci                 # also installs the git hooks (pre-commit, pre-push)
 npm run build          # → dist/
 npm run watch          # rebuild dist/ on change (then reload the extension in Chrome)
 npm run typecheck
-npm test               # sync-layer unit tests in real Chromium (Vitest browser mode)
+npm test               # Vitest, two projects: sync-layer unit tests in real Chromium, repo-wide consistency checks in Node
 npm run test:e2e       # Playwright drives the built extension against tests/fixtures
+npm run screenshots    # regenerates the store PNGs under docs/store/ from a fixture (outside the gate)
+npm run package        # builds and zips dist/ for the store, see docs/release.md
 npm run check          # the one gate: typecheck, import and unused-code checks, unit, build, e2e
 ```
 
@@ -119,7 +121,7 @@ src/
   content.ts     entry: capture-phase keydown → bridge
   background.ts  service worker: grants content scripts session storage, nothing else
 popup/ options/  plain HTML + TS
-tests/           unit/ (Vitest browser mode) · e2e/ (Playwright) · fixtures/
+tests/           unit/ (Vitest in Chromium) · node/ (Vitest in Node: repo-wide consistency checks) · e2e/ (Playwright) · screenshots/ (the store PNGs) · fixtures/
 ```
 
 Design: [DESIGN.md](DESIGN.md) · Vocabulary: [GLOSSARY.md](GLOSSARY.md) ·
