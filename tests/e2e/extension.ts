@@ -10,14 +10,21 @@ import { fixtureOrigin } from "./fixture-port";
 
 export { fixtureOrigin };
 
-/** Launches Chromium with the built extension loaded (needs `npm run build` first). */
+/**
+ * Launches Chromium with the built extension loaded (needs `npm run build`
+ * first). A project sets the window through Playwright's own `viewport` and
+ * `deviceScaleFactor` options (the screenshot project does); their defaults
+ * are what a persistent context opens with anyway.
+ */
 export const test = base.extend<{ context: BrowserContext; page: Page }>({
-  context: async ({}, use) => {
+  context: async ({ viewport, deviceScaleFactor }, use) => {
     const userDataDir = mkdtempSync(resolve(tmpdir(), "vimtext-"));
     const context = await chromium.launchPersistentContext(userDataDir, {
       channel: "chromium",
       headless: true,
       args: [`--disable-extensions-except=${dist}`, `--load-extension=${dist}`],
+      viewport,
+      deviceScaleFactor,
     });
     await use(context);
     await context.close();

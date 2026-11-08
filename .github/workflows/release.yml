@@ -1,0 +1,35 @@
+# Pushing an annotated v* tag runs the gate, packages the zip and publishes a GitHub Release
+# with the tag's message as its notes and the zip attached. The store upload stays a human
+# step: docs/release.md. The workflow holds no logic of its own; the package script checks
+# that the tag matches the manifest version.
+name: release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run check
+      - run: npm run package -- --expect-tag "$GITHUB_REF_NAME"
+      - name: Create the GitHub Release from the tag's message
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # checkout can leave the tag ref pointing at the commit rather than the annotated
+          # tag object (actions/checkout#290); fetch it again so its message is readable.
+          git fetch --force origin "+refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
+          git tag -l --format='%(contents)' "$GITHUB_REF_NAME" > release/notes.md
+          gh release create "$GITHUB_REF_NAME" \
+            "release/vimtext-${GITHUB_REF_NAME#v}.zip" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file release/notes.md
