@@ -78,8 +78,8 @@ function render(settings: Settings): void {
 saveVimrc.addEventListener("click", () => {
   void updateSettings((s) => {
     s.vimrc = vimrc.value;
-  }).then((s) => {
-    renderVimrcErrors(checkVimrc(s.vimrc));
+  }).then(() => {
+    // The errors render from the storage change the save triggers (`watchSettings`).
     vimrcStatus.textContent = "Saved. Applies on the next Field activation.";
     setTimeout(() => (vimrcStatus.textContent = ""), 3000);
   });

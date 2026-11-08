@@ -1,10 +1,39 @@
 import { Vim } from "@replit/codemirror-vim";
-import type {
-  InsertModeChangesState,
-  InsertModeKeyState,
-  RegisterState,
-  SessionState,
-} from "../settings/sessionState";
+/** One Insert-mode special key inside a recorded macro (the engine's `InsertModeKey`). */
+interface InsertModeKeyState {
+  keyName: string;
+  key: string;
+  ctrlKey: boolean;
+  altKey: boolean;
+  metaKey: boolean;
+  shiftKey: boolean;
+}
+
+/** One Insert session as a macro replays it: typed text, special keys, and ranged replacements. */
+interface InsertModeChangesState {
+  changes: (string | [string, number?] | { insertModeKey: InsertModeKeyState })[];
+  expectCursorActivityForChange: boolean;
+  visualBlock?: number;
+}
+
+interface RegisterState {
+  text: string;
+  linewise: boolean;
+  blockwise: boolean;
+  insertModeChanges: InsertModeChangesState[];
+  searchQueries: string[];
+}
+
+/** Session State (GLOSSARY.md) as plain data: what `chrome.storage.session` holds and every tab restores. */
+export interface SessionState {
+  /** By register name, as the engine keys them (lowercase; `"` `0`-`9` `-` `.` `:` `/` `+`). */
+  registers: Record<string, RegisterState>;
+  /** The register `@@` replays. */
+  latestRegister?: string;
+  searchHistory: string[];
+  exHistory: string[];
+  lastCharacterSearch: { increment: number; forward: boolean; selectedCharacter: string };
+}
 
 /**
  * The slice of the engine's global state (one object per page, shared by
@@ -49,13 +78,13 @@ interface GlobalState {
   lastCharacterSearch: { increment: number; forward: boolean; selectedCharacter: string };
 }
 
-const V = Vim as unknown as {
+const engine = Vim as unknown as {
   getVimGlobalState_(): GlobalState;
   InsertModeKey: new (keyName: string, e: Omit<InsertModeKeyState, "keyName">) => InsertModeKey;
 };
 
 function isInsertModeKey(change: unknown): change is InsertModeKey {
-  return change instanceof V.InsertModeKey;
+  return change instanceof engine.InsertModeKey;
 }
 
 function snapshotChanges(c: InsertModeChanges): InsertModeChangesState {
@@ -78,7 +107,7 @@ function restoreChanges(c: InsertModeChangesState): InsertModeChanges {
   const changes = c.changes.map((change) => {
     if (typeof change === "object" && !Array.isArray(change) && "insertModeKey" in change) {
       const { keyName, ...e } = change.insertModeKey;
-      return new V.InsertModeKey(keyName, e);
+      return new engine.InsertModeKey(keyName, e);
     }
     return change;
   });
@@ -89,30 +118,30 @@ function restoreChanges(c: InsertModeChangesState): InsertModeChanges {
   };
 }
 
-function snapshotRegister(r: Register): RegisterState {
+function snapshotRegister(register: Register): RegisterState {
   return {
-    text: r.toString(),
-    linewise: !!r.linewise,
-    blockwise: !!r.blockwise,
-    insertModeChanges: r.insertModeChanges.map(snapshotChanges),
-    searchQueries: [...r.searchQueries],
+    text: register.toString(),
+    linewise: !!register.linewise,
+    blockwise: !!register.blockwise,
+    insertModeChanges: register.insertModeChanges.map(snapshotChanges),
+    searchQueries: [...register.searchQueries],
   };
 }
 
 /** Register names sorted, so two tabs serialize the same state the same way. */
 export function snapshotGlobalState(): SessionState {
-  const g = V.getVimGlobalState_();
+  const global = engine.getVimGlobalState_();
   const registers: Record<string, RegisterState> = {};
-  for (const name of Object.keys(g.registerController.registers).sort()) {
-    registers[name] = snapshotRegister(g.registerController.registers[name]!);
+  for (const name of Object.keys(global.registerController.registers).sort()) {
+    registers[name] = snapshotRegister(global.registerController.registers[name]!);
   }
-  const latest = g.macroModeState.latestRegister;
+  const latest = global.macroModeState.latestRegister;
   return {
     registers,
     ...(latest !== undefined ? { latestRegister: latest } : {}),
-    searchHistory: [...g.searchHistoryController.historyBuffer],
-    exHistory: [...g.exCommandHistoryController.historyBuffer],
-    lastCharacterSearch: { ...g.lastCharacterSearch },
+    searchHistory: [...global.searchHistoryController.historyBuffer],
+    exHistory: [...global.exCommandHistoryController.historyBuffer],
+    lastCharacterSearch: { ...global.lastCharacterSearch },
   };
 }
 
@@ -122,25 +151,25 @@ export function snapshotGlobalState(): SessionState {
  * contents replaced. A register the snapshot lacks is cleared, never deleted.
  */
 export function restoreGlobalState(s: SessionState): void {
-  const g = V.getVimGlobalState_();
-  const rc = g.registerController;
-  for (const name of Object.keys(rc.registers)) {
-    if (!(name in s.registers)) rc.registers[name]!.clear();
+  const global = engine.getVimGlobalState_();
+  const controller = global.registerController;
+  for (const name of Object.keys(controller.registers)) {
+    if (!(name in s.registers)) controller.registers[name]!.clear();
   }
   for (const [name, state] of Object.entries(s.registers)) {
     // `getRegister` answers the unnamed register for a name it does not accept.
-    if (!rc.registers[name] && !rc.isValidRegister(name)) continue;
-    const r = rc.getRegister(name);
-    r.setText(state.text, state.linewise, state.blockwise);
-    r.insertModeChanges = state.insertModeChanges.map(restoreChanges);
-    r.searchQueries = [...state.searchQueries];
+    if (!controller.registers[name] && !controller.isValidRegister(name)) continue;
+    const register = controller.getRegister(name);
+    register.setText(state.text, state.linewise, state.blockwise);
+    register.insertModeChanges = state.insertModeChanges.map(restoreChanges);
+    register.searchQueries = [...state.searchQueries];
   }
-  g.macroModeState.latestRegister = s.latestRegister;
-  g.searchHistoryController.historyBuffer = [...s.searchHistory];
-  g.searchHistoryController.reset();
-  g.exCommandHistoryController.historyBuffer = [...s.exHistory];
-  g.exCommandHistoryController.reset();
-  g.lastCharacterSearch = { ...s.lastCharacterSearch };
+  global.macroModeState.latestRegister = s.latestRegister;
+  global.searchHistoryController.historyBuffer = [...s.searchHistory];
+  global.searchHistoryController.reset();
+  global.exCommandHistoryController.historyBuffer = [...s.exHistory];
+  global.exCommandHistoryController.reset();
+  global.lastCharacterSearch = { ...s.lastCharacterSearch };
 }
 
 function same(a: unknown, b: unknown): boolean {

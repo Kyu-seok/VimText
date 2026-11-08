@@ -1,44 +1,11 @@
 /**
  * Session State (GLOSSARY.md): the engine's global state every tab shares for
  * as long as the browser session lasts, kept under one key in
- * `chrome.storage.session`. Plain data: the snapshot and restore live in
- * `src/engine/globalState.ts`.
+ * `chrome.storage.session`. The shape, snapshot and restore live in
+ * `src/engine/globalState.ts`; this is the storage adapter.
  */
 
-/** One Insert-mode special key inside a recorded macro (the engine's `InsertModeKey`). */
-export interface InsertModeKeyState {
-  keyName: string;
-  key: string;
-  ctrlKey: boolean;
-  altKey: boolean;
-  metaKey: boolean;
-  shiftKey: boolean;
-}
-
-/** One Insert session as a macro replays it: typed text, special keys, and ranged replacements. */
-export interface InsertModeChangesState {
-  changes: (string | [string, number?] | { insertModeKey: InsertModeKeyState })[];
-  expectCursorActivityForChange: boolean;
-  visualBlock?: number;
-}
-
-export interface RegisterState {
-  text: string;
-  linewise: boolean;
-  blockwise: boolean;
-  insertModeChanges: InsertModeChangesState[];
-  searchQueries: string[];
-}
-
-export interface SessionState {
-  /** By register name, as the engine keys them (lowercase; `"` `0`-`9` `-` `.` `:` `/` `+`). */
-  registers: Record<string, RegisterState>;
-  /** The register `@@` replays. */
-  latestRegister?: string;
-  searchHistory: string[];
-  exHistory: string[];
-  lastCharacterSearch: { increment: number; forward: boolean; selectedCharacter: string };
-}
+import type { SessionState } from "../engine/globalState";
 
 const KEY = "sessionState";
 

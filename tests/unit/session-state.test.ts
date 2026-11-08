@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Sessions, type SessionStatePort, type SettingsPort } from "../../src/content/Sessions";
+import { Sessions, type SettingsPort } from "../../src/content/Sessions";
+import type { SessionStatePort } from "../../src/content/SessionStateSync";
 import { DEFAULT_SETTINGS, type Settings } from "../../src/settings/settings";
-import type { SessionState } from "../../src/settings/sessionState";
+import type { SessionState } from "../../src/engine/globalState";
 import { keydown, keys, settle } from "./dom";
 
 /**
