@@ -30,7 +30,8 @@ src/
   bridge/        sync: Field <-> mirror, key routing, ownership rules, self-heal
   ui/            Status Line (shadow root): mode, pending keys, recording, command line, messages
   settings/      Site Policy, vimrc, Plugin toggles (storage.sync); Session State (storage.session)
-  plugins/       surround, targets — built on the engine's define*/map API, never a fork
+  plugins/       surround, targets — engine commands via define*/mapCommand, reached through
+                 the bridge's Plugin key hook (ADR 0006), never a fork
   content.ts     entry: capture-phase keydown → bridge
 popup/ options/  plain HTML + TS
 tests/           Vitest browser mode (sync layer) · Playwright e2e (unpacked extension, fixtures)
@@ -170,18 +171,57 @@ access to session storage (`setAccessLevel`). Nothing else runs there.
   focused. A key pressed before the content script runs at all is lost.
 - vimrc: a text box of ex commands (`map`, `noremap`, `set`, …) run through the engine on every
   Activation. The saved vimrc is the whole truth about user mappings: an Activation first clears
-  every user mapping (engine mappings are global per frame), then runs the vimrc, then re-applies
-  the mappings of each enabled Plugin, so a mapping deleted from the vimrc is gone at the next
-  Activation in every tab and a vimrc save never disables a Plugin. On save (and on open) the
+  every user mapping (engine mappings are global per frame), then binds each enabled Plugin's
+  keys, then runs the vimrc, so a mapping deleted from the vimrc is gone at the next Activation
+  in every tab, a vimrc save never disables a Plugin, and a vimrc mapping on a key a Plugin
+  also binds wins (as a user's vimrc beats a plugin's default maps in Vim). On save (and on open) the
   options page runs the text through a scratch mirror line by line and lists each failing line
   with the engine's message under the text box; a clean vimrc lists nothing. The content script
   reports nothing for a bad line.
-- Plugin toggles (surround, targets), off by default.
+- Plugin toggles (surround, targets), off by default. A toggle takes effect at the next
+  Activation in every tab, the rule the vimrc follows.
 - Popup: global on/off, Site Policy for the current Site, Mode of the focused Field. Two
   queries to the content script: the Site origin from the top frame only (which also
   proves VimText runs there); the Mode from every frame, where only a frame holding a
   Session on its own active element answers, so a Field focused inside an iframe is
   reported. No answer → "No Field activated".
+
+**Plugins** (`src/plugins/`, one module per Plugin; its oracle is the upstream plugin's own
+documentation, GLOSSARY.md **Plugin**). A Plugin defines its operators, motions and actions
+once at module load through the engine's `define*` API, and binds its keys through
+`mapCommand` on every Activation, because those bindings land in the same keymap partition
+as the vimrc's and the Activation's `mapclear` wipes them.
+
+The engine's matcher takes a full match over a partial one and never waits (the `timeoutlen`
+deviation under accepted limitations): `d`, `c`, `y` are complete operators and `in` is a
+complete text object, so a `ds<character>` binding can never fire and `cin(` resolves as `c`
+plus the object `n`. The bridge therefore has one Plugin key hook, where the `"*` rewrite
+lives, that turns a typed sequence into a **Plugin Key**, a key name no keyboard produces.
+With surround on it holds a `y`, `c` or `d` typed in plain Normal and feeds `<SurroundYs>`
+(`<SurroundYss>` after a second `s`), `<SurroundCs>` or `<SurroundDs>` when `s` follows;
+Visual `S` is rewritten to `<SurroundS>` at once. With targets on it holds `i`/`a` in
+operator-pending and Visual and feeds the next/last Plugin Key when `n`/`l` follows. Esc
+discards the held keys, is fed to the engine and counts as pending input, so it never reaches
+the page as a bare Esc; any other key releases the held keys into the engine in order and
+then takes the normal path. Held keys do not show on the Status Line. The hook knows only
+grammar; every semantic (the motion and count after `<SurroundYs>`, text objects, `.`,
+macros) is the engine's, running the Plugin's commands. A Plugin key is Key Policy row 1.
+
+The second literal of `ys{motion}{char}` and `cs{old}{new}` is a one-shot catch-all
+`<character>` binding the Plugin arms from inside the engine: it survives Pass-through keys
+like a pending operator and is cancelled by Esc or any non-printable key the engine
+receives. `.` repeats `ys`, `cs` and `ds` with the same characters (the Plugin keeps the last
+ones and tells a `.` replay from a macro replay by the engine's input state being the
+recorded one). Macros record Plugin Keys and replay through the engine unaided.
+
+_surround, v1_: `ys{motion}{char}`, `yss{char}`, `cs{old}{new}`, `ds{old}`, Visual `S{char}`
+(charwise and linewise); the four bracket pairs (the opening character adds inner spaces,
+the closing one does not) with the aliases `b` `r` `B` `a`, and the three quotes; any other
+character wraps literally. _targets, v1_: Seek for the pair and quote objects (`ci(` from
+outside the parentheses finds the next pair; `i"` works from anywhere on the line), the
+`n`/`l` prefixes (`cin(`, `dil"`, `vin(`), and the argument objects `ia`/`aa`. While a
+Plugin is on, the Baseline keys it claims (`i(`, `i"`, Visual `S`) behave as the plugin
+makes them behave in Vim.
 
 **Manifest.** MV3. Permissions: `storage`, `clipboardRead`, `clipboardWrite`. Content script
 on `http://*/*`, `https://*/*`, `all_frames: true`, `run_at: document_idle`, one classic IIFE
@@ -226,6 +266,16 @@ push/PR · MIT · version restarts at 0.1.0. Upstream engine tests are not re-ru
   to its own origin as the Site, so the top page's policy does not reach it.
 - The popup's Mode comes from any frame holding a Session on its active element, so a
   Field left focused in a background frame can be the one reported.
+- Plugins (M3 part 2): a held key (`d` while the hook waits for `s`) is invisible on the Status
+  Line for that keystroke. Macros record Plugin Keys, so `:reg` and `"qp` show `<SurroundDs>(`
+  where `ds(` was typed; they replay correctly. A vimrc `nnoremap` cannot expand into a Plugin
+  key (the engine resolves `noremap` against its own defaults only); `nmap` can. With targets
+  on, `cin` followed by a key that is not an object runs `c` on the failed object, which
+  enters Insert mode where Vim beeps; the stock engine does the same for `cix`. Linewise
+  Visual `S)` on a Single-line Field yields `(text)` (the newline strip). Visual `S` is not
+  `.`-repeatable. Not in v1: the tag and function targets (`ysiw<div>`, `cst`, `dst`; own
+  follow-up issue), `yS` `ySS` `cS` `gS`, Insert-mode `Ctrl-s`; targets' separator objects,
+  `I`/`A`, any-block `ib` and any-quote `iq`, tag seeking and `g:targets_*` configuration.
 - In a cross-origin frame whose embedding page's permissions policy denies clipboard access,
   `"+p`/`"*p` show a Status Line message and leave the text untouched; `"+y` still fills the
   register but the clipboard does not change. On a plain `http://` page (not a secure context)
@@ -240,8 +290,8 @@ push/PR · MIT · version restarts at 0.1.0. Upstream engine tests are not re-ru
 - **M3** in three parts, each landing on `main`: part 1 clipboard registers (`"*` is an alias
   of `"+`) and Session State across tabs (a minimal service worker grants content scripts
   session storage; last writer wins) plus vimrc error reporting in the options page and
-  mappings that replace rather than accumulate; part 2 Plugins (surround, targets; own
-  planning session); part 3 Web Store release (package script, privacy policy in the repo,
+  mappings that replace rather than accumulate; part 2 Plugins (surround with the Plugin key hook first, then targets; decided in the grill
+  of 2026-11-08, ADR 0006); part 3 Web Store release (package script, privacy policy in the repo,
   listing, dogfooding on GitHub, Reddit, Hacker News, Stack Overflow). 0.3.0 is tagged at
   the store submission.
 - **M4** contenteditable Field (own planning session first).

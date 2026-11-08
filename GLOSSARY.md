@@ -44,8 +44,16 @@ Behaviour that Vim itself has, as documented in Vim's `:help`. The Baseline is t
 _Avoid_: core, builtin, native vim
 
 **Plugin**:
-An opt-in behaviour modelled on a well-known Vim plugin (for example surround or targets) that is not part of the Baseline. Plugins are off by default.
+An opt-in behaviour modelled on a well-known Vim plugin (for example surround or targets) that is not part of the Baseline. The upstream plugin's own documentation is its oracle, as `:help` is the Baseline's. Plugins are off by default.
 _Avoid_: extension, add-on, feature flag
+
+**Plugin Key**:
+A key name private to a Plugin that no keyboard produces, which VimText substitutes for the sequence a person types (`ds` becomes one Plugin Key before the engine sees it).
+_Avoid_: internal key, synthetic key, pseudo-key
+
+**Seek**:
+What targets does when the cursor is not inside the requested text object: it looks ahead on the line for the next one, then behind for the last.
+_Avoid_: search, jump, scan
 
 **Pass-through**:
 A key press that VimText deliberately lets reach the page untouched, even while a Field is in a non-Insert Mode (for example Cmd+Enter or Tab).
