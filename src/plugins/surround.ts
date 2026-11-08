@@ -371,4 +371,9 @@ export const surround: Plugin = {
   bind(engine) {
     for (const command of BINDINGS) engine.bindKey(command);
   },
+
+  onBlur() {
+    waiting = null;
+    disarm();
+  },
 };

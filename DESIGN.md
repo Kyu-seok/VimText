@@ -210,7 +210,8 @@ macros) is the engine's, running the Plugin's commands. A Plugin key is Key Poli
 The second literal of `ys{motion}{char}` and `cs{old}{new}` is a one-shot catch-all
 `<character>` binding the Plugin arms from inside the engine: it survives Pass-through keys
 like a pending operator and is cancelled by Esc or any non-printable key the engine
-receives. `.` repeats `ys`, `cs` and `ds` with the same characters (the Plugin keeps the last
+receives. The Field losing focus cancels it too and discards the hook's held keys, so a
+wait armed in one Field never takes a key typed in another. `.` repeats `ys`, `cs` and `ds` with the same characters (the Plugin keeps the last
 ones and tells a `.` replay from a macro replay by the engine's input state being the
 recorded one). Macros record Plugin Keys and replay through the engine unaided.
 
