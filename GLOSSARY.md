@@ -16,12 +16,8 @@ _Avoid_: single-line input, input field, one-line box
 A Field whose page rewrites its value in response to edits, as React controlled components, input masks and uppercase filters do. The page's rewrite is the truth; VimText follows it.
 _Avoid_: framework field, React input, managed input
 
-**Attach / Detach**:
-VimText attaches to a Field when the Field gains focus and detaches when it loses focus or leaves the page.
-_Avoid_: activate, bind, hook
-
 **Activate**:
-The first time a focused Field is switched out of Insert mode (via Esc or Ctrl+[). Before activation VimText is inert on that Field and shows nothing; after activation the Field stays under VimText's control until it leaves the page.
+The moment VimText takes control of a focused Field: on its first Esc or Ctrl+[ when the Start Mode is Insert, or as soon as it is focused when the Start Mode is Normal. Before activation VimText is inert on that Field and shows nothing; after activation the Field stays under VimText's control until it leaves the page.
 _Avoid_: enable, wake, turn on
 
 **Mode**:
@@ -32,7 +28,7 @@ The strip VimText shows at the bottom edge of an activated Field: the current Mo
 _Avoid_: overlay, badge, mode indicator, HUD
 
 **Start Mode**:
-The Mode a Field is placed in when VimText first attaches to it. The global default is Insert; a Site Policy can set it to Normal.
+The Mode a Field is placed in when it is Activated. The global default is Insert; a Site Policy can set it to Normal.
 _Avoid_: default mode, initial mode
 
 **Site Policy**:

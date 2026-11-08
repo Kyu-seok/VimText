@@ -98,7 +98,8 @@ A plain `Enter` the engine reports unhandled in Normal or Visual (a failed motio
 a form or inserts a newline. Cmd/Ctrl+Enter stay row-3 Pass-through.
 
 **Lifecycle.** Engine + mirror are created lazily on Activation (first `Esc`/`Ctrl+[`
-while focused), never on focus. They live while the element stays in the DOM; refocusing
+while focused; on focus itself only under Start Mode Normal), never on focus under Start
+Mode Insert. They live while the element stays in the DOM; refocusing
 resumes the last Mode. Element removed → destroyed (marks and undo gone), promptly, via a
 `MutationObserver` on the document that runs only while a Session exists (it also watches
 the shadow root of a Field that lives in one, since records from inside a shadow tree never
@@ -131,6 +132,15 @@ search + command history, vimrc mappings. Per Field: marks, undo.
 
 - Site Policy keyed by origin: disabled / enabled+Insert / enabled+Normal. Unknown origin →
   enabled+Insert. No built-in deny list.
+- Settings arrive asynchronously (storage read at load, then every change). The content
+  entry treats the Site Policy as unknown until then: nothing is activated, and an
+  Activation key reaches the page as usual but is remembered for the Field it was pressed
+  on (forgotten when that Field loses focus). Every arrival, first load and later changes
+  alike, runs one reconcile step on the focused Field when the document has focus: policy
+  "off" disposes every Session; "normal" Activates it; "insert" Activates it only if the
+  remembered key was pressed on it. This also catches an `autofocus` Field, which is
+  focused before the content script runs, and a popup switch to "normal" while a Field is
+  focused. A key pressed before the content script runs at all is lost.
 - vimrc: a text box of ex commands (`map`, `noremap`, `set`, …) run through the engine on every Activation.
 - Plugin toggles (surround, targets), off by default.
 - Popup: global on/off, Site Policy for current origin, Mode of the focused Field.
