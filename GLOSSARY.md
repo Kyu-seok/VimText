@@ -24,15 +24,19 @@ _Avoid_: enable, wake, turn on
 The Vim editing mode a Field is currently in: Insert, Normal, Visual (charwise, linewise, blockwise), Replace, or Command-line.
 
 **Status Line**:
-The strip VimText shows at the bottom edge of an activated Field: the current Mode, pending keys, macro-recording indicator, the command line for `:` `/` `?`, and messages such as Vim errors.
+The strip VimText shows at the edge of an activated Field, below it when there is room and above it otherwise: the current Mode, pending keys, macro-recording indicator, the command line for `:` `/` `?`, and messages such as Vim errors.
 _Avoid_: overlay, badge, mode indicator, HUD
 
 **Start Mode**:
 The Mode a Field is placed in when it is Activated. The global default is Insert; a Site Policy can set it to Normal.
 _Avoid_: default mode, initial mode
 
+**Site**:
+The origin of the page in the tab's address bar. Every frame that page embeds, same-origin or not, belongs to that Site; a Field in an embedded frame is on the Site of the page around it.
+_Avoid_: domain, host, frame origin, page
+
 **Site Policy**:
-The user's per-site settings: whether VimText is enabled there and which Start Mode applies.
+The user's settings for one Site: whether VimText is enabled there and which Start Mode applies. The same policy governs every Field on the Site, including those in embedded frames.
 _Avoid_: whitelist, blacklist, exclusion list
 
 **Baseline**:
