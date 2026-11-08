@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { TextareaField } from "../../src/field/TextareaField";
 import { Session } from "../../src/bridge/Session";
 import { surround } from "../../src/plugins/surround";
+import { targets } from "../../src/plugins/targets";
 import { keyDriver } from "./keys";
 import { statusText } from "./dom";
 
@@ -27,9 +28,9 @@ let field: TextareaField;
 let session: Session;
 const { keydown, keys } = keyDriver(() => session);
 
-function activate(vimrc: string, plugins = [surround]): void {
+function activate(vimrc: string, plugins = [surround], text = TEXT): void {
   ta = document.createElement("textarea");
-  ta.value = TEXT;
+  ta.value = text;
   ta.style.cssText = "width:400px;height:120px;font:14px/1.4 monospace";
   document.body.appendChild(ta);
   ta.focus();
@@ -127,5 +128,93 @@ describe("with surround off", () => {
   it("nothing is held: d s x is the Baseline (d s clears, x deletes a character)", () => {
     keys("dsx");
     expect(ta.value).toMatch(/^he quick/);
+  });
+});
+
+// targets' grammar: `i`/`a` are held in operator-pending and Visual only, and
+// `n`/`l` completes them into the next/last Plugin Key. The vimrc maps those
+// keys to the Baseline `a` (operator-pending `onoremap`, Visual `vnoremap`),
+// so a fed Plugin Key shows as the stock `a<object>` text object; a sequence
+// released instead shows as the stock `i<object>`.
+const PAIRS = 'foo (bar) "baz" qux';
+const TARGETS_VIMRC = "onoremap <TargetsIn> a\nvnoremap <TargetsIl> a";
+
+describe("with targets on, in operator-pending", () => {
+  beforeEach(() => activate(TARGETS_VIMRC, [targets], PAIRS));
+
+  it("c i n ( feeds c then <TargetsIn> then (", () => {
+    keys("cin("); // the engine ran ca( (its a( from before a pair finds the next one)
+    expect(ta.value).toBe('foo  "baz" qux');
+    expect(session.mode).toBe("insert");
+  });
+
+  it("c i w feeds c i w: holding i for n or l costs nothing", () => {
+    keys("ciw");
+    expect(ta.value).toBe(' (bar) "baz" qux');
+    expect(session.mode).toBe("insert");
+  });
+
+  it("c i Esc discards i, and Esc cancels the operator", () => {
+    keys("ci");
+    expect(keydown("Escape").defaultPrevented).toBe(true);
+    keys("w"); // nothing pending: w is a motion
+    expect(ta.value).toBe(PAIRS);
+    expect(ta.selectionStart).toBe(4);
+    expect(session.mode).toBe("normal");
+  });
+
+  it("a key that completes a pending partial key is not held: d f a deletes through the a at once", () => {
+    keys("dfa");
+    expect(ta.value).toBe('r) "baz" qux');
+  });
+
+  it("the Status Line shows c i n while the object key is pending, never the Plugin Key's name", () => {
+    keys("cin");
+    expect(statusText()).toContain("cin");
+    expect(statusText()).not.toContain("Targets");
+  });
+
+  it("with surround on as well, c is released into the engine and i is held in operator-pending: c i n (", () => {
+    session.destroy();
+    field.destroy();
+    ta.remove();
+    activate(TARGETS_VIMRC, [surround, targets], PAIRS);
+    keys("cin(");
+    expect(ta.value).toBe('foo  "baz" qux');
+    expect(session.mode).toBe("insert");
+  });
+});
+
+describe("with targets on, in Visual", () => {
+  beforeEach(() => activate(TARGETS_VIMRC, [targets], PAIRS));
+
+  it('v i l " feeds v then <TargetsIl> then "', () => {
+    keys('vil"d'); // the engine ran va" (its a" from before the quotes finds the next ones)
+    expect(ta.value).toBe("foo (bar)  qux");
+  });
+
+  it("v i w feeds v i w", () => {
+    keys("viwd");
+    expect(ta.value).toBe(' (bar) "baz" qux');
+  });
+});
+
+describe("with targets on, in Normal with no operator", () => {
+  beforeEach(() => activate(TARGETS_VIMRC, [targets], PAIRS));
+
+  it("i is not held: it enters Insert mode at once and the next key is the page's", () => {
+    keys("i");
+    expect(session.mode).toBe("insert");
+    expect(keydown("n").defaultPrevented).toBe(false);
+  });
+});
+
+describe("with targets off", () => {
+  beforeEach(() => activate(TARGETS_VIMRC, [], PAIRS));
+
+  it("nothing is held: c i n ( is the Baseline (i n is no text object, so c is cancelled; ( is a motion)", () => {
+    keys("cin(");
+    expect(ta.value).toBe(PAIRS);
+    expect(session.mode).toBe("normal");
   });
 });
