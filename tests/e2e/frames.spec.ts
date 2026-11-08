@@ -20,6 +20,13 @@ function hostCount(where: Page | Frame): Promise<number> {
   return where.evaluate(() => document.querySelectorAll("vimtext-status").length);
 }
 
+/** Focuses a Field inside `frame` and Activates it with Esc; the Status Line shows NORMAL in that frame. */
+async function activateIn(page: Page, frame: Frame, selector: string): Promise<void> {
+  await frame.locator(selector).focus();
+  await page.keyboard.press("Escape");
+  expect(await statusText(frame)).toContain("NORMAL");
+}
+
 /** A loaded child frame of the fixture page, found by the start of its URL. */
 async function frameAt(page: Page, prefix: string): Promise<Frame> {
   const frame = page.frames().find((f) => f.url().startsWith(prefix));
@@ -44,9 +51,7 @@ test("Esc Activates a Field in a same-origin frame; the Status Line lives in tha
   page,
 }) => {
   const frame = await frameAt(page, `${fixtureOrigin}/single-line.html`);
-  await frame.locator("#in").focus();
-  await page.keyboard.press("Escape");
-  expect(await statusText(frame)).toContain("NORMAL");
+  await activateIn(page, frame, "#in");
   expect(await hostCount(frame)).toBe(1);
   expect(await hostCount(page)).toBe(0);
   await page.keyboard.type("0x");
@@ -59,16 +64,14 @@ test("Esc Activates a Field in a cross-origin frame; the Status Line lives in th
   page,
 }) => {
   const frame = await frameAt(page, `${crossOrigin}/single-line.html`);
-  await frame.locator("#in").focus();
-  await page.keyboard.press("Escape");
-  expect(await statusText(frame)).toContain("NORMAL");
+  await activateIn(page, frame, "#in");
   expect(await hostCount(frame)).toBe(1);
   expect(await hostCount(page)).toBe(0);
   await page.keyboard.type("0x");
   await expect(frame.locator("#in")).toHaveValue("ello world");
 });
 
-test("a Site Policy 'normal' for the top origin Activates a Field in the cross-origin frame on focus", async ({
+test("a Site Policy 'normal' for the Site Activates a Field in the cross-origin frame on focus", async ({
   context,
   page,
 }) => {
@@ -80,7 +83,7 @@ test("a Site Policy 'normal' for the top origin Activates a Field in the cross-o
   await expect(frame.locator("#in")).toHaveValue("ello world");
 });
 
-test("a Site Policy 'off' for the top origin leaves Esc to the page inside the cross-origin frame", async ({
+test("a Site Policy 'off' for the Site leaves Esc to the page inside the cross-origin frame", async ({
   context,
   page,
 }) => {
@@ -92,14 +95,12 @@ test("a Site Policy 'off' for the top origin leaves Esc to the page inside the c
   expect(await statusText(frame)).toBe("");
 });
 
-test("the popup reports the top origin and the Mode of a Field focused inside the cross-origin frame", async ({
+test("the popup reports the Site and the Mode of a Field focused inside the cross-origin frame", async ({
   context,
   page,
 }) => {
   const frame = await frameAt(page, `${crossOrigin}/single-line.html`);
-  await frame.locator("#in").focus();
-  await page.keyboard.press("Escape");
-  expect(await statusText(frame)).toContain("NORMAL");
+  await activateIn(page, frame, "#in");
   const popup = await context.newPage();
   await popup.goto(`chrome-extension://${extensionId}/popup/popup.html`);
   await page.bringToFront();
@@ -110,9 +111,7 @@ test("the popup reports the top origin and the Mode of a Field focused inside th
 
 test("a Field flush with the bottom of a short frame gets its Status Line above it", async ({ page }) => {
   const frame = await frameAt(page, `${fixtureOrigin}/bottom.html`);
-  await frame.locator("#ta").focus();
-  await page.keyboard.press("Escape");
-  expect(await statusText(frame)).toContain("NORMAL");
+  await activateIn(page, frame, "#ta");
   const above = await frame.evaluate(() => {
     const r = document.getElementById("ta")!.getBoundingClientRect();
     return document.elementFromPoint(r.left + 20, r.top - 8)?.localName;

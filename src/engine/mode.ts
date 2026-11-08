@@ -54,7 +54,7 @@ export function modeLabel(mode: Mode): string {
   return LABELS[mode];
 }
 
-/** Narrows a value that crossed a message boundary (the popup's `vimtext:status` answer). */
+/** Narrows a value that crossed a message boundary (the popup's `vimtext:focused-mode` answer). */
 export function isMode(value: unknown): value is Mode {
   return (MODES as readonly unknown[]).includes(value);
 }

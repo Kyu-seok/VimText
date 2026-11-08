@@ -4,7 +4,7 @@ status: accepted
 
 # Site Policy is keyed by the top page's origin, resolved in each frame from `ancestorOrigins`
 
-Decided in the M2 part 2 grill of 2026-11-08 (issue #11). The content script runs in every frame, and a frame's Fields are governed by the policy of the **Site**: the origin of the page in the tab's address bar, which the frame reads as the last entry of `location.ancestorOrigins`. A top-level document is its own Site. Where that list is empty (Firefox, which does not implement it) the frame falls back to its own origin.
+Decided in the M2 part 2 grill of 2026-11-08 (issue #11). The content script runs in every frame, and a frame's Fields are governed by the policy of the **Site**: the origin of the page in the tab's address bar, which the frame reads as the last entry of `location.ancestorOrigins`. A top-level document is its own Site. On a browser without the property at all (Firefox does not implement it) the frame falls back to its own origin.
 
 ## Considered options
 

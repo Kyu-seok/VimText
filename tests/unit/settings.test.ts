@@ -44,7 +44,7 @@ describe("Site origin", () => {
     ).toBe("https://a.test");
   });
 
-  it("falls back to the frame's own origin where the ancestor list is empty (Firefox)", () => {
-    expect(siteOrigin({ origin: "https://widget.test", ancestorOrigins: [] })).toBe("https://widget.test");
+  it("falls back to the frame's own origin on a browser without ancestorOrigins at all (Firefox)", () => {
+    expect(siteOrigin({ origin: "https://widget.test" })).toBe("https://widget.test");
   });
 });

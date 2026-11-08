@@ -48,4 +48,10 @@ describe("Status Line placement", () => {
     mount("bottom:0");
     expect(hitAt(-8)?.localName).toBe("vimtext-status");
   });
+
+  it("sits above a Field whose bottom edge is within the strip's height of the viewport bottom", () => {
+    mount("bottom:10px"); // the strip is taller than 10px
+    expect(hitAt(-8)?.localName).toBe("vimtext-status");
+    expect(hitAt(5)?.localName).not.toBe("vimtext-status");
+  });
 });

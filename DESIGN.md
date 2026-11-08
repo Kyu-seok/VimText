@@ -114,14 +114,15 @@ pending keys, `recording @q`, the command line for `:` `/` `?`, engine messages
 (e.g. `E486`). Never shown on a Field that was not activated; dim `-- INSERT --` after
 activation. No page-level bar. It sits below the Field when the strip fits in the
 viewport there and above it otherwise, so a Field flush with the bottom of a short
-iframe keeps a visible strip. A Field in an iframe gets its Status Line in that frame's
+iframe keeps a visible strip; when it fits neither side (a Field taller than the
+viewport) it stays below. A Field in an iframe gets its Status Line in that frame's
 own document, never in the top page (no cross-frame rendering).
 
 **Frames.** The content script runs in every frame; each frame owns its Fields, Sessions
 and Status Lines, and a Field is Activated only by keys and focus inside its own frame.
 A frame belongs to the Site of the page around it (GLOSSARY.md **Site**): it resolves the
 top origin from `location.ancestorOrigins` (last entry; also works for nested and
-sandboxed frames) and falls back to its own origin where that list is empty (Firefox).
+sandboxed frames) and falls back to its own origin on a browser without that property (Firefox).
 
 **Cursor.** Normal mode block cursor = native selection of the char under the cursor;
 Visual = native selection. No overlay. Visual block edits apply correctly but only the
@@ -157,8 +158,7 @@ search + command history, vimrc mappings. Per Field: marks, undo.
   queries to the content script: the Site origin from the top frame only (which also
   proves VimText runs there); the Mode from every frame, where only a frame holding a
   Session on its own active element answers, so a Field focused inside an iframe is
-  reported. No answer → "No Field activated". A Field left focused in a background frame
-  still answers; accepted.
+  reported. No answer → "No Field activated".
 
 **Manifest.** MV3. Permissions: `storage`, `clipboardRead`, `clipboardWrite`. Content script
 on `http://*/*`, `https://*/*`, `all_frames: true`, `run_at: document_idle`, one classic IIFE
@@ -201,6 +201,8 @@ push/PR · MIT · version restarts at 0.1.0. Upstream engine tests are not re-ru
   case is contenteditable, M4).
 - On browsers without `location.ancestorOrigins` (Firefox) a cross-origin frame falls back
   to its own origin as the Site, so the top page's policy does not reach it.
+- The popup's Mode comes from any frame holding a Session on its active element, so a
+  Field left focused in a background frame can be the one reported.
 
 ## Milestones
 
