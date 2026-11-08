@@ -3,7 +3,7 @@ import { TextareaField } from "../field/TextareaField";
 import { Session, isActivationKey, type ExRunner } from "../bridge/Session";
 import { policyFor, type Settings, type SitePolicy } from "../settings/settings";
 import type { SessionState } from "../settings/sessionState";
-import { restoreGlobalState, snapshotGlobalState } from "../engine/globalState";
+import { overlayLocalChanges, restoreGlobalState, snapshotGlobalState } from "../engine/globalState";
 
 /**
  * The Plugins VimText can enable, each registering its mappings through the
@@ -85,6 +85,12 @@ export class Sessions {
   /** Serialized writes of ours whose storage change has not come back yet; the echo is not restored. */
   private readonly inFlight: string[] = [];
   private snapshotQueued = false;
+  /** False until the storage read settles: nothing is written over state not yet read. */
+  private stateLoaded = false;
+  /** A snapshot fell due while the read was pending; it is published once the read settles. */
+  private publishPending = false;
+  /** The engine's global state before this tab's first key, to tell what the keys changed from what was loaded. */
+  private readonly stateBefore: SessionState | null;
 
   /**
    * `site` is the origin the Site Policy is keyed by: the top page's, which in
@@ -111,13 +117,15 @@ export class Sessions {
       if (!this.settings) this.onSettings(s);
     });
     this.stopWatchingState = sessionState?.watch(this.onSessionState) ?? (() => {});
-    void sessionState
-      ?.load()
-      .then((s) => {
-        if (s && this.lastStateForm === null) this.onSessionState(s);
-      })
+    this.stateBefore = sessionState ? snapshotGlobalState() : null;
+    void sessionState?.load().then(
+      (s) => this.onSessionStateLoaded(s),
       // Right after install the service worker may not have granted access yet; start empty.
-      .catch((err: unknown) => console.warn("VimText: Session State not read", err));
+      (err: unknown) => {
+        console.warn("VimText: Session State not read", err);
+        this.onSessionStateLoaded(null);
+      },
+    );
   }
 
   /** Mode of the Session on the focused Field, or null when it has none. */
@@ -281,6 +289,10 @@ export class Sessions {
 
   private publishState(): void {
     if (!this.sessionState) return;
+    if (!this.stateLoaded) {
+      this.publishPending = true;
+      return;
+    }
     const state = snapshotGlobalState();
     const form = JSON.stringify(state);
     if (form === this.lastStateForm) return;
@@ -292,6 +304,24 @@ export class Sessions {
       const i = this.inFlight.indexOf(form);
       if (i >= 0) this.inFlight.splice(i, 1);
     });
+  }
+
+  /**
+   * The storage read completed. A change delivered before it is newer than
+   * what it returns (as for settings), so the read is then dropped. Keys
+   * typed before it are newer too: what they changed is laid over the loaded
+   * state, and the result is written back as this tab's first write.
+   */
+  private onSessionStateLoaded(loaded: SessionState | null): void {
+    if (loaded && this.lastStateForm === null && this.stateBefore) {
+      restoreGlobalState(overlayLocalChanges(loaded, snapshotGlobalState(), this.stateBefore));
+      this.lastStateForm = JSON.stringify(loaded);
+    }
+    this.stateLoaded = true;
+    if (this.publishPending) {
+      this.publishPending = false;
+      this.publishState();
+    }
   }
 
   private onSessionState = (s: SessionState): void => {

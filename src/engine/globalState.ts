@@ -142,3 +142,58 @@ export function restoreGlobalState(s: SessionState): void {
   g.exCommandHistoryController.reset();
   g.lastCharacterSearch = { ...s.lastCharacterSearch };
 }
+
+function same(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/** `history` with `added` pushed as the engine pushes input: moved to the end if already there. */
+function pushAll(history: string[], added: string[]): string[] {
+  const out = [...history];
+  for (const entry of added) {
+    const i = out.indexOf(entry);
+    if (i >= 0) out.splice(i, 1);
+    out.push(entry);
+  }
+  return out;
+}
+
+/**
+ * The state read from storage with everything this tab changed since
+ * `before` laid over it: the read answers what the browser session held
+ * before this tab's first key, so a register, history entry or last search
+ * the keys produced in the meantime is newer than it. A register the keys
+ * left alone takes the loaded value.
+ */
+export function overlayLocalChanges(
+  loaded: SessionState,
+  local: SessionState,
+  before: SessionState,
+): SessionState {
+  const registers: Record<string, RegisterState> = {};
+  for (const name of [
+    ...new Set([...Object.keys(loaded.registers), ...Object.keys(local.registers)]),
+  ].sort()) {
+    const mine = local.registers[name];
+    const changed = mine !== undefined && !same(mine, before.registers[name]);
+    registers[name] = (changed ? mine : (loaded.registers[name] ?? mine))!;
+  }
+  const latest = same(local.latestRegister, before.latestRegister)
+    ? loaded.latestRegister
+    : local.latestRegister;
+  return {
+    registers,
+    ...(latest !== undefined ? { latestRegister: latest } : {}),
+    searchHistory: pushAll(
+      loaded.searchHistory,
+      local.searchHistory.filter((q) => !before.searchHistory.includes(q)),
+    ),
+    exHistory: pushAll(
+      loaded.exHistory,
+      local.exHistory.filter((q) => !before.exHistory.includes(q)),
+    ),
+    lastCharacterSearch: same(local.lastCharacterSearch, before.lastCharacterSearch)
+      ? { ...loaded.lastCharacterSearch }
+      : { ...local.lastCharacterSearch },
+  };
+}

@@ -19,12 +19,20 @@ function settledSettings(): SettingsPort {
 }
 
 /** A session-storage port the test controls: what was saved, and changes from other tabs. */
-function fakeStorage(initial: SessionState | null = null) {
+function fakeStorage(initial: SessionState | null = null, opts: { controlledLoad?: boolean } = {}) {
   const saved: SessionState[] = [];
   let handler: ((s: SessionState) => void) | null = null;
   let failSave = false;
+  let resolveLoad: (s: SessionState | null) => void = () => {};
+  let rejectLoad: (err: Error) => void = () => {};
   const port: SessionStatePort = {
-    load: () => Promise.resolve(initial),
+    load: () =>
+      opts.controlledLoad
+        ? new Promise<SessionState | null>((resolve, reject) => {
+            resolveLoad = resolve;
+            rejectLoad = reject;
+          })
+        : Promise.resolve(initial),
     save: (s) => {
       if (failSave) return Promise.reject(new Error("QUOTA_BYTES quota exceeded"));
       saved.push(JSON.parse(JSON.stringify(s)) as SessionState);
@@ -42,6 +50,10 @@ function fakeStorage(initial: SessionState | null = null) {
     change: (s: SessionState) => handler?.(s),
     /** Every later save is rejected, as a quota error would. */
     rejectSaves: () => (failSave = true),
+    /** The storage read completes (`controlledLoad` only). */
+    loaded: (s: SessionState | null) => resolveLoad(s),
+    /** The storage read fails, as it does before the service worker's grant. */
+    loadFailed: () => rejectLoad(new Error("Access to storage is not allowed from this context")),
   };
 }
 
@@ -73,8 +85,11 @@ let sessions: Sessions;
 let ta: HTMLTextAreaElement;
 let storage: ReturnType<typeof fakeStorage>;
 
-async function activated(initial: SessionState | null = null): Promise<void> {
-  storage = fakeStorage(initial);
+async function activated(
+  initial: SessionState | null = null,
+  opts: { controlledLoad?: boolean } = {},
+): Promise<void> {
+  storage = fakeStorage(initial, opts);
   sessions = new Sessions(document, settledSettings(), location.origin, storage.port);
   ta = document.createElement("textarea");
   ta.value = "the quick brown fox\njumps over the lazy dog";
@@ -238,5 +253,42 @@ describe("Session State written elsewhere is restored before the next key", () =
     storage.change(first); // the echo of the first write arrives after the second yank
     keys(ta, '0"aP');
     expect(ta.value).toMatch(/^quickthe quick/);
+  });
+});
+
+describe("Session State loaded at start, when keys came first", () => {
+  it("a yank before the read completes is kept, the loaded registers land, and the first write carries both", async () => {
+    await activated(null, { controlledLoad: true });
+    keys(ta, '"byiw');
+    await settle();
+    expect(storage.saved).toEqual([]); // nothing is written over state not yet read
+    storage.loaded(stateWith({ a: { ...plain, text: "other tab" } }));
+    await settle();
+    keys(ta, '"aP');
+    expect(ta.value).toMatch(/^other tabthe quick/);
+    keys(ta, '"bP');
+    expect(ta.value).toMatch(/^other tabthethe quick/);
+    const first = storage.saved[0]!;
+    expect(first.registers["a"]!.text).toBe("other tab");
+    expect(first.registers["b"]!.text).toBe("the");
+  });
+
+  it("a storage change that arrives before the read completes is newer: the read is ignored", async () => {
+    await activated(null, { controlledLoad: true });
+    storage.change(stateWith({ a: { ...plain, text: "newer" } }));
+    storage.loaded(stateWith({ a: { ...plain, text: "older" } }));
+    await settle();
+    keys(ta, '"aP');
+    expect(ta.value).toMatch(/^newerthe quick/);
+  });
+
+  it("a failed read is logged and ignored: the tab keeps its registers and writes from then on", async () => {
+    await activated(null, { controlledLoad: true });
+    keys(ta, "yiw");
+    storage.loadFailed();
+    await settle();
+    keys(ta, "P");
+    expect(ta.value).toMatch(/^thethe quick/);
+    expect(storage.saved.at(-1)!.registers['"']!.text).toBe("the");
   });
 });
