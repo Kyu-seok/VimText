@@ -136,7 +136,7 @@ Cmd+V in Normal is a Pass-through.
 `:wq`/`:x` → `:w` then `:q`; the Status Line stays until the `:w` notice closes. VimText never discards Field text.
 
 **Session State** (`chrome.storage.session`, shared by all tabs/frames): registers, macros,
-search + command history, vimrc mappings. Per Field: marks, undo.
+search + command history. Per Field: marks, undo. vimrc mappings are not stored here: every Activation re-runs the vimrc from Settings.
 
 **Settings** (`chrome.storage.sync`):
 
@@ -210,7 +210,13 @@ push/PR · MIT · version restarts at 0.1.0. Upstream engine tests are not re-ru
 - **M2** Single-line Field semantics + Controlled Fields + iframes. Part 1 (Single-line and
   Controlled Fields, issues #7 #8 #9) lands on `main` first; 0.2.0 is tagged only once iframes
   and the settings race (#6) are in.
-- **M3** vimrc, clipboard registers, Session State across tabs, Plugins, Web Store release.
+- **M3** in three parts, each landing on `main`: part 1 clipboard registers (`"*` is an alias
+  of `"+`) and Session State across tabs (a minimal service worker grants content scripts
+  session storage; last writer wins) plus vimrc error reporting in the options page and
+  mappings that replace rather than accumulate; part 2 Plugins (surround, targets; own
+  planning session); part 3 Web Store release (package script, privacy policy in the repo,
+  listing, dogfooding on GitHub, Reddit, Hacker News, Stack Overflow). 0.3.0 is tagged at
+  the store submission.
 - **M4** contenteditable Field (own planning session first).
 
 Each milestone is a usable release.

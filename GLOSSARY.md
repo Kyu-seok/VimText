@@ -55,8 +55,12 @@ _Avoid_: ignored key, unhandled key
 The fixed set of keys VimText decides on before the engine sees them while a Field is in a non-Insert Mode: some are Pass-through, others are swallowed because the Field cannot act on them (a new line on a Single-line Field). A vimrc mapping never reaches a key the Key Policy has decided.
 _Avoid_: key filter, hotkey table, interception list
 
+**Session**:
+The Vim engine and its mirror attached to one Activated Field, living from Activation until the Field leaves the page or stops qualifying. A Field's marks and undo history live in its Session.
+_Avoid_: instance, attachment, editor
+
 **Session State**:
-The Vim state shared by every Field in every tab for as long as the browser session lasts: registers, macros, search and command history, and the user's vimrc mappings. Marks and undo history are not Session State; they belong to one Field.
+The Vim state shared by every Field in every tab for as long as the browser session lasts: registers, macros, and search and command history. Marks and undo history are not Session State; they belong to one Field. The vimrc is a Setting, not Session State: its mappings are in every tab because every tab runs it.
 _Avoid_: global state
 
 **vimrc**:
