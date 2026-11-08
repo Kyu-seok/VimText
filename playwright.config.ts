@@ -1,7 +1,5 @@
 import { defineConfig } from "@playwright/test";
-
-// Parallel worktrees each need their own fixture server (the server serves one tree's fixtures).
-const port = process.env.VIMTEXT_E2E_PORT ?? "4173";
+import { fixturePort as port } from "./tests/e2e/fixture-port";
 
 export default defineConfig({
   testDir: "tests/e2e",
