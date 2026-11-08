@@ -101,4 +101,142 @@ describe("Session State is written after the key that changed it", () => {
     expect(last.registers["a"]).toMatchObject({ text: "the", linewise: false });
     expect(last.registers['"']!.text).toBe("the");
   });
+
+  it("recording a macro writes it, Insert-mode special keys included", async () => {
+    // qm: A, type "!?" natively, Backspace (recorded by the engine as a special key), Esc, q
+    keys(ta, "qmA");
+    ta.value += "!?";
+    ta.setSelectionRange(ta.value.length, ta.value.length);
+    ta.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: "!?" }));
+    keydown(ta, "Backspace");
+    ta.value = ta.value.slice(0, -1);
+    ta.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "deleteContentBackward" }));
+    keydown(ta, "Escape");
+    keys(ta, "q");
+    await settle();
+    const m = storage.saved.at(-1)!.registers["m"]!;
+    expect(m.text).toBe("A");
+    expect(m.insertModeChanges[0]!.changes).toEqual([
+      "!?",
+      { insertModeKey: expect.objectContaining({ keyName: "Backspace" }) },
+    ]);
+  });
+
+  it("a : command writes the ex history", async () => {
+    keys(ta, ":");
+    commandLineEnter("s/quick/slow/");
+    await settle();
+    expect(ta.value).toMatch(/^the slow brown/);
+    expect(storage.saved.at(-1)!.exHistory).toEqual(["s/quick/slow/"]);
+  });
+
+  it("a / search writes the search history", async () => {
+    keys(ta, "/");
+    commandLineEnter("lazy");
+    await settle();
+    expect(storage.saved.at(-1)!.searchHistory).toEqual(["lazy"]);
+  });
+
+  it("a key that changes nothing (a motion) does not write again", async () => {
+    keys(ta, "yiw");
+    await settle();
+    const writes = storage.saved.length;
+    keys(ta, "wl");
+    await settle();
+    expect(storage.saved.length).toBe(writes);
+  });
+
+  it("a rejected write is swallowed: the in-memory register still pastes", async () => {
+    storage.rejectSaves();
+    keys(ta, "yiwP");
+    await settle();
+    expect(ta.value).toMatch(/^thethe quick/);
+  });
+});
+
+/** A state another tab wrote, holding one register. */
+function stateWith(registers: SessionState["registers"]): SessionState {
+  return {
+    registers,
+    searchHistory: [],
+    exHistory: [],
+    lastCharacterSearch: { increment: 0, forward: true, selectedCharacter: "" },
+  };
+}
+
+const plain = { linewise: false, blockwise: false, insertModeChanges: [], searchQueries: [] };
+
+describe("Session State written elsewhere is restored before the next key", () => {
+  it("a storage change carrying a register makes it pastable", async () => {
+    await activated();
+    storage.change(stateWith({ a: { ...plain, text: "other tab" } }));
+    keys(ta, '"aP');
+    expect(ta.value).toMatch(/^other tabthe quick/);
+  });
+
+  it("the state loaded at start is pastable, linewise kept", async () => {
+    await activated(stateWith({ b: { ...plain, text: "a line\n", linewise: true } }));
+    keys(ta, '"bp');
+    expect(ta.value).toMatch(/^the quick brown fox\na line\njumps/);
+  });
+
+  it("a macro from another tab replays through its Insert-mode special key", async () => {
+    await activated();
+    // A, Backspace, type "xy", Esc. The engine replays a special key only when
+    // it is its own class, which the serialized form cannot carry: a plain
+    // object there throws inside the replay and the "xy" after it never lands.
+    storage.change(
+      stateWith({
+        m: {
+          ...plain,
+          text: "A",
+          insertModeChanges: [
+            {
+              changes: [
+                {
+                  insertModeKey: {
+                    keyName: "Backspace",
+                    key: "Backspace",
+                    ctrlKey: false,
+                    altKey: false,
+                    metaKey: false,
+                    shiftKey: false,
+                  },
+                },
+                "xy",
+              ],
+              expectCursorActivityForChange: false,
+            },
+          ],
+        },
+      }),
+    );
+    keys(ta, "@m");
+    expect(ta.value).toMatch(/^the quick brown foxxy\n/);
+  });
+
+  it("the search history from another tab is what Up recalls", async () => {
+    await activated();
+    storage.change({ ...stateWith({}), searchHistory: ["lazy"] });
+    keys(ta, "/");
+    const input = document.querySelector("vimtext-status")!.shadowRoot!.querySelector("input")!;
+    // The engine walks the history on keyup.
+    for (const type of ["keydown", "keyup"])
+      input.dispatchEvent(
+        new KeyboardEvent(type, { key: "ArrowUp", keyCode: 38, bubbles: true, composed: true }),
+      );
+    expect(input.value).toBe("lazy");
+  });
+
+  it("this tab's own write coming back late does not undo a newer yank", async () => {
+    await activated();
+    keys(ta, '"ayiw');
+    await settle();
+    const first = storage.saved.at(-1)!;
+    keys(ta, 'w"ayiw');
+    await settle();
+    storage.change(first); // the echo of the first write arrives after the second yank
+    keys(ta, '0"aP');
+    expect(ta.value).toMatch(/^quickthe quick/);
+  });
 });
