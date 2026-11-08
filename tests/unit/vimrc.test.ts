@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Sessions, type PluginRegistry, type SettingsPort } from "../../src/content/Sessions";
 import { DEFAULT_SETTINGS, type Settings, type SitePolicy } from "../../src/settings/settings";
+import { checkVimrc } from "../../src/engine/vimrc";
 
 /**
  * The vimrc is a Setting that every Activation re-runs (GLOSSARY.md
@@ -142,5 +143,24 @@ describe("Plugin mappings", () => {
     activateAtStart();
     keys(ta, "\\s");
     expect(ta.value).toBe("he quick brown fox\njumps over");
+  });
+});
+
+describe("checkVimrc: what the options page shows under the text box", () => {
+  it("reports a bad line by number with the engine's message, and nothing for the good ones", () => {
+    const errors = checkVimrc('" comment\nnnoremap Y y$\n\n:notacommand foo\nset nosuchoption');
+    expect(errors).toEqual([
+      { line: 4, text: "notacommand foo", error: 'Not an editor command ":notacommand foo"' },
+      // The engine reads `no` as the boolean prefix before it looks the option up.
+      { line: 5, text: "set nosuchoption", error: "Unknown option: suchoption" },
+    ]);
+  });
+
+  it("reports nothing for a clean vimrc", () => {
+    expect(checkVimrc("nnoremap Y y$\nset textwidth=80\nnnoremap \\x dd")).toEqual([]);
+  });
+
+  it("reports an error that the engine raises on a later line only against that line", () => {
+    expect(checkVimrc("nnoremap Y y$\nunmap Q").map((e) => e.line)).toEqual([2]);
   });
 });

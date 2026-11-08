@@ -1,7 +1,8 @@
 import { EditorSelection, type Text } from "@codemirror/state";
 import type { Field } from "../field/Field";
 import { diffText } from "../field/diff";
-import { Mirror, Vim, vimrcLines, type KeyLike } from "../engine/mirror";
+import { Mirror, Vim, type KeyLike } from "../engine/mirror";
+import { vimrcLines } from "../engine/vimrc";
 import type { Mode } from "../engine/mode";
 import { StatusLine } from "../ui/StatusLine";
 

@@ -177,15 +177,4 @@ export class Mirror {
   }
 }
 
-/**
- * The vimrc's runnable lines: the leading `:` and whitespace stripped, blank
- * and `"` comment lines skipped, each paired with its 1-based line number.
- */
-export function vimrcLines(vimrc: string): Array<{ line: number; text: string }> {
-  return vimrc
-    .split("\n")
-    .map((raw, i) => ({ line: i + 1, text: raw.replace(/^\s*:?/, "").trim() }))
-    .filter(({ text }) => text && !text.startsWith('"'));
-}
-
 export { Vim };
