@@ -6,6 +6,7 @@ import {
   contentStatus,
   fixtureOrigin,
   extensionId,
+  ready,
 } from "./extension";
 import type { Frame, Page } from "@playwright/test";
 
@@ -27,7 +28,7 @@ async function activateIn(page: Page, frame: Frame, selector: string): Promise<v
   expect(await statusText(frame)).toContain("NORMAL");
 }
 
-/** A loaded child frame of the fixture page, found by the start of its URL. */
+/** A child frame of the fixture page, found by the start of its URL, with its content script run. */
 async function frameAt(page: Page, prefix: string): Promise<Frame> {
   const frame = page.frames().find((f) => f.url().startsWith(prefix));
   if (!frame)
@@ -37,13 +38,13 @@ async function frameAt(page: Page, prefix: string): Promise<Frame> {
         .map((f) => f.url())
         .join(", ")}`,
     );
+  await ready(frame);
   return frame;
 }
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/frames.html");
-  await page.waitForLoadState("networkidle");
-  await page.waitForTimeout(300); // content scripts run at document_idle in each frame
+  await page.waitForLoadState("networkidle"); // the cross-origin frame's src is set by script
 });
 
 test("Esc Activates a Field in a same-origin frame; the Status Line lives in that frame", async ({

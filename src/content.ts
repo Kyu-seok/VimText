@@ -3,6 +3,9 @@ import { loadSettings, siteOrigin, watchSettings } from "./settings/settings";
 
 const site = siteOrigin(location);
 const sessions = new Sessions(document, { load: loadSettings, watch: watchSettings }, site);
+// Marks this document as attended, per frame; the e2e helper `ready` waits for it
+// instead of guessing when `document_idle` has passed.
+document.documentElement.setAttribute("data-vimtext", "");
 
 chrome.runtime.onMessage.addListener((msg: { type?: string }, _sender, sendResponse) => {
   if (msg?.type === "vimtext:status") {

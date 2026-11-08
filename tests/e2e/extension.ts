@@ -52,6 +52,14 @@ export async function setSettings(context: BrowserContext, settings: object): Pr
   await page.close();
 }
 
+/**
+ * Resolves once the content script has run in `where` (a page or a frame): it
+ * marks its document on load, so no spec guesses how long `document_idle` takes.
+ */
+export async function ready(where: Page | Frame): Promise<void> {
+  await where.waitForSelector("html[data-vimtext]", { state: "attached" });
+}
+
 /** The Status Line host VimText injects next to an activated Field, in that page or frame. */
 export function statusText(page: Page | Frame): Promise<string> {
   return page.evaluate(() => {

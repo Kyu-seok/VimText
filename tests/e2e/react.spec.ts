@@ -1,4 +1,4 @@
-import { test, expect, statusText, activateAtStart } from "./extension";
+import { test, expect, statusText, activateAtStart, ready } from "./extension";
 import type { Page } from "@playwright/test";
 
 // A React 19 controlled input is a Controlled Field: React re-renders the
@@ -7,7 +7,7 @@ import type { Page } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/react.html");
-  await page.waitForTimeout(150); // content script runs at document_idle
+  await ready(page);
   await expect(page.locator("#in")).toHaveValue("the quick brown fox"); // React mounted
 });
 

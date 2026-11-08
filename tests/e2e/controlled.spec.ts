@@ -1,8 +1,8 @@
-import { test, expect } from "./extension";
+import { test, expect, ready } from "./extension";
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/controlled.html");
-  await page.waitForTimeout(150); // content script runs at document_idle
+  await ready(page);
 });
 
 test("synchronous rewrite: x keeps the page's uppercase text, one u restores the original, . repeats", async ({

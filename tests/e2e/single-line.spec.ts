@@ -1,8 +1,8 @@
-import { test, expect, statusText } from "./extension";
+import { test, expect, statusText, ready } from "./extension";
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/single-line.html");
-  await page.waitForTimeout(150); // content script runs at document_idle
+  await ready(page);
 });
 
 test("Enter submits in Normal, j/k are no-ops", async ({ page }) => {

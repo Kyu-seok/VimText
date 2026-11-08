@@ -11,6 +11,7 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 - **Comment on an issue**: `gh issue comment <number> --body "..."`
 - **Apply / remove labels**: `gh issue edit <number> --add-label "..."` / `--remove-label "..."`
 - **Close**: `gh issue close <number> --comment "..."`
+- **Verify a "red on `main`" claim in a brief**: `git stash push -- src popup && npm run build && npx playwright test tests/e2e/<spec> ; git stash pop`, then rebuild. The e2e suite runs the built extension against the fixtures in the working tree, so stashing only the source leaves the new tests in place.
 - **Resolve earlier issues from a ticket**: a spec or ticket that implements decisions recorded on other issues lists `Closes #<n>` for each in its body, and the landing commit or PR carries the same lines, so the merge to `main` closes them. An issue left open after its work shipped costs a triage pass (#7, #8, #9 after M2 part 1).
 
 Infer the repo from `git remote -v`; `gh` does this automatically when run inside a clone.

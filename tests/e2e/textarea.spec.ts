@@ -1,8 +1,8 @@
-import { test, expect, statusText } from "./extension";
+import { test, expect, statusText, ready } from "./extension";
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/textarea.html");
-  await page.waitForTimeout(150); // content script runs at document_idle
+  await ready(page);
 });
 
 test("is inert until Esc, then shows NORMAL", async ({ page }) => {
