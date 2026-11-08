@@ -1,5 +1,5 @@
 import type { CodeMirrorV, EngineApi, OperatorFn, Pos, vimKey } from "../engine/pluginApi";
-import { enclosingPair } from "./pairs";
+import { BRACKETS, enclosingPair, type Pair, type Span } from "./pairs";
 import type { Plugin } from "./Plugin";
 
 /**
@@ -18,21 +18,8 @@ import type { Plugin } from "./Plugin";
 
 // --- Targets and replacements (surround.txt "TARGETS", "REPLACEMENTS") ---
 
-/** The bracket pairs, each reachable by either character and by its alias (`b` `B` `r` `a`). */
-const BRACKETS: Record<string, readonly [string, string]> = {
-  "(": ["(", ")"],
-  ")": ["(", ")"],
-  b: ["(", ")"],
-  "{": ["{", "}"],
-  "}": ["{", "}"],
-  B: ["{", "}"],
-  "[": ["[", "]"],
-  "]": ["[", "]"],
-  r: ["[", "]"],
-  "<": ["<", ">"],
-  ">": ["<", ">"],
-  a: ["<", ">"],
-};
+/** The bracket pairs as surround names them: either character, Vim's `b` `B`, and vim-surround's own aliases `r` `a`. */
+const SURROUND_BRACKETS: Record<string, Pair> = { ...BRACKETS, r: BRACKETS["["]!, a: BRACKETS["<"]! };
 
 /** The opening bracket as a target trims the inner whitespace; as a replacement it adds a space inside. */
 const OPENING = new Set(["(", "{", "[", "<"]);
@@ -42,15 +29,15 @@ const OPENING = new Set(["(", "{", "[", "<"]);
  * for one this version leaves alone: `<` and `t` prompt for a tag in Vim (not
  * in v1, DESIGN.md accepted limitations) and a letter wraps with nothing.
  */
-function delimiters(char: string): [string, string] | null {
+function delimiters(char: string): Pair | null {
   if (char === "<" || char === "t" || char === "T") return null;
-  const pair = BRACKETS[char];
+  const pair = SURROUND_BRACKETS[char];
   if (pair) {
     const space = OPENING.has(char) ? " " : "";
-    return [pair[0] + space, space + pair[1]];
+    return { open: pair.open + space, close: space + pair.close };
   }
   if (/[\p{L}\p{N}]/u.test(char) || char === " ") return null;
-  return [char, char];
+  return { open: char, close: char };
 }
 
 /**
@@ -85,18 +72,8 @@ function sameCharPair(line: string, ch: number, char: string): [number, number] 
 
 /** Offsets of the target pair's two delimiters for `ds`/`cs`, `count` pairs out for brackets; null when absent. */
 function findTarget(cm: CodeMirrorV, head: Pos, char: string, count: number): [number, number] | null {
-  const bracket = BRACKETS[char];
-  if (bracket) {
-    const text = cm.getValue();
-    let at = cm.indexFromPos(head);
-    let found: [number, number] | null = null;
-    for (let n = 0; n < count; n++) {
-      found = enclosingPair(text, at, bracket[0], bracket[1]);
-      if (!found) return null;
-      at = found[0] - 1;
-    }
-    return found;
-  }
+  const bracket = SURROUND_BRACKETS[char];
+  if (bracket) return enclosingPair(cm.getValue(), cm.indexFromPos(head), bracket, count);
   // A letter names a word, sentence, paragraph or tag target: none in v1.
   if (/[\p{L}\p{N}]/u.test(char)) return null;
   const pair = sameCharPair(cm.getLine(head.line), head.ch, char);
@@ -107,15 +84,9 @@ function findTarget(cm: CodeMirrorV, head: Pos, char: string, count: number): [n
 
 // --- The one wait the engine cannot express: the character after ys{motion} and cs{old} ---
 
-/** A span of the document, by offsets, end exclusive. */
-interface Span {
-  from: number;
-  to: number;
-}
-
 interface Wait {
   cm: CodeMirrorV;
-  /** The document as it was: a change in between (focus went elsewhere) voids the wait. */
+  /** The document as it was: the spans are offsets into it, so a page rewrite of the Field in between (a Controlled Field) voids the wait. */
   doc: string;
   apply(char: string): Pos | null;
 }
@@ -195,14 +166,14 @@ function wrapSpans(
     let wrapped: string;
     if (linewise) {
       const indent = /^[ \t]*/.exec(text)![0];
-      wrapped = `${indent}${d[0].trimEnd()}\n${text}\n${indent}${d[1].trimStart()}`;
+      wrapped = `${indent}${d.open.trimEnd()}\n${text}\n${indent}${d.close.trimStart()}`;
     } else {
       let trailing = "";
       if (keepTrailing) {
         trailing = /[ \t]*$/.exec(text)![0];
         text = text.slice(0, text.length - trailing.length);
       }
-      wrapped = d[0] + text + d[1] + trailing;
+      wrapped = d.open + text + d.close + trailing;
     }
     cursor = replaceSpan(cm, span, wrapped);
   }
@@ -226,8 +197,9 @@ function inner(cm: CodeMirrorV, span: Span, target: string): string {
 
 /**
  * `ys{motion}`, `yss`, Visual `S`: wraps the range. With the character known
- * (Visual `S{char}` is one binding; a `.` replay has the last one) it wraps
- * at once; typed `ys` waits for it.
+ * (Visual `S{char}` is one binding; a `.` replay of `ys` has the last one) it
+ * wraps at once; typed `ys` waits for it. A `.` replay of Visual `S` does
+ * nothing: vim-surround does not repeat it (DESIGN.md accepted limitations).
  */
 const wrap: OperatorFn = (cm, args, ranges, oldAnchor) => {
   const vim = cm.state.vim;
@@ -237,7 +209,10 @@ const wrap: OperatorFn = (cm, args, ranges, oldAnchor) => {
   const first = cm.posFromIndex(spans[0]!.from);
   // Only Visual S{char} carries its character; in Normal, `selectedCharacter`
   // is the motion's (`iw`'s w, `f)`'s parenthesis), copied in by the engine.
+  // The engine replays a Visual operator over a same-sized selection, so the
+  // replay arrives here in Visual mode too.
   if (vim.visualMode && args.selectedCharacter !== undefined) {
+    if (repeating(cm, args)) return oldAnchor;
     return wrapSpans(cm, spans, args.selectedCharacter, linewise, keepTrailing) ?? first;
   }
   if (repeating(cm, args)) {
@@ -268,7 +243,7 @@ const changeSurroundings: OperatorFn = (cm, args, ranges, oldAnchor) => {
   const text = inner(cm, span, args.selectedCharacter ?? "");
   const change = (char: string): Pos | null => {
     const d = delimiters(char);
-    return d ? replaceSpan(cm, span, d[0] + text + d[1]) : null;
+    return d ? replaceSpan(cm, span, d.open + text + d.close) : null;
   };
   if (repeating(cm, args)) {
     return lastChangeChar !== undefined ? (change(lastChangeChar) ?? oldAnchor) : oldAnchor;
@@ -333,9 +308,9 @@ export const surround: Plugin = {
   ],
 
   define(engine) {
+    api = engine; // the one this Activation gave: the waits bind and unbind through it
     if (defined) return;
     defined = true;
-    api = engine;
     engine.defineOperator("surroundWrap", wrap);
     engine.defineOperator("surroundDelete", deleteSurroundings);
     engine.defineOperator("surroundChange", changeSurroundings);
@@ -370,5 +345,10 @@ export const surround: Plugin = {
 
   bind(engine) {
     for (const command of BINDINGS) engine.bindKey(command);
+  },
+
+  onBlur() {
+    waiting = null;
+    disarm();
   },
 };

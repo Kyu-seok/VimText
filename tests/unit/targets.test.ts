@@ -1,83 +1,18 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { Mirror } from "../../src/engine/mirror";
-import { engineApi } from "../../src/engine/pluginApi";
 import { targets } from "../../src/plugins/targets";
+import { pluginMirror } from "./plugin-mirror";
 
 /**
  * targets' semantics (DESIGN.md "Plugins"; oracle: targets.vim's targets.txt
- * with its default settings, whose examples and charts these cases are). As
- * tests/unit/surround.test.ts, under the one exception spec #24 grants to rule
- * 6: the Plugin is driven at the mirror, fed its exact object keys and its
- * Plugin Keys directly, so that the hook's grammar
- * (tests/unit/plugin-keys.test.ts) and the Plugin's meaning are proven apart.
- * Observed through the mirror's document and selection, which are what the
- * Session renders into the Field.
+ * with its default settings, whose examples and charts these cases are),
+ * driven at the mirror under spec #24's exception to rule 6
+ * (tests/unit/plugin-mirror.ts) and observed through the mirror's document
+ * and selection and the Mode text the engine renders.
  */
 
-let mirror: Mirror | null = null;
-let scratch: HTMLElement | null = null;
+const { open, close, feed, text, selected, status } = pluginMirror(targets);
 
-/** A mirror over `doc` with the cursor at `cursor` and targets bound, as an Activation binds it. */
-function open(doc: string, cursor: number): void {
-  scratch = document.createElement("div");
-  scratch.style.cssText = "position:fixed;left:-100000px;top:0;visibility:hidden";
-  const input = document.createElement("textarea");
-  const statusbar = document.createElement("div");
-  scratch.append(input, statusbar);
-  document.body.appendChild(scratch);
-  mirror = new Mirror({
-    container: scratch,
-    inputField: input,
-    focus: () => {},
-    doc,
-    cursor,
-    style: {
-      font: "13px monospace",
-      letterSpacing: "normal",
-      lineHeight: "normal",
-      contentWidth: 400,
-      whiteSpace: "pre-wrap",
-      wordBreak: "normal",
-      overflowWrap: "normal",
-      tabSize: "8",
-    },
-    statusbar,
-  });
-  mirror.clearUserMappings();
-  targets.define(engineApi);
-  targets.bind(engineApi);
-}
-
-afterEach(() => {
-  mirror?.clearUserMappings();
-  mirror?.destroy();
-  scratch?.remove();
-  mirror = null;
-  scratch = null;
-});
-
-/** Feeds keys: a single character as typed, a longer name as a Plugin Key or special key. */
-function feed(...keys: string[]): void {
-  for (const key of keys) {
-    mirror!.handleKey({
-      key,
-      ctrlKey: false,
-      altKey: false,
-      metaKey: false,
-      shiftKey: false,
-      preventDefault() {},
-      stopPropagation() {},
-    });
-  }
-}
-
-const text = () => mirror!.view.state.doc.toString();
-const insertMode = () => mirror!.vim.insertMode;
-/** The Visual selection as the text it covers. */
-const selected = () => {
-  const { from, to } = mirror!.view.state.selection.main;
-  return mirror!.view.state.doc.sliceString(from, to);
-};
+afterEach(close);
 
 describe("pair objects Seek (targets.txt 'pair seek'): inside first, then the next on the line, then the last", () => {
   const DOC = "This is example text (with a pair of parentheses)";
@@ -86,7 +21,7 @@ describe("pair objects Seek (targets.txt 'pair seek'): inside first, then the ne
     open(DOC, 5);
     feed("c", "i", "(");
     expect(text()).toBe("This is example text ()");
-    expect(insertMode()).toBe(true);
+    expect(status()).toContain("INSERT");
   });
 
   it("ci( from inside the pair changes inside it", () => {
@@ -99,7 +34,7 @@ describe("pair objects Seek (targets.txt 'pair seek'): inside first, then the ne
     open("(a) and then more", 10);
     feed("c", "i", "(");
     expect(text()).toBe("() and then more");
-    expect(insertMode()).toBe(true);
+    expect(status()).toContain("INSERT");
   });
 
   it("the pair the cursor is in wins over a later one on the line", () => {
@@ -147,7 +82,7 @@ describe("pair objects Seek (targets.txt 'pair seek'): inside first, then the ne
     open("no pair", 3);
     feed("c", "i", "(", "x");
     expect(text()).toBe("no air");
-    expect(insertMode()).toBe(false);
+    expect(status()).toContain("NORMAL");
   });
 
   it("the Plugin's i( shadows the engine's for that key only: iw stays the engine's", () => {
@@ -219,7 +154,7 @@ describe("quote objects count the quotes from the start of the line (targets.txt
     open('join("hello", "world")', 12);
     feed("c", "i", '"');
     expect(text()).toBe('join("hello", "")');
-    expect(insertMode()).toBe(true);
+    expect(status()).toContain("INSERT");
   });
 
   it('di" from before any quote on the line changes the next string', () => {
@@ -247,7 +182,7 @@ describe("quote objects count the quotes from the start of the line (targets.txt
     open('none\n"a"', 1);
     feed("d", "i", '"', "x");
     expect(text()).toBe('nne\n"a"');
-    expect(insertMode()).toBe(false);
+    expect(status()).toContain("NORMAL");
   });
 
   it("the back tick is a quote too, and in Visual the string becomes the selection", () => {
@@ -266,7 +201,7 @@ describe("n and l reach the next and last object (targets.txt 'next and last pai
     open("This is example text (with a pair of parentheses)", 5);
     feed("c", "TargetsIn", "(");
     expect(text()).toBe("This is example text ()");
-    expect(insertMode()).toBe(true);
+    expect(status()).toContain("INSERT");
   });
 
   it("in) from inside a pair is the pair after it; 2in) the one after that", () => {
@@ -326,14 +261,14 @@ describe("n and l reach the next and last object (targets.txt 'next and last pai
     open("(a) tail", 5);
     feed("c", "TargetsIn", "(", "x");
     expect(text()).toBe("(a) til");
-    expect(insertMode()).toBe(false);
+    expect(status()).toContain("NORMAL");
   });
 
   it("a key that is no object after in cancels the operator too, as the engine's own failed text object does (DESIGN.md limitations)", () => {
     open("one two", 0);
     feed("c", "TargetsIn", "w", "x");
     expect(text()).toBe("ne two");
-    expect(insertMode()).toBe(false);
+    expect(status()).toContain("NORMAL");
   });
 
   it(". repeats din( on the next pair from where the cursor ended", () => {
@@ -369,7 +304,7 @@ describe("argument objects (targets.txt 'argument text objects' and its chart)",
     open("f( x )", 3);
     feed("c", "i", "a");
     expect(text()).toBe("f()");
-    expect(insertMode()).toBe(true);
+    expect(status()).toContain("INSERT");
   });
 
   // The argument chart's line, the cursor on eeeeee.
@@ -425,7 +360,7 @@ describe("argument objects (targets.txt 'argument text objects' and its chart)",
     open("a, b", 0);
     feed("d", "i", "a", "x");
     expect(text()).toBe(", b");
-    expect(insertMode()).toBe(false);
+    expect(status()).toContain("NORMAL");
   });
 
   it("an argument spanning lines: daa on the last one takes its separator and the line break", () => {

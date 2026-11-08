@@ -3,8 +3,10 @@ import { TextareaField } from "../../src/field/TextareaField";
 import { Session } from "../../src/bridge/Session";
 import { surround } from "../../src/plugins/surround";
 import { targets } from "../../src/plugins/targets";
+import { Sessions } from "../../src/content/Sessions";
 import { keyDriver } from "./keys";
-import { statusText } from "./dom";
+import { keys as keysOn, settle, statusText } from "./dom";
+import { controlledPort, settingsFor } from "./settings-port";
 
 /**
  * The bridge's Plugin key hook (DESIGN.md "Plugins", ADR 0006): a typed
@@ -15,9 +17,11 @@ import { statusText } from "./dom";
  * commands whose effect on the Field is visible (`r` makes the character
  * that follows visible, `d`/`x` show the count), so this file proves the
  * grammar and nothing of surround's semantics (tests/unit/surround.test.ts).
- * Coverage (rule 5): Normal, Visual and operator-pending on a textarea; the
- * hook sits inside the Session, so Field placement is the Sessions class's
- * concern.
+ * Coverage (rule 5): Normal, Visual and operator-pending on a textarea, and
+ * Replace on a textarea and on a Field inside an open shadow root (a key held
+ * there would take a typed character from the Field); Insert never reaches
+ * the hook (`nativeInsert` returns first; session.test.ts). Blur is covered
+ * on textareas, with the Sessions class routing the focus events.
  */
 
 const TEXT = "the quick brown fox\njumps over the lazy dog\nthird line here";
@@ -28,11 +32,16 @@ let field: TextareaField;
 let session: Session;
 const { keydown, keys } = keyDriver(() => session);
 
-function activate(vimrc: string, plugins = [surround], text = TEXT): void {
-  ta = document.createElement("textarea");
-  ta.value = text;
-  ta.style.cssText = "width:400px;height:120px;font:14px/1.4 monospace";
-  document.body.appendChild(ta);
+function makeTextarea(text: string, root: ParentNode = document.body): HTMLTextAreaElement {
+  const el = document.createElement("textarea");
+  el.value = text;
+  el.style.cssText = "width:400px;height:120px;font:14px/1.4 monospace";
+  root.appendChild(el);
+  return el;
+}
+
+function activate(vimrc: string, plugins = [surround], text = TEXT, root: ParentNode = document.body): void {
+  ta = makeTextarea(text, root);
   ta.focus();
   ta.setSelectionRange(0, 0);
   field = new TextareaField(ta);
@@ -53,7 +62,7 @@ describe("with surround on, in Normal", () => {
     expect(ta.value).toMatch(/^\(he quick/);
   });
 
-  it("d w feeds d then w: holding d for s costs nothing", () => {
+  it("d w feeds d then w: the released d is the operator and w its motion", () => {
     keys("dw");
     expect(ta.value).toMatch(/^quick brown/);
   });
@@ -107,6 +116,26 @@ describe("with surround on, in Normal", () => {
   });
 });
 
+describe("with surround on, in Replace", () => {
+  afterEach(() => document.body.replaceChildren());
+
+  it("d is not held: R then d overwrites the first character and the Status Line shows REPLACE", () => {
+    activate(VIMRC);
+    keys("Rd");
+    expect(ta.value).toMatch(/^dhe quick/);
+    expect(statusText()).toContain("REPLACE");
+  });
+
+  it("the same on a Field inside an open shadow root", () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    activate(VIMRC, [surround], TEXT, host.attachShadow({ mode: "open" }));
+    keys("Rd");
+    expect(ta.value).toMatch(/^dhe quick/);
+    expect(statusText()).toContain("REPLACE");
+  });
+});
+
 describe("with surround on, in Visual", () => {
   beforeEach(() => activate(VIMRC));
 
@@ -119,6 +148,55 @@ describe("with surround on, in Visual", () => {
     keys("vlds");
     expect(ta.value).toMatch(/^ quick/);
     expect(session.mode).toBe("insert");
+  });
+});
+
+// Focus leaving the Field ends what the hook and the Plugin were waiting for
+// (DESIGN.md "Plugins"): the Sessions class routes the focus events, with the
+// Site Policy "normal" so a focused textarea Activates at once; the engine
+// runs surround's own commands here, so the Field shows what completed.
+describe("with surround on, when the Field loses focus", () => {
+  let sessions: Sessions;
+  let first: HTMLTextAreaElement;
+  let second: HTMLTextAreaElement;
+
+  beforeEach(async () => {
+    const port = controlledPort();
+    sessions = new Sessions(document, port.port, location.origin, null, { surround });
+    port.arrive({ ...settingsFor("normal"), plugins: { surround: true, targets: false } });
+    await settle();
+    first = makeTextarea(TEXT);
+    second = makeTextarea("second field");
+    // Both Activated up front: an Activation's `mapclear` would otherwise hide what a wait leaves behind.
+    second.focus();
+    second.setSelectionRange(0, 0);
+    first.focus();
+    first.setSelectionRange(0, 0);
+    // Two Status Line hosts now: the Mode is read as the popup reads it.
+    expect(sessions.focusedMode).toBe("normal");
+  });
+
+  afterEach(() => {
+    sessions.destroy();
+    first.remove();
+    second.remove();
+  });
+
+  it("a held d is discarded: d, Tab away and back, s is the Baseline substitute, not ds", () => {
+    keysOn(first, "d");
+    second.focus(); // where the page's Tab lands
+    first.focus();
+    keysOn(first, "s");
+    expect(first.value).toMatch(/^he quick/);
+    expect(sessions.focusedMode).toBe("insert");
+  });
+
+  it("a wait armed in one Field never takes a key typed in another: ysiw, focus the second Field, x deletes there", () => {
+    keysOn(first, "ysiw");
+    second.focus();
+    keysOn(second, "x");
+    expect(second.value).toBe("econd field");
+    expect(first.value).toBe(TEXT);
   });
 });
 
@@ -148,7 +226,7 @@ describe("with targets on, in operator-pending", () => {
     expect(session.mode).toBe("insert");
   });
 
-  it("c i w feeds c i w: holding i for n or l costs nothing", () => {
+  it("c i w feeds c i w: the released i and w are the stock text object under c", () => {
     keys("ciw");
     expect(ta.value).toBe(' (bar) "baz" qux');
     expect(session.mode).toBe("insert");

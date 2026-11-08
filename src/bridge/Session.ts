@@ -71,7 +71,7 @@ function toEngineKey(e: KeyboardEvent): KeyLike {
  * name (`SurroundDs`; the engine brackets any multi-character name). Never
  * shifted: a shifted multi-character name would become `<S-SurroundS>`.
  */
-function syntheticKey(key: string): KeyLike {
+function fedKey(key: string): KeyLike {
   return {
     key,
     ctrlKey: false,
@@ -133,6 +133,8 @@ export class Session {
   /** The Field text the bridge last wrote or agreed with; anything else means the page changed the Field. */
   private lastText: string | null = null;
   private readonly onDialog: (() => void) | undefined;
+  /** The enabled Plugins, bound on every Activation and told when the Field loses focus. */
+  private readonly plugins: readonly Plugin[];
   /** The Plugin key hook: turns the typed sequences the enabled Plugins claim into Plugin Keys. */
   private readonly pluginKeys: PluginKeyHook;
 
@@ -142,7 +144,8 @@ export class Session {
   ) {
     defineExCommands();
     this.onDialog = config.onDialog;
-    this.pluginKeys = new PluginKeyHook((config.plugins ?? []).flatMap((p) => p.keys));
+    this.plugins = config.plugins ?? [];
+    this.pluginKeys = new PluginKeyHook(this.plugins.flatMap((p) => p.keys));
     this.status = new StatusLine(field);
     const sel = field.getSelection();
     this.mirror = new Mirror({
@@ -191,7 +194,7 @@ export class Session {
    */
   private runVimrc(config: SessionConfig): void {
     this.mirror.clearUserMappings();
-    for (const plugin of config.plugins ?? []) {
+    for (const plugin of this.plugins) {
       plugin.define(engineApi);
       plugin.bind(engineApi);
     }
@@ -329,12 +332,14 @@ export class Session {
 
   /**
    * The engine's context as the Plugin key hook sees it (DESIGN.md "Plugins"):
-   * null when a partial key (`g`, `"`, `z`, an operator's `f`) is pending,
-   * which no Plugin claims: the key that completes it is the engine's. A count
-   * in the buffer or a register already taken is fine.
+   * null in Insert and Replace (`insertMode` with overwrite), where every typed
+   * character is text, and null when a partial key (`g`, `"`, `z`, an
+   * operator's `f`) is pending, which no Plugin claims: the key that completes
+   * it is the engine's. A count in the buffer or a register already taken is fine.
    */
   private pluginContext(): PluginContext | null {
     const vim = this.mirror.vim;
+    if (vim.insertMode) return null;
     if (!/^\d*$/.test(vim.inputState.keyBuffer.join(""))) return null;
     if (vim.visualMode) return "visual";
     return vim.inputState.operator ? "operator-pending" : "normal";
@@ -368,10 +373,10 @@ export class Session {
         case "hold":
           return "consumed";
         case "release":
-          for (const key of step.held) this.mirror.handleKey(syntheticKey(key));
+          for (const key of step.held) this.mirror.handleKey(fedKey(key));
           break;
         case "plugin-key":
-          this.mirror.handleKey(syntheticKey(step.key));
+          this.mirror.handleKey(fedKey(step.key));
           this.mirror.showTypedKeys(`<${step.key}>`, step.typed);
           if (step.consumed) return "consumed";
       }
@@ -602,6 +607,12 @@ export class Session {
 
   onBlur(): void {
     if (this.destroyed) return;
+    // Focus leaving ends what the Plugin key hook holds and any wait a Plugin
+    // armed (DESIGN.md "Plugins"): a key typed back here or in another Field
+    // starts afresh. A Pass-through key that keeps focus (Cmd+C) leaves both
+    // alone, like a pending operator.
+    this.pluginKeys.discard();
+    for (const plugin of this.plugins) plugin.onBlur?.();
     // Keep the bar while the command line has focus (it lives in our shadow
     // root) or `:wq` is leaving behind its notice.
     if (this.mirror.commandLineOpen() || this.noticeOutlivesBlur) return;

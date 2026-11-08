@@ -30,7 +30,7 @@ src/
   bridge/        sync: Field <-> mirror, key routing, ownership rules, self-heal
   ui/            Status Line (shadow root): mode, pending keys, recording, command line, messages
   settings/      Site Policy, vimrc, Plugin toggles (storage.sync); Session State (storage.session)
-  plugins/       surround, targets — engine commands via define*/mapCommand, reached through
+  plugins/       surround, targets — engine commands via define*/_mapCommand, reached through
                  the bridge's Plugin key hook (ADR 0006), never a fork
   content.ts     entry: capture-phase keydown → bridge
 popup/ options/  plain HTML + TS
@@ -188,9 +188,10 @@ access to session storage (`setAccessLevel`). Nothing else runs there.
 
 **Plugins** (`src/plugins/`, one module per Plugin; its oracle is the upstream plugin's own
 documentation, GLOSSARY.md **Plugin**). A Plugin defines its operators, motions and actions
-once at module load through the engine's `define*` API, and binds its keys through
-`mapCommand` on every Activation, because those bindings land in the same keymap partition
-as the vimrc's and the Activation's `mapclear` wipes them.
+once at module load through the engine's `define*` API, and binds its keys through the
+engine's `_mapCommand` (the public `mapCommand` cannot express an `operatorMotion` entry) on
+every Activation, because those bindings land in the same keymap partition as the vimrc's
+and the Activation's `mapclear` wipes them.
 
 The engine's matcher takes a full match over a partial one and never waits (the `timeoutlen`
 deviation under accepted limitations): `d`, `c`, `y` are complete operators and `in` is a
@@ -210,7 +211,8 @@ macros) is the engine's, running the Plugin's commands. A Plugin key is Key Poli
 The second literal of `ys{motion}{char}` and `cs{old}{new}` is a one-shot catch-all
 `<character>` binding the Plugin arms from inside the engine: it survives Pass-through keys
 like a pending operator and is cancelled by Esc or any non-printable key the engine
-receives. `.` repeats `ys`, `cs` and `ds` with the same characters (the Plugin keeps the last
+receives. The Field losing focus cancels it too and discards the hook's held keys, so a
+wait armed in one Field never takes a key typed in another. `.` repeats `ys`, `cs` and `ds` with the same characters (the Plugin keeps the last
 ones and tells a `.` replay from a macro replay by the engine's input state being the
 recorded one). Macros record Plugin Keys and replay through the engine unaided.
 
@@ -267,7 +269,8 @@ push/PR · MIT · version restarts at 0.1.0. Upstream engine tests are not re-ru
 - The popup's Mode comes from any frame holding a Session on its active element, so a
   Field left focused in a background frame can be the one reported.
 - Plugins (M3 part 2): a held key (`d` while the hook waits for `s`) is invisible on the Status
-  Line for that keystroke. Macros record Plugin Keys, so `:reg` and `"qp` show `<SurroundDs>(`
+  Line until the sequence resolves (one key for `d`, two for `ys`, which may still become
+  `yss`). Macros record Plugin Keys, so `:reg` and `"qp` show `<SurroundDs>(`
   where `ds(` was typed; they replay correctly. A vimrc `nnoremap` cannot expand into a Plugin
   key (the engine resolves `noremap` against its own defaults only); `nmap` can. With targets
   on, `cin` followed by a key that is not an object cancels the `c` and stays in Normal mode
@@ -282,9 +285,8 @@ push/PR · MIT · version restarts at 0.1.0. Upstream engine tests are not re-ru
   (`( x )` leaves `( )`).
   In Visual, an object typed again grows only when the selection is wider than one
   character (a one-character inner cannot be told from a fresh `v`). Linewise
-  Visual `S)` on a Single-line Field yields `(text)` (the newline strip). `.` after Visual
-  `S` wraps a same-sized region from the cursor, as the engine replays any Visual operator
-  (Vim's `.` does not repeat it). While `ys{motion}` or `cs{old}` waits for its character, a
+  Visual `S)` on a Single-line Field yields `(text)` (the newline strip). Visual `S` is not
+  `.`-repeatable (vim-surround does not promise it). While `ys{motion}` or `cs{old}` waits for its character, a
   digit `1`-`9` is a count for the key after it, not the character (`ysiw3)` wraps with `)`;
   `0` and every other printable key are taken as typed). After a cancelled wait (Esc), `.`
   repeats that `ys`/`cs` with the last character it completed with, where Vim repeats the
