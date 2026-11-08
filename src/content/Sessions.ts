@@ -1,15 +1,16 @@
 import { isTextControl, type TextControl } from "../field/Field";
 import { TextareaField } from "../field/TextareaField";
-import { Session, isActivationKey, type ExRunner } from "../bridge/Session";
+import { Session, isActivationKey } from "../bridge/Session";
 import { policyFor, type Settings, type SitePolicy } from "../settings/settings";
+import type { Plugin } from "../plugins/Plugin";
 import { SessionStateSync, type SessionStatePort } from "./SessionStateSync";
 
 /**
- * The Plugins VimText can enable, each registering its mappings through the
- * ex runner on every Activation after the vimrc. M3 part 2 fills this; the
- * content entry passes none yet.
+ * The Plugins VimText can enable, by the name of their Settings toggle. An
+ * enabled one is bound on every Activation, before the vimrc (DESIGN.md
+ * "Settings"); the content entry passes the real registry.
  */
-export type PluginRegistry = Partial<Record<keyof Settings["plugins"], (ex: ExRunner) => void>>;
+export type PluginRegistry = Partial<Record<keyof Settings["plugins"], Plugin>>;
 
 /** Where settings come from: a one-time read, then every later change. */
 export interface SettingsPort {
@@ -80,7 +81,7 @@ export class Sessions {
    *
    * `sessionState` is optional so a test of something else needs no storage;
    * the content entry always passes one. `plugins` is the registry of
-   * Plugins that may be enabled; the content entry passes none yet.
+   * Plugins that may be enabled; a test of something else passes none.
    */
   constructor(
     private readonly document: Document,
@@ -131,7 +132,7 @@ export class Sessions {
   }
 
   /** The registered Plugins the settings enable, in registry order. */
-  private enabledPlugins(): Array<(ex: ExRunner) => void> {
+  private enabledPlugins(): Plugin[] {
     const toggles = this.settings?.plugins;
     if (!toggles) return [];
     return (Object.keys(this.plugins) as Array<keyof PluginRegistry>)

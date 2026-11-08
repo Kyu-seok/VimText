@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Sessions, type PluginRegistry } from "../../src/content/Sessions";
 import type { Settings, SitePolicy } from "../../src/settings/settings";
 import { checkVimrc } from "../../src/engine/vimrc";
+import { surround } from "../../src/plugins/surround";
 import { keydown, keys, settle, statusText } from "./dom";
 import { controlledPort, settingsFor } from "./settings-port";
 
@@ -68,9 +69,15 @@ describe("vimrc mappings replace rather than accumulate", () => {
   });
 });
 
-describe("Plugin mappings", () => {
-  // No Plugin exists yet (M3 part 2); a fake one stands in at the hook.
-  const plugins: PluginRegistry = { surround: (ex) => ex("nnoremap \\s dd") };
+describe("Plugin bindings", () => {
+  // A fake Plugin stands in at the registry: one binding, no typed sequences to hold.
+  const plugins: PluginRegistry = {
+    surround: {
+      keys: [],
+      define() {},
+      bind: (engine) => engine.bindKey({ keys: "\\s", type: "keyToKey", toKeys: "dd" }),
+    },
+  };
 
   function withSurround(policy: SitePolicy | null, vimrc: string, enabled = true): Settings {
     return { ...settingsFor(policy, vimrc), plugins: { surround: enabled, targets: false } };
@@ -109,6 +116,46 @@ describe("Plugin mappings", () => {
     expect(ta.value).toBe(TEXT);
     keys(ta, "s");
     expect(ta.value).toBe("he quick brown fox\njumps over");
+  });
+});
+
+describe('the surround Plugin through the Settings (DESIGN.md "Settings": clear, bind Plugins, run the vimrc)', () => {
+  const PARENS = "(the) quick\nsecond";
+
+  function withSurround(policy: SitePolicy | null, vimrc: string, enabled: boolean): Settings {
+    return { ...settingsFor(policy, vimrc), plugins: { surround: enabled, targets: false } };
+  }
+
+  beforeEach(() => {
+    sessions.destroy();
+    sessions = new Sessions(document, port.port, location.origin, null, { surround });
+    ta.value = PARENS;
+  });
+
+  it("bindings are applied before the vimrc, so a vimrc mapping on a Plugin Key wins: nnoremap <SurroundDs> dd", async () => {
+    port.arrive(withSurround(null, "nnoremap <SurroundDs> dd", true));
+    await settle();
+    activateAtStart();
+    keys(ta, "ds(");
+    expect(ta.value).toBe("second"); // the line went, not the parentheses
+  });
+
+  it("enabled, ds( deletes the parentheses; disabled at the next Activation, the same keys are the Baseline", async () => {
+    port.arrive(withSurround(null, "", true));
+    await settle();
+    activateAtStart();
+    keys(ta, "ds(");
+    expect(ta.value).toBe("the quick\nsecond");
+
+    ta.value = PARENS;
+    port.change(withSurround("off", "", false));
+    port.change(withSurround(null, "", false));
+    activateAtStart();
+    keys(ta, "ds(");
+    expect(ta.value).toBe(PARENS); // d then s: no such command, the engine clears; ( is a motion
+    keys(ta, "s");
+    expect(ta.value).toBe("the) quick\nsecond");
+    expect(statusText()).toContain("INSERT");
   });
 });
 
