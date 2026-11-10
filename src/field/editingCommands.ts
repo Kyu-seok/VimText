@@ -22,3 +22,12 @@ export function replaceDomRange(host: Element, from: DomPoint, to: DomPoint, tex
   });
   return ok;
 }
+
+/**
+ * Inserts an Atom's markup at the caret through the editor's own
+ * `insertHTML`, the one editing command that can bring back an element
+ * (an undone Atom deletion). Returns false when the browser refused it.
+ */
+export function insertAtomHtml(html: string): boolean {
+  return document.execCommand("insertHTML", false, html);
+}

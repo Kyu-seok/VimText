@@ -4,6 +4,7 @@ import { history, undo, undoDepth } from "@codemirror/commands";
 import { vim, getCM, Vim } from "@replit/codemirror-vim";
 import type { WrappingStyle } from "../field/Field";
 import { modeFromEngine, type Mode } from "./mode";
+import { atomTable, installAtomRegisters, noteRead, sameAtoms, setAtoms, type AtomAt } from "./atoms";
 
 /** The slice of the adapter's CM5-style object the bridge relies on. */
 interface VimCM {
@@ -18,6 +19,9 @@ interface VimCM {
   off(type: string, f: (...args: any[]) => void): void;
   focus(): void;
   getInputField(): HTMLElement;
+  getRange(from: unknown, to: unknown): string;
+  getSelection(): string;
+  indexFromPos(pos: unknown): number;
   openNotification(template: Node, options: { bottom?: boolean; duration?: number }): () => void;
 }
 
@@ -93,6 +97,7 @@ export class Mirror {
           EditorView.lineWrapping,
           EditorState.allowMultipleSelections.of(true),
           updateListener,
+          atomTable,
           EditorView.theme({
             ".cm-content": { padding: "0" },
             ".cm-line": { padding: "0" },
@@ -113,9 +118,37 @@ export class Mirror {
     cm.focus = () => opts.focus();
     cm.getInputField = () => opts.inputField;
 
+    this.noteAtomReads();
+
     cm.state.statusbar = opts.statusbar;
     this.plugin.updateStatus();
     this.applyStyle(opts.style);
+  }
+
+  /**
+   * Every text the engine reads to store in a register passes through
+   * `getRange` or `getSelection`; noting the Atoms in it lets the register
+   * write store their visible text (docs/engine-seams.md, Atoms in registers).
+   */
+  private noteAtomReads(): void {
+    installAtomRegisters();
+    const cm = this.cm;
+    const getRange = cm.getRange.bind(cm);
+    const getSelection = cm.getSelection.bind(cm);
+    cm.getRange = (s, e) => {
+      noteRead(this.view.state, [{ from: cm.indexFromPos(s), to: cm.indexFromPos(e) }]);
+      return getRange(s, e);
+    };
+    cm.getSelection = () => {
+      noteRead(this.view.state, this.view.state.selection.ranges);
+      return getSelection();
+    };
+  }
+
+  /** The Field's Atoms, read now that the mirror's text is the Field's. */
+  setAtoms(atoms: readonly AtomAt[]): void {
+    if (sameAtoms(this.view.state.field(atomTable), atoms)) return;
+    this.view.dispatch({ effects: setAtoms.of(atoms) });
   }
 
   get vim(): VimState {
