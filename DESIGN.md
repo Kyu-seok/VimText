@@ -251,7 +251,8 @@ tag message as notes and the zip attached; procedure in `docs/release.md`) · MI
 restarts at 0.1.0. Upstream engine tests are not re-run here. A second Playwright project,
 `screenshots` (`npm run screenshots`; its own config, `playwright.screenshots.config.ts`, extends
 the e2e config, so a bare `playwright test` runs `e2e` alone), drives the same launcher at
-1280×800 against a comment-form fixture and rewrites the store screenshots under `docs/store/`;
+1280×800 against a comment-form fixture and rewrites the store screenshots under `docs/store/`,
+and renders the store icon and promo tiles from their sources there (`store-art.spec.ts`);
 it is outside the gate, so PNG churn never fails `npm run check`.
 
 ## Accepted limitations (M1–M3)
@@ -340,6 +341,7 @@ it is outside the gate, so PNG churn never fails `npm run check`.
   affiliation disclosed, a GitHub Discussion) go out after approval, not at upload. Not in
   this part: Firefox/AMO, a CHANGELOG file (GitHub Release notes are the changelog), #12, #23.
 - **M4** contenteditable Field (own planning session first). Reddit's rich-text comment
-  composer is one of its cases.
+  composer and Stack Overflow's answer editor (the Stacks Editor, ProseMirror) are among its
+  cases.
 
 Each milestone is a usable release.

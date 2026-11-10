@@ -13,13 +13,13 @@ host match in `manifest.json` is justified below (`tests/node/summary.test.ts`,
 **Name:** VimText
 
 **Store icon:** `icon-128.png` beside this file: 128×128, the 96×96 artwork centred in 16px of
-transparent padding, as the store asks. `icon.svg` is its source, rendered with Playwright's
-Chromium at 1×; the extension's own `icons/` are drawn by `tools/make-icons.mjs`.
+transparent padding, as the store asks. `icon.svg` is its source, rendered by
+`npm run screenshots`; the extension's own `icons/` are drawn by `tools/make-icons.mjs`.
 
 **Promo tiles:** `promo-small.png` (440×280, the small promo tile) and `promo-marquee.png`
 (1400×560, the marquee promo tile) beside this file, opaque 24-bit PNGs as the store asks.
-Their sources are `promo/small.html` and `promo/marquee.html`, rendered at 1× with
-Playwright's Chromium on macOS (the text uses Menlo and the system sans-serif).
+Their sources are `promo/small.html` and `promo/marquee.html`, rendered by
+`npm run screenshots` on macOS (the text uses Menlo and the system sans-serif).
 
 **Summary** (132 characters at most; this exact sentence is the manifest's `description`,
 so Chrome and the store page show the same words):
