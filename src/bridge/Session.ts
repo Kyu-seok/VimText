@@ -2,7 +2,7 @@ import { EditorSelection, type Text } from "@codemirror/state";
 import type { Field } from "../field/Field";
 import { diffText } from "../field/diff";
 import { ATOM_CHAR } from "../field/atoms";
-import { Mirror, Vim, type KeyLike } from "../engine/mirror";
+import { clipToLine, Mirror, Vim, type KeyLike } from "../engine/mirror";
 import { engineApi } from "../engine/pluginApi";
 import { vimrcLines } from "../engine/vimrc";
 import type { Mode } from "../engine/mode";
@@ -93,13 +93,6 @@ function fedKey(key: string): KeyLike {
 function onlyAtomsUnwritten(before: string, text: string): boolean {
   const count = (s: string) => s.split(ATOM_CHAR).length - 1;
   return count(text) > count(before) && text.split(ATOM_CHAR).join("") === before.split(ATOM_CHAR).join("");
-}
-
-/** Normal-mode cursors sit on a character, never past the end of a non-empty line. */
-function clipToLine(doc: Text, pos: number): number {
-  pos = Math.max(0, Math.min(doc.length, pos));
-  const line = doc.lineAt(pos);
-  return pos === line.to && line.length > 0 ? pos - 1 : pos;
 }
 
 let exCommandsDefined = false;
@@ -640,23 +633,7 @@ export class Session {
         this.syncFromFieldInner(true);
         return;
       }
-      const view = this.mirror.view;
-      const head = view.state.selection.main.head;
-      this.mirror.undoSince(this.agreedDepth);
-      const text = this.field.getValue();
-      const doc = view.state.doc.toString();
-      const { start, endOld, endNew } = diffText(doc, text);
-      const changes = view.state.changes(
-        text === doc ? [] : { from: start, to: endOld, insert: text.slice(start, endNew) },
-      );
-      const newDoc = changes.apply(view.state.doc);
-      // The undo restores the selection the command started from (`x`'s
-      // covers its character, which the engine would take for Visual).
-      view.dispatch({
-        changes,
-        selection: EditorSelection.cursor(clipToLine(newDoc, Math.min(head, newDoc.length))),
-        userEvent: "input.type",
-      });
+      this.mirror.takeBackSince(this.agreedDepth, this.field.getValue());
     });
     this.mirror.notify("VimText: the page refused the edit");
   }
