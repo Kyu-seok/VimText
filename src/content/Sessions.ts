@@ -47,9 +47,15 @@ function concernsFields(record: MutationRecord): boolean {
   return false;
 }
 
-/** True while the element a Session is keyed by still resolves to a Field on itself. */
-function stillQualifies(el: HTMLElement): boolean {
-  return resolveField(el)?.element === el;
+/**
+ * True while the element a Session is keyed by still resolves to a Field on
+ * itself, of the kind its Field was made as: a host that gains or loses
+ * `aria-multiline="false"` stops qualifying, and the next Activation makes a
+ * Field of the new kind.
+ */
+function stillQualifies(el: HTMLElement, field: Field): boolean {
+  const resolved = resolveField(el);
+  return resolved?.element === el && resolved.singleLine === field.singleLine;
 }
 
 const lifecycleOptions: MutationObserverInit = {
@@ -242,8 +248,8 @@ export class Sessions {
     if (!this.lifecycleObserver) {
       this.lifecycleObserver = new MutationObserver((records) => {
         if (!records.some(concernsFields)) return;
-        for (const el of [...this.sessions.keys()])
-          if (!el.isConnected || !stillQualifies(el)) this.dispose(el);
+        for (const [el, { field }] of [...this.sessions])
+          if (!el.isConnected || !stillQualifies(el, field)) this.dispose(el);
       });
       this.lifecycleObserver.observe(this.document, lifecycleOptions);
     }
