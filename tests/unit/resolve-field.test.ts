@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { resolveField } from "../../src/field/resolve";
+import { editableHost } from "./contenteditable";
 
 /**
  * The one decision of what is a Field (#42): every entry point of the content
@@ -64,5 +65,43 @@ describe("resolveField", () => {
     expect(resolveField(add("button"))).toBeNull();
     expect(resolveField(document)).toBeNull();
     expect(resolveField(null)).toBeNull();
+  });
+});
+
+describe("resolveField on contenteditable", () => {
+  it.each(["true", "plaintext-only"])(
+    'a contenteditable="%s" host is a multi-line Field on itself',
+    (value) => {
+      const host = editableHost("<p>one</p>", { contenteditable: value });
+      const resolved = resolveField(host);
+      expect(resolved?.element).toBe(host);
+      const field = resolved!.create();
+      expect(field.element).toBe(host);
+      expect(field.singleLine).toBe(false);
+      expect(field.getValue()).toBe("one");
+      field.destroy();
+    },
+  );
+
+  it("anything inside a host resolves to the host, a non-editable island and nested editables included", () => {
+    const host = editableHost(
+      '<p id="p"><b id="b">one</b><span id="island" contenteditable="false"><i id="deep">x</i></span>' +
+        '<span id="inner" contenteditable="true">y</span></p>',
+    );
+    for (const id of ["p", "b", "island", "deep", "inner"]) {
+      expect(resolveField(document.getElementById(id))?.element, id).toBe(host);
+    }
+    expect(resolveField(document.getElementById("b")!.firstChild)?.element).toBe(host);
+  });
+
+  it('a contenteditable="false" element outside any host is not a Field', () => {
+    expect(resolveField(add("div", (el) => (el.contentEditable = "false")))).toBeNull();
+  });
+
+  it("a host stops resolving once it stops being editable", () => {
+    const host = editableHost("<p>one</p>");
+    expect(resolveField(host)).not.toBeNull();
+    host.setAttribute("contenteditable", "false");
+    expect(resolveField(host)).toBeNull();
   });
 });

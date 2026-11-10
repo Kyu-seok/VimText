@@ -56,7 +56,7 @@ const lifecycleOptions: MutationObserverInit = {
   childList: true,
   subtree: true,
   attributes: true,
-  attributeFilter: ["type", "readonly", "disabled"],
+  attributeFilter: ["type", "readonly", "disabled", "contenteditable", "aria-multiline"],
 };
 
 /**
@@ -226,7 +226,8 @@ export class Sessions {
 
   // Disposal is prompt (ADR 0003): a Session ends when its Field leaves the
   // page (framework re-mounts included) or stops qualifying (readonly,
-  // disabled, type changed to password), not on the next focus change
+  // disabled, type changed to password, a host no longer contenteditable),
+  // not on the next focus change
   // elsewhere. The observer runs only while a Session exists, so an inert
   // page costs nothing.
 
