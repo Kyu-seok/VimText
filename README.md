@@ -6,7 +6,7 @@ install, no replacement editor widget.
 
 ## Install
 
-Chrome Web Store: `<CHROME-WEB-STORE-URL>`
+Chrome Web Store: https://chromewebstore.google.com/detail/vimtext/egfolppakllammjdjnpbajpioigchbkp
 
 Or load it unpacked from a clone: see [Develop](#develop).
 

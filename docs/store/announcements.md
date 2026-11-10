@@ -4,8 +4,10 @@ Every text that goes out with 0.3.0, drafted before the store upload and posted
 by a human after the store's approval (DESIGN.md, M3 part 3). Each draft is in
 its own fenced block so it can be copied whole.
 
-Before posting, replace the token `<CHROME-WEB-STORE-URL>` with the store page's
-URL in every draft. Nothing else in a draft is a placeholder.
+Every draft carries the store page's URL, which goes live when the review
+passes; nothing in a draft is a placeholder. The release notes (section 1)
+say instead that the README links the store page, since the tag message
+was written before the store assigned the URL.
 
 The release notes are the annotated tag's message, verbatim
 (`docs/release.md`): first line the title, plain text, no Markdown. The other
@@ -134,7 +136,7 @@ Text:
 ```text
 VimText is a Chrome extension that gives Vim's modal editing to the text fields of ordinary web pages. It edits the page's own textarea or input in place: no native host to install, no editor widget replacing the field.
 
-Store: <CHROME-WEB-STORE-URL>
+Store: https://chromewebstore.google.com/detail/vimtext/egfolppakllammjdjnpbajpioigchbkp
 Source (MIT): https://github.com/Kyu-seok/VimText
 
 How it behaves: every field starts in Insert mode and is the page's own, so IME, autocomplete and the site's handlers work as before. Press Esc (or Ctrl+[) in a focused field and that field is under Vim until it leaves the page, with a small Status Line at its edge for the mode, pending keys, the : / ? command line and messages. A Site Policy can make a site start in Normal mode, or turn VimText off there. Tab, Cmd/Ctrl shortcuts the engine doesn't bind, a second Esc in Normal and Enter in a single-line input all reach the page, so the site stays usable.
@@ -163,7 +165,7 @@ Body:
 ```text
 I wrote a Chrome extension that puts Vim's modal editing on the text fields of ordinary web pages: comment boxes, issue forms, search inputs. It edits the page's own textarea or input in place. No native host, no Neovim to install, no editor replacing the field.
 
-Store: <CHROME-WEB-STORE-URL>
+Store: https://chromewebstore.google.com/detail/vimtext/egfolppakllammjdjnpbajpioigchbkp
 Source (MIT): https://github.com/Kyu-seok/VimText
 
 **How it feels**
@@ -203,7 +205,7 @@ Body:
 ```text
 I published VimText, a Chrome extension that gives Vim's modal editing to the text fields of ordinary web pages. It edits the page's own textarea or input in place, with no native messaging host and no replacement editor widget.
 
-Store: <CHROME-WEB-STORE-URL>
+Store: https://chromewebstore.google.com/detail/vimtext/egfolppakllammjdjnpbajpioigchbkp
 Source (MIT): https://github.com/Kyu-seok/VimText
 
 **What it does**
@@ -252,7 +254,7 @@ navigation extensions.)
 ```text
 Disclosure: I wrote the extension this answer recommends.
 
-The navigation extensions you tried are for moving around the page; they do not give you a Normal mode inside a text field. What you describe (press Esc in the text area you are typing in, then `dd`) is what [VimText](<CHROME-WEB-STORE-URL>) does. It is a Chrome extension (Chrome only; Firefox is untested) that edits the page's own textarea or input in place: no native host and no editor widget replacing the field. Source is on GitHub: https://github.com/Kyu-seok/VimText
+The navigation extensions you tried are for moving around the page; they do not give you a Normal mode inside a text field. What you describe (press Esc in the text area you are typing in, then `dd`) is what [VimText](https://chromewebstore.google.com/detail/vimtext/egfolppakllammjdjnpbajpioigchbkp) does. It is a Chrome extension (Chrome only; Firefox is untested) that edits the page's own textarea or input in place: no native host and no editor widget replacing the field. Source is on GitHub: https://github.com/Kyu-seok/VimText
 
 How it works: every field starts in Insert mode and behaves natively. Press `Esc` or `Ctrl+[` and that field is under Vim until it leaves the page, with a small Status Line at its edge for the mode, pending keys and the `:` `/` `?` command line. The engine is the Vim implementation behind CodeMirror, so motions, operators, text objects, counts, registers, marks, macros, Visual block, `.`, `u`/`Ctrl-r` and ex commands (`:s`, `:g`, `:sort`, `:map`, `:set`) work, and a vimrc box in the options page takes your mappings. A Site Policy can make a site start in Normal mode or turn the extension off there. `Tab`, `Cmd`/`Ctrl` shortcuts, a second `Esc` and `Enter` in a single-line input still reach the page.
 
@@ -270,7 +272,7 @@ Vim, on Chrome.)
 ```text
 Disclosure: I wrote the extension this answer recommends.
 
-A current option for Chrome: [VimText](<CHROME-WEB-STORE-URL>) (source: https://github.com/Kyu-seok/VimText, MIT). It gives Vim's modal editing to the page's own text fields, in place. There is nothing to run outside the browser: no native host, no editor server, no Neovim install, and the field is not replaced by an editor widget. Chrome only; Firefox is untested and not submitted.
+A current option for Chrome: [VimText](https://chromewebstore.google.com/detail/vimtext/egfolppakllammjdjnpbajpioigchbkp) (source: https://github.com/Kyu-seok/VimText, MIT). It gives Vim's modal editing to the page's own text fields, in place. There is nothing to run outside the browser: no native host, no editor server, no Neovim install, and the field is not replaced by an editor widget. Chrome only; Firefox is untested and not submitted.
 
 Each field starts in Insert mode and is the page's own, so IME, autocomplete and the site's handlers keep working. Press `Esc` (or `Ctrl+[`) in a focused field and it is under Vim until it leaves the page; a Status Line at the edge of the field shows the mode, pending keys and the `:` `/` `?` command line. The engine is the one behind CodeMirror's Vim mode, so motions, operators, text objects, counts, registers, marks, macros, Visual block, `.`, search and ex commands work, `"+` and `"*` are the system clipboard, and a vimrc box in the options page takes mappings and `set` options. A Site Policy can make a site start in Normal mode (closer to what you ask for) or turn the extension off there. Two opt-in Plugins, off by default, model surround and targets.
 
@@ -288,7 +290,7 @@ separate server.)
 ```text
 Disclosure: I wrote the extension this answer recommends.
 
-If what you miss is Vim's editing rather than your own Vim binary and plugins, there is now a way that needs no server and no native host: [VimText](<CHROME-WEB-STORE-URL>), a Chrome extension (source: https://github.com/Kyu-seok/VimText, MIT). To be clear about what it is not: it does not open the textarea in your installed vim or gvim, and your `~/.vimrc` and plugins are not involved. It runs a Vim engine (the one behind CodeMirror's Vim mode) inside the browser and edits the page's own textarea in place.
+If what you miss is Vim's editing rather than your own Vim binary and plugins, there is now a way that needs no server and no native host: [VimText](https://chromewebstore.google.com/detail/vimtext/egfolppakllammjdjnpbajpioigchbkp), a Chrome extension (source: https://github.com/Kyu-seok/VimText, MIT). To be clear about what it is not: it does not open the textarea in your installed vim or gvim, and your `~/.vimrc` and plugins are not involved. It runs a Vim engine (the one behind CodeMirror's Vim mode) inside the browser and edits the page's own textarea in place.
 
 What you get: press `Esc` or `Ctrl+[` in a focused textarea or single-line input and that field is under Vim until it leaves the page, with a Status Line at its edge for the mode, pending keys and the `:` `/` `?` command line. Motions, operators, text objects, counts, registers, marks, macros, Visual block, `.`, search and ex commands (`:s`, `:g`, `:sort`, `:map`, `:set`) work; `"+` and `"*` are the system clipboard; a vimrc box in the options page takes mappings and `set` options; surround and targets are available as opt-in Plugins. Until you press Esc the field is the page's own, so nothing changes on sites where you do not want it, and a Site Policy can turn it off or make a site start in Normal mode.
 
@@ -308,7 +310,7 @@ VimText 0.3.0 is on the Chrome Web Store
 Body:
 
 ```text
-VimText 0.3.0 is the first version you can install from the Chrome Web Store: <CHROME-WEB-STORE-URL>
+VimText 0.3.0 is the first version you can install from the Chrome Web Store: https://chromewebstore.google.com/detail/vimtext/egfolppakllammjdjnpbajpioigchbkp
 
 The release and the zip the store received are at https://github.com/Kyu-seok/VimText/releases/tag/v0.3.0; the release notes there are the full list of what changed since 0.2.0. In short, M3 is closed:
 
