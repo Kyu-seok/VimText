@@ -29,6 +29,8 @@ export interface Field {
   /** Styles the mirror should copy so its line wrapping matches this Field. */
   wrappingStyle(): WrappingStyle;
   isConnected(): boolean;
+  /** Stops listening to the page; the Session that used it is already destroyed. */
+  destroy(): void;
 }
 
 export interface WrappingStyle {
@@ -44,14 +46,3 @@ export interface WrappingStyle {
 }
 
 export type TextControl = HTMLTextAreaElement | HTMLInputElement;
-
-const TEXT_INPUT_TYPES = new Set(["text", "search", "url", "email", "tel"]);
-
-/** Decides whether an element is something VimText may attach to. */
-export function isTextControl(el: EventTarget | null): el is TextControl {
-  if (el instanceof HTMLTextAreaElement) return !el.readOnly && !el.disabled;
-  if (el instanceof HTMLInputElement) {
-    return TEXT_INPUT_TYPES.has(el.type) && !el.readOnly && !el.disabled;
-  }
-  return false;
-}
