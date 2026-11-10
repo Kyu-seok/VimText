@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { project } from "../../src/field/projection";
 import { resolveField } from "../../src/field/resolve";
-import { activeHost, backspaceNatively, editableHost } from "./contenteditable";
+import { activeHost, backspaceNatively, editableHost, selectedText } from "./contenteditable";
 import { keyDriver } from "./keys";
 import { statusText } from "./dom";
 import { Session } from "../../src/bridge/Session";
@@ -70,11 +70,11 @@ describe("motions over Atoms", () => {
     keys("lll");
     expect(coversExactly(chip)).toBe(true);
     keys("l");
-    expect(getSelection()!.toString()).toBe(" ");
+    expect(selectedText()).toBe(" ");
     keys("lllll");
     expect(coversExactly(img)).toBe(true);
     keys("h");
-    expect(getSelection()!.toString()).toBe(" ");
+    expect(selectedText()).toBe(" ");
   });
 
   it("w lands on each Atom as a word of its own", () => {
@@ -84,7 +84,7 @@ describe("motions over Atoms", () => {
     keys("ww");
     expect(coversExactly(host.querySelector("img")!)).toBe(true);
     keys("w");
-    expect(getSelection()!.toString()).toBe("o");
+    expect(selectedText()).toBe("o");
   });
 });
 

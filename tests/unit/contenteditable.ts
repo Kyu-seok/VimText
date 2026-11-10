@@ -48,9 +48,26 @@ export function caretAt(node: Node, offset = 0): void {
   getSelection()!.setBaseAndExtent(node, offset, node, offset);
 }
 
-/** The text the native selection covers: a Normal-mode cursor's character, a Visual selection. */
-export function selectedText(): string {
-  return getSelection()!.toString();
+/** Three plain blocks, the tracer bullet's host. */
+export const THREE_LINES = "<p>the quick brown fox</p><p>jumps over the lazy dog</p><p>third line here</p>";
+
+/** Chromium's `ShadowRoot.getSelection`, not in the DOM typings: the selection inside the tree, not retargeted to its host. */
+export function selectionOf(root: ShadowRoot): Selection {
+  return (root as ShadowRoot & { getSelection(): Selection }).getSelection();
+}
+
+/**
+ * The text the native selection covers: a Normal-mode cursor's character, a
+ * Visual selection. With `root`, the selection inside that open shadow root.
+ */
+export function selectedText(root?: ShadowRoot): string {
+  return (root ? selectionOf(root) : getSelection()!).toString();
+}
+
+/** Whether the native selection is a collapsed caret inside `block`: the cursor on an empty line. */
+export function isCaretIn(block: Element): boolean {
+  const sel = getSelection()!;
+  return sel.isCollapsed && block.contains(sel.anchorNode);
 }
 
 /**

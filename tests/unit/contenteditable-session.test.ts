@@ -8,7 +8,9 @@ import {
   editableHost,
   caretAt,
   inputLog,
+  isCaretIn,
   selectedText,
+  THREE_LINES,
   typeNatively,
 } from "./contenteditable";
 import { keyDriver } from "./keys";
@@ -37,8 +39,6 @@ afterEach(() => {
 });
 
 const { keydown, keys } = keyDriver(() => current!.session);
-
-const THREE_LINES = "<p>the quick brown fox</p><p>jumps over the lazy dog</p><p>third line here</p>";
 
 function open(html = THREE_LINES) {
   current = activeHost(html);
@@ -219,9 +219,7 @@ describe("the Normal cursor", () => {
   it("is a collapsed caret on an empty block", () => {
     const { host } = open("<p>one</p><p><br></p><p>three</p>");
     keys("j");
-    const sel = getSelection()!;
-    expect(sel.isCollapsed).toBe(true);
-    expect(host.children[1]!.contains(sel.anchorNode)).toBe(true);
+    expect(isCaretIn(host.children[1]!)).toBe(true);
   });
 });
 

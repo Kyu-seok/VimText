@@ -1,5 +1,13 @@
-import { test, expect, statusText, ready, activateAtStart, blockTexts } from "./extension";
-import type { Page } from "@playwright/test";
+import {
+  test,
+  expect,
+  statusText,
+  ready,
+  activateAtStart,
+  blockTexts,
+  hostCount,
+  selectedText,
+} from "./extension";
 
 /**
  * A contenteditable inside a web component's open shadow root (#50) through
@@ -15,39 +23,27 @@ test.beforeEach(async ({ page }) => {
   await ready(page);
 });
 
-/** What the selection inside the component's shadow root covers (the document's is retargeted to the component). */
-function shadowSelectedText(page: Page): Promise<string> {
-  return page.evaluate(() => {
-    const root = document.getElementById("editor")!.shadowRoot as ShadowRoot & { getSelection(): Selection };
-    return root.getSelection().toString();
-  });
-}
-
-function hostCount(page: Page): Promise<number> {
-  return page.evaluate(() => document.querySelectorAll("vimtext-status").length);
-}
-
 test("Esc Activates on the host in the shadow root; motions move the Normal cursor drawn inside it", async ({
   page,
 }) => {
   await activateAtStart(page, "#ce");
   await expect(page.locator("#log")).toBeEmpty();
-  expect(await shadowSelectedText(page)).toBe("t");
+  expect(await selectedText(page, "#editor")).toBe("t");
   await page.keyboard.type("ww");
-  expect(await shadowSelectedText(page)).toBe("b"); // into the bold run
+  expect(await selectedText(page, "#editor")).toBe("b"); // into the bold run
   await page.keyboard.type("j$");
-  expect(await shadowSelectedText(page)).toBe("g");
+  expect(await selectedText(page, "#editor")).toBe("g");
   await page.keyboard.type("G0");
-  expect(await shadowSelectedText(page)).toBe("l");
+  expect(await selectedText(page, "#editor")).toBe("l");
   await page.keyboard.type("gg");
-  expect(await shadowSelectedText(page)).toBe("t");
+  expect(await selectedText(page, "#editor")).toBe("t");
 });
 
 test("Visual selects inside the shadow tree", async ({ page }) => {
   await activateAtStart(page, "#ce");
   await page.keyboard.type("vee");
   expect(await statusText(page)).toContain("VISUAL");
-  expect(await shadowSelectedText(page)).toBe("the quick");
+  expect(await selectedText(page, "#editor")).toBe("the quick");
 });
 
 test("x dw cw dd o land as editing commands; u walks them back", async ({ page }) => {
