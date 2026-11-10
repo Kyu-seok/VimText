@@ -5,11 +5,19 @@ VimText is a Chrome extension that gives Vim's modal editing to the text fields 
 ## Language
 
 **Field**:
-An editable element on a web page that VimText can attach to, such as a textarea, a single-line text input, or (later) a contenteditable region.
+An editable element on a web page that VimText can attach to: a textarea, a single-line text input, or a contenteditable Field. To Vim every Field is plain text; formatting is not part of it.
 _Avoid_: input, element, editor, box
 
+**contenteditable Field**:
+A Field that is one editing host: the outermost editable element of a rich-text region, such as Gmail's compose body or Stack Overflow's answer editor. Its text is its plain text, each block a line; regions marked non-editable inside it belong to it. A page that makes every block its own editing host (Notion) has one Field per block.
+_Avoid_: rich-text field, contenteditable region, editor
+
+**Atom**:
+Something inside a contenteditable Field that is not text but sits in it like a character: a mention chip, an inline image, a non-editable island. To Vim it is one character; yanked, it is its visible text.
+_Avoid_: embed, node, widget, chip
+
 **Single-line Field**:
-A Field that cannot hold a newline, such as a text, search, url, email or tel input. Commands that would open a new line have nowhere to go on it.
+A Field that cannot hold a newline: a text, search, url, email or tel input, or a contenteditable Field that declares itself single-line. Commands that would open a new line have nowhere to go on it.
 _Avoid_: single-line input, input field, one-line box
 
 **Controlled Field**:
