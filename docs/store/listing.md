@@ -12,6 +12,10 @@ host match in `manifest.json` is justified below (`tests/node/summary.test.ts`,
 
 **Name:** VimText
 
+**Store icon:** `icon-128.png` beside this file: 128×128, the 96×96 artwork centred in 16px of
+transparent padding, as the store asks. `icon.svg` is its source, rendered with Playwright's
+Chromium at 1×; the extension's own `icons/` are drawn by `tools/make-icons.mjs`.
+
 **Summary** (132 characters at most; this exact sentence is the manifest's `description`,
 so Chrome and the store page show the same words):
 

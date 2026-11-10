@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Chrome Web Store icon: 96x96 artwork centred in 16px of transparent padding.
+       The extension's own green tile and light block cursor, set on lines of text. -->
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#11845f"/>
+      <stop offset="1" stop-color="#0a5c42"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#000" flood-opacity=".28"/>
+    </filter>
+  </defs>
+  <rect x="16" y="16" width="96" height="96" rx="22" fill="url(#tile)" filter="url(#shadow)"/>
+  <rect x="16.5" y="16.5" width="95" height="95" rx="21.5" fill="none" stroke="#fff" stroke-opacity=".12"/>
+  <g fill="#e1f5eb" fill-opacity=".5">
+    <rect x="31" y="37" width="30" height="8" rx="4"/>
+    <rect x="65" y="37" width="32" height="8" rx="4"/>
+    <rect x="31" y="59" width="22" height="8" rx="4"/>
+    <rect x="72" y="59" width="16" height="8" rx="4"/>
+    <rect x="31" y="81" width="44" height="8" rx="4"/>
+  </g>
+  <rect x="56" y="53" width="13" height="20" rx="2" fill="#e1f5eb"/>
+</svg>
