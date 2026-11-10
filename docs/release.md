@@ -7,6 +7,8 @@ Terms as in `GLOSSARY.md`; the decisions behind this procedure are in spec #27.
 
 ## Procedure
 
+A store release is gated by the [dogfooding pass](#dogfooding-pass) on the build from `main`.
+
 1. **Bump both versions.** `manifest.json` and `package.json` each keep a version, bumped by
    hand. `npm test` (the Node project, `tests/node/versions.test.ts`) refuses a commit that
    bumps one and not the other.
@@ -16,7 +18,9 @@ Terms as in `GLOSSARY.md`; the decisions behind this procedure are in spec #27.
    `git tag -a v<version>` and write the notes in the editor (or `-F <file>`). The notes are
    drafted in `docs/store/announcements.md` (ticket #32); the tag message is what the Release
    shows as its body, so write it for the reader of the Releases page. A change to
-   `PRIVACY.md` is noted here.
+   `PRIVACY.md` is noted here. The tag message never changes after the push, so the notes
+   name only what exists at tag time: no store URL before the first upload
+   (`tests/node/release-notes.test.ts` refuses a `<PLACEHOLDER>` token).
 4. **Push the commit, then the tag**: `git push && git push origin v<version>`. The pre-push
    hook runs the gate locally; the workflow runs it again on the runner, then
    `npm run package -- --expect-tag v<version>`, then `gh release create` with the zip
@@ -30,6 +34,42 @@ A tag is cut once. If the store rejects the submission, fix the finding and ship
 **next patch version** (`0.3.0` rejected becomes `0.3.1`): bump, commit, tag, push again. Never
 delete and re-cut a tag: the tag, the Release and the uploaded zip must always agree, and the
 store never sees a version twice.
+
+## Dogfooding pass
+
+The submission gate for a store release (DESIGN.md "Milestones" holds the blocker rule: a
+finding that corrupts text, traps the page or throws blocks; anything else is filed
+`needs-triage`). One comment per site on the gate ticket.
+
+**Load the build under test.** `npm run build`, reload VimText in `chrome://extensions`, then
+refresh every tab you test in: a tab open before the reload keeps the old content script, or
+none. In the 0.3.0 pass a stale tab read as "GitHub does not work".
+
+**On each site,** in the box named below, with the console open:
+
+1. Type two lines (one where Enter submits); Esc shows `--NORMAL--` under the box.
+2. `gg` `dd` (one line: `0dw`); `u` restores it.
+3. Visual: `j w v e d` (one line: `w v e d`) deletes one word.
+4. `i`, a word, Esc: inserted at the cursor.
+5. Copy text elsewhere on a page; `"+p` pastes it after the cursor.
+6. Submit with the site's own button; the posted text is what Vim would leave.
+7. No console errors.
+
+**Which box, per site** (re-check when a site redesigns):
+
+- **GitHub**: the issue or PR comment box, a `<textarea>`.
+- **Hacker News**: the reply box on a recent item (old items are closed to replies), a `<textarea>`.
+- **Stack Overflow**: the "Add a comment" box, a `<textarea>`; Enter submits it, so one line;
+  commenting on others' posts needs 50 reputation. The answer editor is the Stacks Editor
+  (ProseMirror, contenteditable): an M4 case, not a finding.
+- **Reddit**: the comment composer is rich text (contenteditable, M4) and its Markdown switch
+  was not found in 2026-11; `old.reddit.com` has a `<textarea>`. Claude in Chrome cannot open
+  reddit.com.
+
+**An agent driving the pass** (Claude in Chrome): focus the box with `element.focus()` from
+the page's JavaScript, not a coordinate click (a late layout shift sent keys to the page),
+send keys, and assert the Field's `.value` after each step. Posting publicly is the user's
+call; ask before step 6.
 
 ## The package script
 
