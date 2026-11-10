@@ -1,6 +1,6 @@
 import { EditorState, type Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { history } from "@codemirror/commands";
+import { history, undo, undoDepth } from "@codemirror/commands";
 import { vim, getCM, Vim } from "@replit/codemirror-vim";
 import type { WrappingStyle } from "../field/Field";
 import { modeFromEngine, type Mode } from "./mode";
@@ -200,6 +200,22 @@ export class Mirror {
     if (!vim.status.includes(pluginKey)) return;
     vim.status = vim.status.split(pluginKey).join(typed);
     this.plugin.updateStatus();
+  }
+
+  /** How many undo steps the mirror's history holds; the bridge notes it whenever it agrees with the Field. */
+  undoDepth(): number {
+    return undoDepth(this.view.state);
+  }
+
+  /**
+   * Takes back the changes made since the history held `depth` steps, as `u`
+   * would, so no later `u` finds them (a refused edit, #48). With no new step
+   * the change joined the last one (docs/engine-seams.md "History grouping"),
+   * which goes too: the caller writes back what of it the Field kept.
+   */
+  undoSince(depth: number): void {
+    let steps = Math.max(1, undoDepth(this.view.state) - depth);
+    while (steps-- > 0 && undo(this.view));
   }
 
   /** Runs an ex command line (without the leading colon). */

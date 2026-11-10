@@ -10,6 +10,8 @@ import { ContentEditableField } from "./ContentEditableField";
  */
 export interface ResolvedField {
   readonly element: HTMLElement;
+  /** Whether the Field it makes is a Single-line Field: a Session made for the other kind no longer fits. */
+  readonly singleLine: boolean;
   create(): Field;
 }
 
@@ -44,6 +46,14 @@ function editingHost(target: EventTarget | null): HTMLElement | null {
 }
 
 /**
+ * A host is a Single-line Field only when it says so (DESIGN.md
+ * "contenteditable Fields", _Single-line_): no guessing from height or role.
+ */
+function declaresSingleLine(host: HTMLElement): boolean {
+  return host.getAttribute("aria-multiline") === "false";
+}
+
+/**
  * The one decision of whether an event target is a Field and which kind:
  * every entry point (focus, keydown, the lifecycle observer, the popup's Mode
  * lookup) asks this, so a new Field kind is one more branch here. Null when
@@ -51,8 +61,17 @@ function editingHost(target: EventTarget | null): HTMLElement | null {
  * (readonly, disabled, type changed): the lifecycle observer disposes on that.
  */
 export function resolveField(target: EventTarget | null): ResolvedField | null {
-  if (isTextControl(target)) return { element: target, create: () => new TextareaField(target) };
+  if (isTextControl(target)) {
+    return {
+      element: target,
+      singleLine: target instanceof HTMLInputElement,
+      create: () => new TextareaField(target),
+    };
+  }
   const host = editingHost(target);
-  if (host) return { element: host, create: () => new ContentEditableField(host) };
+  if (host) {
+    const singleLine = declaresSingleLine(host);
+    return { element: host, singleLine, create: () => new ContentEditableField(host, singleLine) };
+  }
   return null;
 }

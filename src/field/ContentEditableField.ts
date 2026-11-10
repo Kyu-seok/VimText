@@ -57,7 +57,6 @@ function keepAdjacentSpaces(
  * browser's editing commands (`replaceDomRange`), never by mutating the DOM.
  */
 export class ContentEditableField implements Field {
-  readonly singleLine = false;
   private writing = false;
   private inputHandlers = new Set<() => void>();
   /** The last selection set or read inside the host, answered while the native one is elsewhere. */
@@ -66,7 +65,14 @@ export class ContentEditableField implements Field {
   private removedAtoms: RemovedAtom[] = [];
   private writeSeq = 0;
 
-  constructor(readonly element: HTMLElement) {
+  /**
+   * `singleLine` is the host's own declaration (`aria-multiline="false"`),
+   * decided by `resolveField`: the Session then applies every Single-line rule.
+   */
+  constructor(
+    readonly element: HTMLElement,
+    readonly singleLine = false,
+  ) {
     element.addEventListener("input", this.handleInput);
   }
 
