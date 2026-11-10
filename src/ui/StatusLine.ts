@@ -86,17 +86,24 @@ export class StatusLine {
   /**
    * Below the Field when the strip fits in the viewport there, above it
    * otherwise (a Field flush with the bottom of a short iframe), and below
-   * again when neither fits.
+   * again when neither fits. A Field too tall for the Field and the strip to
+   * fit in the viewport gets the strip pinned to the viewport's bottom edge
+   * (below the Field once its bottom edge is scrolled into view), hidden while
+   * the Field is off screen. The viewport is this frame's own.
    */
   reposition = (): void => {
     if (!this.visible) return;
     const r = this.field.element.getBoundingClientRect();
     const wrap = this.bar.parentElement!;
     const height = this.bar.offsetHeight;
-    const above = r.bottom + height > window.innerHeight && r.top - height >= 0;
+    const viewport = window.innerHeight;
+    const pinned = r.height + height > viewport;
+    const above = !pinned && r.bottom + height > viewport && r.top - height >= 0;
+    const onScreen = r.bottom > 0 && r.top < viewport;
+    wrap.style.visibility = pinned && !onScreen ? "hidden" : "";
     wrap.classList.toggle("above", above);
     wrap.style.left = `${r.left}px`;
-    wrap.style.top = `${above ? r.top - height : r.bottom}px`;
+    wrap.style.top = `${pinned ? Math.min(r.bottom, viewport - height) : above ? r.top - height : r.bottom}px`;
     wrap.style.width = `${r.width}px`;
     this.mirrorContainer.style.height = `${Math.max(16, r.height)}px`;
   };
