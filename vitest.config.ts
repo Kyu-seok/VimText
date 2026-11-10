@@ -2,9 +2,10 @@ import { defineConfig } from "vitest/config";
 
 // `npm test` runs two projects. Sync-layer tests run in real Chromium: textarea
 // selection and layout are not trustworthy in jsdom. Repo-wide consistency
-// checks (versions agree, the manifest matches its docs, the package script)
-// run in Node: they read files and spawn processes, which a browser cannot.
-// Adding a Node check is one file: `tests/node/<name>.test.ts`.
+// checks run in Node: they read files and spawn processes, which a browser
+// cannot. CODING_STANDARDS.md ("Mechanical") lists them. Adding a Node check is
+// one file: `tests/node/<name>.test.ts`; `tests/node/setup.ts` clears the git
+// hook's GIT_* variables before any of them runs.
 export default defineConfig({
   test: {
     projects: [
@@ -26,6 +27,7 @@ export default defineConfig({
           name: "node",
           include: ["tests/node/**/*.test.ts"],
           environment: "node",
+          setupFiles: ["tests/node/setup.ts"],
         },
       },
     ],
