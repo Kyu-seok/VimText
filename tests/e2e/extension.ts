@@ -104,7 +104,8 @@ export async function activateAtStart(page: Page, selector = "#in"): Promise<voi
     else el.ownerDocument.getSelection()!.collapse(el, 0);
   });
   await page.keyboard.press("Escape");
-  base.expect(await statusText(page)).toContain("NORMAL");
+  // An Esc before the settings load arrive Activates when they do (Sessions).
+  await base.expect.poll(() => statusText(page)).toContain("NORMAL");
 }
 
 /** The text of each direct child block of a contenteditable host, a no-break space read as the space it renders as. */
