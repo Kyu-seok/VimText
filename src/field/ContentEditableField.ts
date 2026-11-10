@@ -5,12 +5,14 @@ import { readDomSelection, selectDom } from "./domSelection";
 import { insertAtomHtml, replaceDomRange } from "./editingCommands";
 import { ATOM_CHAR, atomText } from "./atoms";
 
-/** An Atom a write removed, kept so an undo that writes its U+FFFC back can restore the element. */
+/**
+ * An Atom a write or the page's own editing removed, kept so an undo that
+ * writes its U+FFFC back can restore the element.
+ */
 interface RemovedAtom {
   html: string;
-  /** Its offset when removed, and the write's sequence number: the order a restore puts several back in. */
+  /** Its offset when removed: an undo writes its U+FFFC back at that same offset. */
   offset: number;
-  seq: number;
 }
 
 /** Holds an Atom's place while it is inserted (see `insertAtom`). */
@@ -92,9 +94,10 @@ export class ContentEditableField implements Field {
   private inputHandlers = new Set<() => void>();
   /** The last selection set or read inside the host, answered while the native one is elsewhere. */
   private lastSelection: FieldSelection = { anchor: 0, head: 0 };
-  /** Atoms the bridge's writes removed, oldest first. */
+  /** Atoms removed from the host, oldest first. */
   private removedAtoms: RemovedAtom[] = [];
-  private writeSeq = 0;
+  /** The Atoms at the last read, so the page's own edit that removes one (an Insert-mode Backspace) is noticed. */
+  private knownAtoms: { element: Element; offset: number }[] = [];
 
   /**
    * `singleLine` is the host's own declaration (`aria-multiline="false"`),
@@ -105,12 +108,23 @@ export class ContentEditableField implements Field {
     readonly singleLine = false,
   ) {
     element.addEventListener("input", this.handleInput);
+    this.noteAtoms(project(element));
   }
 
   private handleInput = () => {
     if (this.writing) return;
+    const projection = project(this.element);
+    const present = new Set(projection.atoms.map((a) => a.element));
+    for (const a of this.knownAtoms) {
+      if (!present.has(a.element)) this.keepRemovedAtom(a.element, a.offset);
+    }
+    this.noteAtoms(projection);
     for (const h of this.inputHandlers) h();
   };
+
+  private noteAtoms(projection: Projection): void {
+    this.knownAtoms = projection.atoms.map((a) => ({ element: a.element, offset: a.offset }));
+  }
 
   getValue(): string {
     return project(this.element).text;
@@ -123,7 +137,7 @@ export class ContentEditableField implements Field {
     const span = breakAtLineEnd(old, keepAdjacentSpaces(old, diffText(old, text), text));
     this.writing = true;
     try {
-      const restored = this.takeRemovedAtoms(span.insert.split(ATOM_CHAR).length - 1);
+      const restored = this.takeRemovedAtoms(span.from, span.insert);
       this.keepRemovedAtoms(projection, span.from, span.to);
       if (!span.insert.includes(ATOM_CHAR)) {
         replaceDomRange(this.element, projection.toDom(span.from), projection.toDom(span.to), span.insert);
@@ -132,44 +146,55 @@ export class ContentEditableField implements Field {
       }
     } finally {
       this.writing = false;
+      this.noteAtoms(project(this.element));
     }
   }
 
   /** The Atoms in the text: each one's offset and the visible text a yank stores for it. */
   atoms(): { offset: number; text: string }[] {
-    return project(this.element).atoms.map((a) => ({ offset: a.offset, text: atomText(a.element) }));
+    const projection = project(this.element);
+    this.noteAtoms(projection);
+    return projection.atoms.map((a) => ({ offset: a.offset, text: atomText(a.element) }));
   }
 
   /**
    * Remembers the Atoms between `from` and `to` before a write removes them.
    * The engine's history holds only their U+FFFC, so this is where an undo
-   * finds the element again: a restore takes the latest removals, in the
-   * order a stack of undos gives them back.
+   * finds the element again.
    */
   private keepRemovedAtoms(projection: Projection, from: number, to: number): void {
-    const seq = ++this.writeSeq;
     for (const a of projection.atoms) {
-      if (a.offset >= from && a.offset < to)
-        this.removedAtoms.push({ html: a.element.outerHTML, offset: a.offset, seq });
+      if (a.offset >= from && a.offset < to) this.keepRemovedAtom(a.element, a.offset);
     }
+  }
+
+  private keepRemovedAtom(element: Element, offset: number): void {
+    this.removedAtoms.push({ html: element.outerHTML, offset });
     this.removedAtoms.splice(0, Math.max(0, this.removedAtoms.length - REMOVED_ATOMS_KEPT));
   }
 
   /**
-   * The markup for `count` U+FFFC a write puts back, in text order: the last
-   * `count` removals, sorted by where they were (a run of `x` removed each at
-   * the same offset, oldest first; `X` walked backwards). Fewer when fewer
-   * were kept: a U+FFFC with no element to restore is written as nothing, and
-   * the Field's text, not the mirror's, then stands (a Controlled Field rewrite).
+   * The markup for each U+FFFC that `insert`, written at `from`, puts back:
+   * the latest Atom removed at that U+FFFC's offset. An undo writes text back
+   * where it was, every later change already undone, so the Atom removed
+   * there is the one the U+FFFC stood for; a run of `x` removed each at the
+   * same offset, and the undoes take them back newest first. A U+FFFC with no
+   * Atom kept at its offset (a literal one, one past the limit) is
+   * `undefined`, written as nothing, and the Field's text, not the mirror's,
+   * then stands (a Controlled Field rewrite).
    */
-  private takeRemovedAtoms(count: number): string[] {
-    if (count === 0) return [];
-    const taken = this.removedAtoms.splice(Math.max(0, this.removedAtoms.length - count));
-    return taken.sort((a, b) => a.offset - b.offset || a.seq - b.seq).map((a) => a.html);
+  private takeRemovedAtoms(from: number, insert: string): (string | undefined)[] {
+    const taken: (string | undefined)[] = [];
+    for (let i = insert.indexOf(ATOM_CHAR); i >= 0; i = insert.indexOf(ATOM_CHAR, i + 1)) {
+      let k = this.removedAtoms.length - 1;
+      while (k >= 0 && this.removedAtoms[k]!.offset !== from + i) k--;
+      taken.push(k < 0 ? undefined : this.removedAtoms.splice(k, 1)[0]!.html);
+    }
+    return taken;
   }
 
-  /** Writes `insert` over `from`..`to`, each U+FFFC as the next of `atoms` (none: nothing). */
-  private writeWithAtoms(from: number, to: number, insert: string, atoms: string[]): void {
+  /** Writes `insert` over `from`..`to`, each U+FFFC as the next of `atoms` (`undefined`: nothing). */
+  private writeWithAtoms(from: number, to: number, insert: string, atoms: (string | undefined)[]): void {
     const [first, ...rest] = insert.split(ATOM_CHAR);
     if (first || from !== to) {
       const p = project(this.element);

@@ -1,6 +1,7 @@
 import { EditorSelection, type Text } from "@codemirror/state";
 import type { Field } from "../field/Field";
 import { diffText } from "../field/diff";
+import { ATOM_CHAR } from "../field/atoms";
 import { Mirror, Vim, type KeyLike } from "../engine/mirror";
 import { engineApi } from "../engine/pluginApi";
 import { vimrcLines } from "../engine/vimrc";
@@ -81,6 +82,17 @@ function fedKey(key: string): KeyLike {
     preventDefault: () => {},
     stopPropagation: () => {},
   };
+}
+
+/**
+ * Whether a write of `text` that left the Field at `before` fell short only by
+ * U+FFFC the Field had no element for (an undo of a literal U+FFFC, or of an
+ * Atom it no longer keeps): the Field wrote what it could, which is not the
+ * page refusing the edit, so it is folded like a Controlled Field's rewrite.
+ */
+function onlyAtomsUnwritten(before: string, text: string): boolean {
+  const count = (s: string) => s.split(ATOM_CHAR).length - 1;
+  return count(text) > count(before) && text.split(ATOM_CHAR).join("") === before.split(ATOM_CHAR).join("");
 }
 
 /** Normal-mode cursors sit on a character, never past the end of a non-empty line. */
@@ -597,7 +609,7 @@ export class Session {
     if (text !== before) {
       this.field.setValue(text);
       const after = this.field.getValue();
-      if (after === before) this.dropRefusedChange();
+      if (after === before && !onlyAtomsUnwritten(before, text)) this.dropRefusedChange();
       // A Controlled Field rewrote the text inside the write; the Field is the truth.
       else if (after !== text) this.withSyncing(() => this.syncFromFieldInner(true));
     }

@@ -61,6 +61,11 @@ export function typeNatively(text: string): void {
   document.execCommand("insertText", false, text);
 }
 
+/** Native Insert-mode Backspace: the editor's own delete before the caret, which fires `input` on the host. */
+export function backspaceNatively(): void {
+  document.execCommand("delete");
+}
+
 /** A Session on a contenteditable host built from `html`, focused with the caret at its start. */
 export function activeHost(html: string, opts: Parameters<typeof editableHost>[1] = {}) {
   const host = editableHost(html, opts);
