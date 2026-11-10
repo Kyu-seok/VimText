@@ -1,0 +1,42 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>VimText fixture: contenteditable in a shadow root</title>
+    <style>
+      body {
+        font-family: system-ui;
+        margin: 40px;
+      }
+      #log {
+        font: 12px monospace;
+        color: #555;
+        white-space: pre;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>VimText fixture: contenteditable in a shadow root</h1>
+    <!-- A web component (as Reddit's composer may be): its editor is a contenteditable inside an open shadow root, styled from inside it. -->
+    <shadow-editor id="editor"></shadow-editor>
+    <div id="log"></div>
+    <script>
+      const log = (line) => (document.getElementById("log").textContent += line + "\n");
+      customElements.define(
+        "shadow-editor",
+        class extends HTMLElement {
+          constructor() {
+            super();
+            const root = this.attachShadow({ mode: "open" });
+            // No whitespace between the host's tags: whitespace is a projection rule of its own.
+            root.innerHTML =
+              "<style>#ce{display:block;width:480px;min-height:120px;padding:4px;border:1px solid #888;font:14px/1.4 Menlo,monospace}#ce p{margin:0}</style>" +
+              '<div id="ce" contenteditable="true"><p>the quick <b>brown</b> fox</p><p>jumps over the lazy dog</p><p>last line</p></div>';
+            const ce = root.getElementById("ce");
+            ce.addEventListener("input", (e) => log(`input:${e.inputType}`));
+          }
+        },
+      );
+    </script>
+  </body>
+</html>

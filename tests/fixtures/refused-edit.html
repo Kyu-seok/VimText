@@ -1,0 +1,45 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>VimText fixture: refused edit</title>
+    <style>
+      body {
+        font-family: system-ui;
+        margin: 40px;
+      }
+      [contenteditable] {
+        width: 480px;
+        min-height: 80px;
+        padding: 4px;
+        border: 1px solid #888;
+        font:
+          14px/1.4 Menlo,
+          monospace;
+      }
+      [contenteditable] p {
+        margin: 0;
+      }
+      .locked {
+        background: #fde68a;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>VimText fixture: refused edit</h1>
+    <!-- An editor that refuses any edit to its locked span: its input handler puts back the last accepted markup, as an editor re-rendering from its own model does. Cancelling beforeinput would not do it: Chrome's editing commands fire none (docs/engine-seams.md "Refused edits"). No whitespace between tags, hence the prettier-ignore. -->
+    <!-- prettier-ignore -->
+    <div id="ce" contenteditable="true"><p>ab<span class="locked">LOCK</span>cd</p><p>next line</p></div>
+    <script>
+      const ce = document.getElementById("ce");
+      const lockedTexts = () => [...ce.querySelectorAll(".locked")].map((s) => s.textContent);
+      const locked = lockedTexts();
+      let accepted = ce.innerHTML;
+      ce.addEventListener("input", () => {
+        const now = lockedTexts();
+        if (now.length === locked.length && now.every((t, i) => t === locked[i])) accepted = ce.innerHTML;
+        else ce.innerHTML = accepted;
+      });
+    </script>
+  </body>
+</html>
