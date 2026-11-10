@@ -1,4 +1,21 @@
-import { test, expect, statusText, ready, activateAtStart, blockTexts, selectedText } from "./extension";
+import {
+  test as base,
+  expect,
+  statusText,
+  ready,
+  activateAtStart,
+  blockTexts,
+  selectedText,
+  fixtureOrigin,
+} from "./extension";
+import type { ContentEditableOption } from "./contenteditable-option";
+
+/**
+ * The host's `contenteditable` value: `true` in the `e2e` project, and the
+ * `e2e plaintext-only` project (playwright.config.ts) reruns this file on a
+ * `plaintext-only` host (#45).
+ */
+const test = base.extend<ContentEditableOption>({ contenteditable: ["true", { option: true }] });
 
 /**
  * Vim on a bare contenteditable of plain blocks (#44, ADR 0007) through the
@@ -9,8 +26,9 @@ import { test, expect, statusText, ready, activateAtStart, blockTexts, selectedT
 
 const ORIGINAL = ["the quick brown fox", "jumps over the lazy dog", "third linefourth line", "", "last line"];
 
-test.beforeEach(async ({ page }) => {
-  await page.goto("/contenteditable.html");
+test.beforeEach(async ({ page, contenteditable }) => {
+  await page.goto(`/contenteditable.html?contenteditable=${contenteditable}`);
+  expect(await page.locator("#ce").getAttribute("contenteditable")).toBe(contenteditable);
   await ready(page);
 });
 
@@ -115,21 +133,39 @@ test("o O and a linewise p make new blocks; dd and J merge them", async ({ page 
   expect(await blockTexts(page, "#ce")).toEqual(["top new", ...ORIGINAL.slice(1), "top"]);
 });
 
-// The edits stay among the <p> blocks: a merge into the <div> moves its first
-// line into the <p> (same text, other markup), which Chrome's innerText reads
-// with a different count of blank lines.
-test("u and Ctrl-r walk VimText's history and restore the text exactly", async ({ page }) => {
+/**
+ * The whole text as Vim sees it, through a `"+` yank of every line: an undo
+ * restores the text, not always the markup (a merge into the <div> moves its
+ * first line into the <p>; on a plaintext-only host a `<br>` is left ending a
+ * block), and `innerText` reads such markup with other blank-line counts.
+ */
+async function vimText(page: import("@playwright/test").Page): Promise<string> {
+  await page.evaluate(() => navigator.clipboard.writeText(""));
+  await page.keyboard.type('gg"+yG');
+  let text = "";
+  await expect
+    .poll(async () => (text = await page.evaluate(() => navigator.clipboard.readText())))
+    .not.toBe("");
+  return text;
+}
+
+test("u and Ctrl-r walk VimText's history and restore the text exactly", async ({ context, page }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: fixtureOrigin });
   await activateAtStart(page, "#ce");
-  const original = await page.locator("#ce").innerText();
+  const original = await vimText(page);
+  expect(original).toBe(
+    "the quick brown fox\njumps over the lazy dog\nthird line\nfourth line\n\nlast line\n",
+  );
   await page.keyboard.type("x");
   await page.keyboard.type("dd");
   await page.keyboard.type("onew");
   await page.keyboard.press("Escape");
-  const edited = await page.locator("#ce").innerText();
+  const edited = await vimText(page);
+  expect(edited).toBe("jumps over the lazy dog\nnew\nthird line\nfourth line\n\nlast line\n");
   await page.keyboard.type("uuu");
-  expect(await page.locator("#ce").innerText()).toBe(original);
+  expect(await vimText(page)).toBe(original);
   for (let i = 0; i < 3; i++) await page.keyboard.press("Control+r");
-  expect(await page.locator("#ce").innerText()).toBe(edited);
+  expect(await vimText(page)).toBe(edited);
 });
 
 test("typing in Insert re-projects; an outside DOM change is picked up on the next key", async ({ page }) => {
