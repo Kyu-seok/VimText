@@ -1,0 +1,92 @@
+<!doctype html><meta charset="utf-8" /><link rel="stylesheet" href="style.css" />
+<style>
+  body {
+    padding: 0 90px;
+    gap: 70px;
+  }
+  .left {
+    flex: 1 1 0;
+  }
+  .head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: -24px;
+  }
+  img {
+    width: 192px;
+    height: 192px;
+  }
+  .name {
+    font-size: 96px;
+  }
+  .tag {
+    font-size: 34px;
+    margin: 18px 0 30px;
+    color: #c9d8cf;
+    max-width: 560px;
+  }
+  .chip {
+    font-size: 20px;
+    padding: 6px 14px;
+  }
+  .card {
+    flex: none;
+    width: 600px;
+    padding: 26px;
+    transform: rotate(-1.5deg);
+  }
+  .who {
+    font:
+      600 18px -apple-system,
+      Arial,
+      sans-serif;
+    margin-bottom: 14px;
+    color: #59636e;
+  }
+  .field {
+    font-size: 21px;
+    line-height: 1.6;
+    padding: 16px 18px;
+    border-radius: 8px 8px 0 0;
+  }
+  .status {
+    font-size: 17px;
+    padding: 6px 14px;
+  }
+  .status span:last-child {
+    color: var(--green);
+  }
+  .btn {
+    margin: 18px 0 0 auto;
+    width: max-content;
+    background: #1f883d;
+    color: #fff;
+    font:
+      600 18px -apple-system,
+      Arial,
+      sans-serif;
+    padding: 9px 20px;
+    border-radius: 8px;
+  }
+</style>
+<div class="left">
+  <div class="head">
+    <img src="../icon.svg" alt="" />
+    <div class="name">Vim<b>Text</b></div>
+  </div>
+  <div class="tag">Press Esc in a comment box and edit it like Vim. The page keeps its own field.</div>
+  <div class="chips">
+    <span class="chip">hjkl</span><span class="chip alt">ciw</span><span class="chip alt">dd</span
+    ><span class="chip alt">"+p</span><span class="chip alt">:s/a/b/g</span>
+  </div>
+</div>
+<div class="card">
+  <div class="who">Add a comment</div>
+  <div class="field">
+    Thanks for the review! The <span class="vis">retry loop now backs of</span
+    ><span class="cur">f</span> before the second request.
+  </div>
+  <div class="status"><span>--VISUAL--</span><span>c</span></div>
+  <div class="btn">Comment</div>
+</div>
