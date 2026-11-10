@@ -1,0 +1,57 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>VimText fixture: aria-multiline contenteditable</title>
+    <style>
+      body {
+        font-family: system-ui;
+        margin: 40px;
+      }
+      [contenteditable] {
+        width: 480px;
+        padding: 4px;
+        border: 1px solid #888;
+        font:
+          14px/1.4 Menlo,
+          monospace;
+      }
+      [contenteditable] p {
+        margin: 0;
+      }
+      #body {
+        min-height: 80px;
+      }
+      #log {
+        font: 12px monospace;
+        color: #555;
+        white-space: pre;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>VimText fixture: aria-multiline contenteditable</h1>
+    <!-- A title field in a form: a contenteditable that declares itself single-line, as a title or search box on an editor page does. Enter submits through the page's own handler, which leaves alone an Enter something else already took. Markup kept free of whitespace between tags. -->
+    <form
+      id="form"
+      onsubmit="
+        event.preventDefault();
+        document.getElementById('log').textContent += 'submit\n';
+      "
+    >
+      <!-- prettier-ignore -->
+      <div id="title" contenteditable="true" role="textbox" aria-multiline="false"><p>hello world</p></div>
+      <!-- The same host without the attribute: multi-line. -->
+      <!-- prettier-ignore -->
+      <div id="body" contenteditable="true" role="textbox"><p>hello world</p></div>
+    </form>
+    <div id="log"></div>
+    <script>
+      document.getElementById("title").addEventListener("keydown", (e) => {
+        if (e.key !== "Enter" || e.defaultPrevented) return;
+        e.preventDefault();
+        document.getElementById("form").requestSubmit();
+      });
+    </script>
+  </body>
+</html>
