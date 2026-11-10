@@ -37,6 +37,9 @@
       const log = (line) => (document.getElementById("log").textContent += line + "\n");
       // What the page's editor would see of each edit.
       const ce = document.getElementById("ce");
+      // `?contenteditable=plaintext-only` reruns the same cases on a plaintext-only host (#45).
+      const mode = new URLSearchParams(location.search).get("contenteditable");
+      if (mode) ce.setAttribute("contenteditable", mode);
       ce.addEventListener("beforeinput", (e) => log(`beforeinput:${e.inputType}`));
       ce.addEventListener("input", (e) => log(`input:${e.inputType}`));
       document.addEventListener("keydown", (e) => {
