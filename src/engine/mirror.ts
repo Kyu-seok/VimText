@@ -1,8 +1,9 @@
-import { EditorState, type Extension } from "@codemirror/state";
+import { EditorSelection, EditorState, type Extension, type Text } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { history, undo, undoDepth } from "@codemirror/commands";
 import { vim, getCM, Vim } from "@replit/codemirror-vim";
 import type { WrappingStyle } from "../field/Field";
+import { diffText } from "../field/diff";
 import { modeFromEngine, type Mode } from "./mode";
 import { atomTable, installAtomRegisters, noteRead, sameAtoms, setAtoms, type AtomAt } from "./atoms";
 
@@ -71,6 +72,13 @@ interface MirrorOptions {
   style: WrappingStyle;
   /** Element the engine renders mode text, pending keys, and dialogs into. */
   statusbar: HTMLElement;
+}
+
+/** Normal-mode cursors sit on a character, never past the end of a non-empty line. */
+export function clipToLine(doc: Text, pos: number): number {
+  pos = Math.max(0, Math.min(doc.length, pos));
+  const line = doc.lineAt(pos);
+  return pos === line.to && line.length > 0 ? pos - 1 : pos;
 }
 
 /**
@@ -213,9 +221,34 @@ export class Mirror {
    * the change joined the last one (docs/engine-seams.md "History grouping"),
    * which goes too: the caller writes back what of it the Field kept.
    */
-  undoSince(depth: number): void {
+  private undoSince(depth: number): void {
     let steps = Math.max(1, undoDepth(this.view.state) - depth);
     while (steps-- > 0 && undo(this.view));
+  }
+
+  /**
+   * Takes back the changes since `depth` (`undoSince`) and makes the text
+   * `kept`, the part of a joined step the Field did keep, in a step of its
+   * own, the Normal cursor where the taken-back command left it. The undo
+   * restores the selection the command started from (`x`'s covers its
+   * character, which the engine would take for Visual), so the cursor is
+   * dispatched in the same breath (docs/engine-seams.md "Taking a change back").
+   */
+  takeBackSince(depth: number, kept: string): void {
+    const head = this.view.state.selection.main.head;
+    this.undoSince(depth);
+    const state = this.view.state;
+    const doc = state.doc.toString();
+    const { start, endOld, endNew } = diffText(doc, kept);
+    const changes = state.changes(
+      kept === doc ? [] : { from: start, to: endOld, insert: kept.slice(start, endNew) },
+    );
+    const newDoc = changes.apply(state.doc);
+    this.view.dispatch({
+      changes,
+      selection: EditorSelection.cursor(clipToLine(newDoc, Math.min(head, newDoc.length))),
+      userEvent: "input.type",
+    });
   }
 
   /** Runs an ex command line (without the leading colon). */

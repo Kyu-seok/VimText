@@ -1,13 +1,7 @@
-import { test, expect, statusText, contentStatus, activateAtStart, ready } from "./extension";
-import type { Page } from "@playwright/test";
+import { test, expect, statusText, contentStatus, activateAtStart, ready, hostCount } from "./extension";
 
 // Disposal is prompt: a Session ends the moment its Field leaves the page or
 // stops qualifying, not on the next focus change elsewhere (decision record on issue #8).
-
-/** How many Status Line hosts VimText has on the page; one per live Session. */
-function hostCount(page: Page): Promise<number> {
-  return page.evaluate(() => document.querySelectorAll("vimtext-status").length);
-}
 
 test.describe("textarea fixture", () => {
   test.beforeEach(async ({ page }) => {

@@ -1,6 +1,14 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { ContentEditableField } from "../../src/field/ContentEditableField";
-import { blockTexts, caretAt, editableHost, inputLog, selectedText, typeNatively } from "./contenteditable";
+import {
+  blockTexts,
+  caretAt,
+  editableHost,
+  inputLog,
+  isCaretIn,
+  selectedText,
+  typeNatively,
+} from "./contenteditable";
 
 /**
  * A contenteditable Field at the `Field` seam (ADR 0007): its text is the
@@ -46,9 +54,7 @@ describe("ContentEditableField", () => {
   it("an empty line's cursor is a collapsed caret in its block", () => {
     const { host, field } = fieldOn("<p>a</p><p><br></p><p>b</p>");
     field.setSelection(2, 2);
-    const sel = getSelection()!;
-    expect(sel.isCollapsed).toBe(true);
-    expect(host.children[1]!.contains(sel.anchorNode)).toBe(true);
+    expect(isCaretIn(host.children[1]!)).toBe(true);
     expect(field.getSelection()).toEqual({ anchor: 2, head: 2 });
   });
 

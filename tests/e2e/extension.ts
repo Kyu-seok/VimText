@@ -115,9 +115,25 @@ export function blockTexts(page: Page | Frame, selector: string): Promise<string
     .evaluate((el) => [...el.children].map((c) => (c.textContent ?? "").replace(/\u00a0/g, " ")));
 }
 
-/** The text the native selection covers in that page or frame: a Normal-mode cursor's character. */
-export function selectedText(page: Page | Frame): Promise<string> {
-  return page.evaluate(() => document.getSelection()?.toString() ?? "");
+/**
+ * The text the native selection covers in that page or frame: a Normal-mode
+ * cursor's character. With `shadowHost`, the selection inside that element's
+ * open shadow root, read through Chromium's `ShadowRoot.getSelection`: the
+ * document's selection is retargeted to the host there.
+ */
+export function selectedText(page: Page | Frame, shadowHost?: string): Promise<string> {
+  return page.evaluate((hostSelector) => {
+    if (!hostSelector) return document.getSelection()?.toString() ?? "";
+    const root = document.querySelector(hostSelector)!.shadowRoot as ShadowRoot & {
+      getSelection(): Selection;
+    };
+    return root.getSelection().toString();
+  }, shadowHost);
+}
+
+/** How many Status Line hosts VimText has on the page; one per live Session. */
+export function hostCount(page: Page | Frame): Promise<number> {
+  return page.evaluate(() => document.querySelectorAll("vimtext-status").length);
 }
 
 /** What the content script of a tab's top frame reports (the popup's `vimtext:status` query). */

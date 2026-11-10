@@ -8,7 +8,9 @@ import {
   editableHost,
   caretAt,
   inputLog,
+  isCaretIn,
   selectedText,
+  THREE_LINES,
   typeNatively,
 } from "./contenteditable";
 import { keyDriver } from "./keys";
@@ -21,9 +23,9 @@ import { controlledPort, settingsFor } from "./settings-port";
  * the page: the host's blocks, the events its editor sees, the native
  * selection and the Status Line.
  *
- * Coverage (CODING_STANDARDS rule 5): Normal, Visual and Insert on a
- * contenteditable host in the document. Replace mode and a host in a shadow
- * root are the shadow-root and later tickets' (#50).
+ * Coverage (CODING_STANDARDS rule 5): Normal, Visual, Insert and Replace on a
+ * contenteditable host in the document. A host in an open shadow root is
+ * `contenteditable-shadow.test.ts` (#50).
  */
 
 let current: ReturnType<typeof activeHost> | null = null;
@@ -37,8 +39,6 @@ afterEach(() => {
 });
 
 const { keydown, keys } = keyDriver(() => current!.session);
-
-const THREE_LINES = "<p>the quick brown fox</p><p>jumps over the lazy dog</p><p>third line here</p>";
 
 function open(html = THREE_LINES) {
   current = activeHost(html);
@@ -219,9 +219,20 @@ describe("the Normal cursor", () => {
   it("is a collapsed caret on an empty block", () => {
     const { host } = open("<p>one</p><p><br></p><p>three</p>");
     keys("j");
-    const sel = getSelection()!;
-    expect(sel.isCollapsed).toBe(true);
-    expect(host.children[1]!.contains(sel.anchorNode)).toBe(true);
+    expect(isCaretIn(host.children[1]!)).toBe(true);
+  });
+});
+
+describe("Replace mode", () => {
+  it("R overwrites characters in place, inside the bold run they were in; Esc and u bring the old text back", () => {
+    const { host } = open("<p>the <b>quick</b> brown fox</p><p>jumps</p>");
+    keys("wRQU");
+    expect(statusText()).toContain("REPLACE");
+    expect(host.querySelector("b")?.textContent).toBe("QUick");
+    expect(blockTexts(host)).toEqual(["the QUick brown fox", "jumps"]);
+    keydown("Escape");
+    keys("u");
+    expect(blockTexts(host)).toEqual(["the quick brown fox", "jumps"]);
   });
 });
 

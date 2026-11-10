@@ -1,6 +1,14 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { Sessions } from "../../src/content/Sessions";
-import { activeHost, blockTexts, editableHost, typeNatively } from "./contenteditable";
+import {
+  activeHost,
+  blockTexts,
+  editableHost,
+  selectedText,
+  selectionOf,
+  THREE_LINES,
+  typeNatively,
+} from "./contenteditable";
 import { keyDriver } from "./keys";
 import { hostCount, keydown as keydownOn, settle, statusText } from "./dom";
 import { controlledPort, settingsFor } from "./settings-port";
@@ -26,13 +34,6 @@ afterEach(() => {
 
 const { keydown, keys } = keyDriver(() => current!.session);
 
-const THREE_LINES = "<p>the quick brown fox</p><p>jumps over the lazy dog</p><p>third line here</p>";
-
-/** Chromium's `ShadowRoot.getSelection`, not in the DOM typings. */
-function selectionOf(root: ShadowRoot): Selection {
-  return (root as ShadowRoot & { getSelection(): Selection }).getSelection();
-}
-
 /** A Session on a host in a fresh open shadow root, focused with the caret at its start. */
 function open(html = THREE_LINES) {
   component = document.createElement("div");
@@ -45,11 +46,11 @@ function open(html = THREE_LINES) {
 describe("a contenteditable host in an open shadow root", () => {
   it("the Normal cursor is the selection of the character under it, inside the shadow tree", () => {
     const { root } = open();
-    expect(selectionOf(root).toString()).toBe("t");
+    expect(selectedText(root)).toBe("t");
     keys("w");
-    expect(selectionOf(root).toString()).toBe("q");
+    expect(selectedText(root)).toBe("q");
     keys("j");
-    expect(selectionOf(root).toString()).toBe("s");
+    expect(selectedText(root)).toBe("s");
   });
 
   it("reads a caret the page put inside the shadow tree", () => {
@@ -62,7 +63,7 @@ describe("a contenteditable host in an open shadow root", () => {
   it("Visual selects inside the shadow tree", () => {
     const { root } = open();
     keys("ve");
-    expect(selectionOf(root).toString()).toBe("the");
+    expect(selectedText(root)).toBe("the");
   });
 
   it("x dw cw dd o and u edit the blocks through editing commands", () => {

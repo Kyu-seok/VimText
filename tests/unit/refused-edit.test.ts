@@ -16,9 +16,9 @@ import { statusText } from "./dom";
  * handler puts back its last accepted markup when an edit touched a locked
  * span, as an editor re-rendering from its own model does.
  *
- * Coverage (CODING_STANDARDS rule 5): Normal, Visual and Insert (a `Ctrl-r`
+ * Coverage (CODING_STANDARDS rule 5): Normal, Visual, Insert (a `Ctrl-r`
  * paste) on a contenteditable host; Normal on a textarea-like Field whose page
- * reverts the write. Replace mode goes through the same Insert path.
+ * reverts the write. Replace (`R` over the span) is folded on the Insert path.
  */
 
 const REFUSED = "VimText: the page refused the edit";
@@ -132,6 +132,18 @@ describe("A refused edit on a contenteditable host", () => {
     expect(blockTexts(host)).toEqual(["abLOCKcd", "next line"]);
     expect(session.mode).toBe("insert");
     expect(statusText()).toContain(REFUSED);
+  });
+
+  it("in Replace, a character typed over the span is refused and Replace goes on outside it", () => {
+    const { host, session } = open();
+    keys("llR");
+    keys("Z");
+    expect(blockTexts(host)).toEqual(["abLOCKcd", "next line"]);
+    expect(session.mode).toBe("replace");
+    expect(statusText()).toContain(REFUSED);
+    keydown("Escape");
+    keys("$RY");
+    expect(blockTexts(host)).toEqual(["abLOCKcY", "next line"]);
   });
 });
 

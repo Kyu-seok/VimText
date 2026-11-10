@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { project } from "../../src/field/projection";
 import { resolveField } from "../../src/field/resolve";
-import { activeHost, editableHost } from "./contenteditable";
+import { activeHost, backspaceNatively, editableHost, selectedText } from "./contenteditable";
 import { keyDriver } from "./keys";
 import { statusText } from "./dom";
 import { Session } from "../../src/bridge/Session";
@@ -70,11 +70,11 @@ describe("motions over Atoms", () => {
     keys("lll");
     expect(coversExactly(chip)).toBe(true);
     keys("l");
-    expect(getSelection()!.toString()).toBe(" ");
+    expect(selectedText()).toBe(" ");
     keys("lllll");
     expect(coversExactly(img)).toBe(true);
     keys("h");
-    expect(getSelection()!.toString()).toBe(" ");
+    expect(selectedText()).toBe(" ");
   });
 
   it("w lands on each Atom as a word of its own", () => {
@@ -84,7 +84,7 @@ describe("motions over Atoms", () => {
     keys("ww");
     expect(coversExactly(host.querySelector("img")!)).toBe(true);
     keys("w");
-    expect(getSelection()!.toString()).toBe("o");
+    expect(selectedText()).toBe("o");
   });
 });
 
@@ -130,6 +130,38 @@ describe("undoing Atom deletions", () => {
     expect(field.getValue()).toBe(`hi ${OBJ} and ${OBJ} ok\nnext`);
     expect(host.querySelector("span")?.textContent).toBe("@alice");
     expect(host.querySelector("img")?.getAttribute("alt")).toBe("cat");
+  });
+});
+
+describe("undo puts back the Atom removed at that place", () => {
+  const TWO = '<p>a<img alt="first">b<img alt="second">c</p>';
+  const alts = (host: HTMLElement) => [...host.querySelectorAll("img")].map((i) => i.alt);
+
+  it("an Atom Backspaced in Insert mode comes back on u in its own place, and an earlier x's Atom on the next u", () => {
+    const { host, field } = open(TWO);
+    keys("lx");
+    expect(alts(host)).toEqual(["second"]);
+    keys("$i");
+    backspaceNatively();
+    keydown("Escape");
+    expect(field.getValue()).toBe("abc");
+    keys("u");
+    expect(alts(host)).toEqual(["second"]);
+    expect(field.getValue()).toBe(`ab${OBJ}c`);
+    expect(statusText()).not.toContain("refused");
+    keys("u");
+    expect(alts(host)).toEqual(["first", "second"]);
+    expect(field.getValue()).toBe(`a${OBJ}b${OBJ}c`);
+    expect(statusText()).not.toContain("refused");
+  });
+
+  it("a U+FFFC written back with no element kept for it is not reported as a refused edit", () => {
+    const { field } = open(`<p>a${OBJ}b</p>`);
+    keys(`l"_x`); // the black hole: a literal U+FFFC in "- would show in a later test's :reg
+    expect(field.getValue()).toBe("ab");
+    keys("u");
+    expect(statusText()).not.toContain("refused");
+    expect(field.getValue()).toBe("ab");
   });
 });
 
