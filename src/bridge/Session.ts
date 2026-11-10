@@ -464,6 +464,12 @@ export class Session {
     // Field's selection is the user's doing.
     if (this.renderQueued) this.render();
     this.withSyncing(() => this.syncFromFieldInner());
+    this.readAtoms();
+  }
+
+  /** The mirror's text is the Field's now: give it the Field's Atoms for the register writes. */
+  private readAtoms(): void {
+    if (this.field.atoms) this.withSyncing(() => this.mirror.setAtoms(this.field.atoms!()));
   }
 
   /** Runs our own mirror dispatches, whose updates must not queue a render: the caller renders. */
@@ -593,6 +599,7 @@ export class Session {
     this.field.setSelection(sel.anchor, sel.head);
     this.lastRendered = this.field.getSelection();
     this.lastText = this.field.getValue();
+    this.readAtoms();
     this.status.setMode(this.mode);
     this.status.reposition();
   }

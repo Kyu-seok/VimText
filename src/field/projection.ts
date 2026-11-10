@@ -9,6 +9,8 @@
  * a table row) is a new kind and its handler, not an edit to the others.
  */
 
+import { ATOM_CHAR, isAtom } from "./atoms";
+
 /** A DOM boundary point: a child index in an element, or a character offset in a text node. */
 export interface DomPoint {
   node: Node;
@@ -21,6 +23,13 @@ export interface Projection {
   toDom(offset: number): DomPoint;
   /** The text offset of a DOM position inside the host. */
   fromDom(node: Node, offset: number): number;
+  /** Each Atom's element and the offset of its U+FFFC, in text order. */
+  readonly atoms: readonly ProjectedAtom[];
+}
+
+interface ProjectedAtom {
+  readonly offset: number;
+  readonly element: Element;
 }
 
 /**
@@ -28,8 +37,8 @@ export interface Projection {
  * between pieces are the line breaks of block boundaries, which no node owns.
  *
  * - `text`: characters of one text node, `start + i` ↔ `(node, i)`.
- * - `node`: one element standing for one character (a `<br>`'s `\n`): `start`
- *   ↔ before it, `end` ↔ after it.
+ * - `node`: one element standing for one character (a `<br>`'s `\n`, an
+ *   Atom's U+FFFC): `start` ↔ before it (or anywhere inside it), `end` ↔ after it.
  * - `line`: an empty block (`<p><br></p>`), zero characters: its offset ↔ `(block, 0)`.
  */
 interface Piece {
@@ -40,7 +49,7 @@ interface Piece {
   to: DomPoint;
 }
 
-type Kind = "skip" | "text" | "br" | "block" | "inline";
+type Kind = "skip" | "text" | "br" | "block" | "inline" | "atom";
 
 function isElement(node: Node): node is Element {
   return node.nodeType === Node.ELEMENT_NODE;
@@ -56,6 +65,7 @@ function kindOf(node: Node): Kind {
   const display = getComputedStyle(node).display;
   if (display === "none") return "skip";
   if (node.localName === "br") return "br";
+  if (isAtom(node)) return "atom";
   return isBlockDisplay(display) ? "block" : "inline";
 }
 
@@ -84,6 +94,7 @@ function indexIn(node: Node): number {
 class Walker {
   private text = "";
   readonly pieces: Piece[] = [];
+  readonly atoms: ProjectedAtom[] = [];
   private breakPending = false;
   private heldBr: Element | null = null;
   /** Per open block, innermost last: whether it has projected anything yet. */
@@ -107,7 +118,23 @@ class Walker {
         return this.block(node as Element);
       case "inline":
         for (const child of node.childNodes) this.walk(child);
+        return;
+      case "atom":
+        return this.atom(node as Element);
     }
+  }
+
+  /** An Atom is one character of its line, whatever it holds. */
+  private atom(el: Element): void {
+    this.beforeContent();
+    const i = indexIn(el);
+    this.atoms.push({ offset: this.text.length, element: el });
+    this.push(
+      "node",
+      ATOM_CHAR,
+      { node: el.parentNode!, offset: i },
+      { node: el.parentNode!, offset: i + 1 },
+    );
   }
 
   private textNode(node: Text): void {
@@ -232,7 +259,7 @@ export function project(host: Element): Projection {
         case "text":
           return node === p.from.node ? p.start + Math.min(offset, p.end - p.start) : p.end;
         case "node":
-          return compare(point, p.from) === 0 ? p.start : p.end;
+          return compare(point, p.to) < 0 ? p.start : p.end;
         case "line":
           return p.start;
       }
@@ -243,5 +270,5 @@ export function project(host: Element): Projection {
     return p.start;
   }
 
-  return { text, toDom, fromDom };
+  return { text, toDom, fromDom, atoms: walker.atoms };
 }
