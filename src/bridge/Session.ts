@@ -132,6 +132,8 @@ export class Session {
   private lastRendered: { anchor: number; head: number } | null = null;
   /** The Field text the bridge last wrote or agreed with; anything else means the page changed the Field. */
   private lastText: string | null = null;
+  /** The mirror's undo depth when `lastText` was last agreed: a refused edit undoes back to it. */
+  private agreedDepth = 0;
   private readonly onDialog: (() => void) | undefined;
   /** The enabled Plugins, bound on every Activation and told when the Field loses focus. */
   private readonly plugins: readonly Plugin[];
@@ -464,6 +466,12 @@ export class Session {
     // Field's selection is the user's doing.
     if (this.renderQueued) this.render();
     this.withSyncing(() => this.syncFromFieldInner());
+    this.readAtoms();
+  }
+
+  /** The mirror's text is the Field's now: give it the Field's Atoms for the register writes. */
+  private readAtoms(): void {
+    if (this.field.atoms) this.withSyncing(() => this.mirror.setAtoms(this.field.atoms!()));
   }
 
   /** Runs our own mirror dispatches, whose updates must not queue a render: the caller renders. */
@@ -508,6 +516,7 @@ export class Session {
         selection: EditorSelection.cursor(insert ? head : clipToLine(newDoc, head)),
         userEvent,
       });
+      this.agreedDepth = this.mirror.undoDepth();
       return;
     }
 
@@ -584,17 +593,60 @@ export class Session {
     this.queuedDocChange = false;
     this.enforceSingleLine();
     const text = this.mirror.view.state.doc.toString();
-    if (text !== this.field.getValue()) {
+    const before = this.field.getValue();
+    if (text !== before) {
       this.field.setValue(text);
+      const after = this.field.getValue();
+      if (after === before) this.dropRefusedChange();
       // A Controlled Field rewrote the text inside the write; the Field is the truth.
-      if (this.field.getValue() !== text) this.withSyncing(() => this.syncFromFieldInner(true));
+      else if (after !== text) this.withSyncing(() => this.syncFromFieldInner(true));
     }
     const sel = this.renderedSelection();
     this.field.setSelection(sel.anchor, sel.head);
     this.lastRendered = this.field.getSelection();
     this.lastText = this.field.getValue();
+    this.readAtoms();
+    this.agreedDepth = this.mirror.undoDepth();
     this.status.setMode(this.mode);
     this.status.reposition();
+  }
+
+  /**
+   * The page refused the write: the Field's text is what it was before it
+   * (spec #40 "Writes"). The Field wins and the engine's change is taken back
+   * out of the undo history, so `u` never undoes a change that never happened;
+   * the part of a joined step the Field did keep is written back as a step of
+   * its own, the cursor left where the command put it. In Insert and Replace
+   * the change is folded instead, as a Controlled Field's rewrite is: an undo
+   * there would be recorded as typed text for `.`, and the Insert session is
+   * one undo step anyway. The Status Line says so: a refused `x` is never a
+   * silent no-op.
+   */
+  private dropRefusedChange(): void {
+    this.withSyncing(() => {
+      if (this.mirror.vim.insertMode) {
+        this.syncFromFieldInner(true);
+        return;
+      }
+      const view = this.mirror.view;
+      const head = view.state.selection.main.head;
+      this.mirror.undoSince(this.agreedDepth);
+      const text = this.field.getValue();
+      const doc = view.state.doc.toString();
+      const { start, endOld, endNew } = diffText(doc, text);
+      const changes = view.state.changes(
+        text === doc ? [] : { from: start, to: endOld, insert: text.slice(start, endNew) },
+      );
+      const newDoc = changes.apply(view.state.doc);
+      // The undo restores the selection the command started from (`x`'s
+      // covers its character, which the engine would take for Visual).
+      view.dispatch({
+        changes,
+        selection: EditorSelection.cursor(clipToLine(newDoc, Math.min(head, newDoc.length))),
+        userEvent: "input.type",
+      });
+    });
+    this.mirror.notify("VimText: the page refused the edit");
   }
 
   onFocus(): void {

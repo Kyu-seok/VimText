@@ -1,8 +1,23 @@
 import type { Field, FieldSelection, WrappingStyle } from "./Field";
 import { diffText, type TextDiff } from "./diff";
-import { project } from "./projection";
+import { project, type Projection } from "./projection";
 import { readDomSelection, selectDom } from "./domSelection";
-import { replaceDomRange } from "./editingCommands";
+import { insertAtomHtml, replaceDomRange } from "./editingCommands";
+import { ATOM_CHAR, atomText } from "./atoms";
+
+/** An Atom a write removed, kept so an undo that writes its U+FFFC back can restore the element. */
+interface RemovedAtom {
+  html: string;
+  /** Its offset when removed, and the write's sequence number: the order a restore puts several back in. */
+  offset: number;
+  seq: number;
+}
+
+/** Holds an Atom's place while it is inserted (see `insertAtom`). */
+const MARKER = "\u200b";
+
+/** How many removed Atoms a Field keeps for undo; older ones come back as nothing. */
+const REMOVED_ATOMS_KEPT = 200;
 
 /**
  * The span a write replaces and what it inserts there. An edit that removes
@@ -12,7 +27,7 @@ import { replaceDomRange } from "./editingCommands";
  * typed there next would join the bold run. A replacement that starts in the
  * plain text keeps that node, and `insertText` writes a no-break space where a
  * plain one would collapse (the projection reads it as a space). Only a space
- * the edit would leave at a line's edge is at risk and taken along: one taken
+ * the edit would leave at a line's or a table cell's edge is at risk and taken along: one taken
  * mid-line is written back in the style of the span's start, so `cw` on the
  * last word of a bold run would turn the plain space after it bold (#46).
  */
@@ -25,8 +40,9 @@ function keepAdjacentSpaces(
   let to = diff.endOld;
   let insert = text.slice(diff.start, diff.endNew);
   if (to === from) return { from, to, insert };
-  const atLineStart = from === 0 || old[from - 1] === "\n";
-  const atLineEnd = to === old.length || old[to] === "\n";
+  // A line's edge or a table cell's (cells join by a tab).
+  const atLineStart = from === 0 || old[from - 1] === "\n" || old[from - 1] === "\t";
+  const atLineEnd = to === old.length || old[to] === "\n" || old[to] === "\t";
   if (old[to] === " " && atLineStart) {
     to++;
     insert += " ";
@@ -72,13 +88,22 @@ function breakAtLineEnd(
  * browser's editing commands (`replaceDomRange`), never by mutating the DOM.
  */
 export class ContentEditableField implements Field {
-  readonly singleLine = false;
   private writing = false;
   private inputHandlers = new Set<() => void>();
   /** The last selection set or read inside the host, answered while the native one is elsewhere. */
   private lastSelection: FieldSelection = { anchor: 0, head: 0 };
+  /** Atoms the bridge's writes removed, oldest first. */
+  private removedAtoms: RemovedAtom[] = [];
+  private writeSeq = 0;
 
-  constructor(readonly element: HTMLElement) {
+  /**
+   * `singleLine` is the host's own declaration (`aria-multiline="false"`),
+   * decided by `resolveField`: the Session then applies every Single-line rule.
+   */
+  constructor(
+    readonly element: HTMLElement,
+    readonly singleLine = false,
+  ) {
     element.addEventListener("input", this.handleInput);
   }
 
@@ -98,10 +123,84 @@ export class ContentEditableField implements Field {
     const span = breakAtLineEnd(old, keepAdjacentSpaces(old, diffText(old, text), text));
     this.writing = true;
     try {
-      replaceDomRange(this.element, projection.toDom(span.from), projection.toDom(span.to), span.insert);
+      const restored = this.takeRemovedAtoms(span.insert.split(ATOM_CHAR).length - 1);
+      this.keepRemovedAtoms(projection, span.from, span.to);
+      if (!span.insert.includes(ATOM_CHAR)) {
+        replaceDomRange(this.element, projection.toDom(span.from), projection.toDom(span.to), span.insert);
+      } else {
+        this.writeWithAtoms(span.from, span.to, span.insert, restored);
+      }
     } finally {
       this.writing = false;
     }
+  }
+
+  /** The Atoms in the text: each one's offset and the visible text a yank stores for it. */
+  atoms(): { offset: number; text: string }[] {
+    return project(this.element).atoms.map((a) => ({ offset: a.offset, text: atomText(a.element) }));
+  }
+
+  /**
+   * Remembers the Atoms between `from` and `to` before a write removes them.
+   * The engine's history holds only their U+FFFC, so this is where an undo
+   * finds the element again: a restore takes the latest removals, in the
+   * order a stack of undos gives them back.
+   */
+  private keepRemovedAtoms(projection: Projection, from: number, to: number): void {
+    const seq = ++this.writeSeq;
+    for (const a of projection.atoms) {
+      if (a.offset >= from && a.offset < to)
+        this.removedAtoms.push({ html: a.element.outerHTML, offset: a.offset, seq });
+    }
+    this.removedAtoms.splice(0, Math.max(0, this.removedAtoms.length - REMOVED_ATOMS_KEPT));
+  }
+
+  /**
+   * The markup for `count` U+FFFC a write puts back, in text order: the last
+   * `count` removals, sorted by where they were (a run of `x` removed each at
+   * the same offset, oldest first; `X` walked backwards). Fewer when fewer
+   * were kept: a U+FFFC with no element to restore is written as nothing, and
+   * the Field's text, not the mirror's, then stands (a Controlled Field rewrite).
+   */
+  private takeRemovedAtoms(count: number): string[] {
+    if (count === 0) return [];
+    const taken = this.removedAtoms.splice(Math.max(0, this.removedAtoms.length - count));
+    return taken.sort((a, b) => a.offset - b.offset || a.seq - b.seq).map((a) => a.html);
+  }
+
+  /** Writes `insert` over `from`..`to`, each U+FFFC as the next of `atoms` (none: nothing). */
+  private writeWithAtoms(from: number, to: number, insert: string, atoms: string[]): void {
+    const [first, ...rest] = insert.split(ATOM_CHAR);
+    if (first || from !== to) {
+      const p = project(this.element);
+      replaceDomRange(this.element, p.toDom(from), p.toDom(to), first!);
+    }
+    let at = from + first!.length;
+    rest.forEach((part, i) => {
+      const html = atoms[i];
+      if (html && this.insertAtom(at, html)) at++;
+      if (!part) return;
+      const caret = project(this.element).toDom(at);
+      replaceDomRange(this.element, caret, caret, part);
+      at += part.length;
+    });
+  }
+
+  /**
+   * Puts an Atom's element back at offset `at` through `insertHTML`, with a
+   * marker character after it while it lands: Chrome moves a non-editable
+   * element inserted at the end of a block out of that block, and leaves the
+   * caret inside it, where no later editing command applies.
+   */
+  private insertAtom(at: number, html: string): boolean {
+    const here = project(this.element).toDom(at);
+    replaceDomRange(this.element, here, here, MARKER);
+    const before = project(this.element).toDom(at);
+    selectDom(this.element, before, before);
+    insertAtomHtml(html);
+    const p = project(this.element);
+    if (p.text[at + 1] === MARKER) replaceDomRange(this.element, p.toDom(at + 1), p.toDom(at + 2), "");
+    return project(this.element).text[at] === ATOM_CHAR;
   }
 
   getSelection(): FieldSelection {
@@ -120,8 +219,12 @@ export class ContentEditableField implements Field {
     const len = projection.text.length;
     const a = Math.max(0, Math.min(len, anchor));
     const h = Math.max(0, Math.min(len, head));
-    selectDom(this.element, projection.toDom(a), projection.toDom(h));
     this.lastSelection = { anchor: a, head: h };
+    // A selection set inside a blurred host focuses it (docs/engine-seams.md,
+    // Editing commands and events): it would take focus from the command
+    // line, which closes on blur. The render on focus sets it.
+    if (!this.hasFocus()) return;
+    selectDom(this.element, projection.toDom(a), projection.toDom(h));
   }
 
   hasFocus(): boolean {

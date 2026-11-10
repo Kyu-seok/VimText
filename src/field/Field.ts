@@ -29,6 +29,12 @@ export interface Field {
   /** Styles the mirror should copy so its line wrapping matches this Field. */
   wrappingStyle(): WrappingStyle;
   isConnected(): boolean;
+  /**
+   * The Atoms in the text (a contenteditable Field's; GLOSSARY.md): each
+   * U+FFFC's offset and the visible text a register stores for it. Absent on
+   * Fields that have none.
+   */
+  atoms?(): { offset: number; text: string }[];
   /** Stops listening to the page; the Session that used it is already destroyed. */
   destroy(): void;
 }
