@@ -6,4 +6,6 @@ playwright-report/
 .DS_Store
 tests/unit/__screenshots__/
 tests/fixtures/react.js
+tests/fixtures/prosemirror.js
+tests/fixtures/prosemirror.css
 .claude/worktrees/

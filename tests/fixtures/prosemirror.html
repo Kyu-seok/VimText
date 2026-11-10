@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>VimText fixture: ProseMirror</title>
+    <!-- prosemirror.js and .css are bundled from prosemirror.ts by tools/build.mjs and gitignored. -->
+    <link rel="stylesheet" href="prosemirror.css" />
+    <style>
+      body {
+        font-family: system-ui;
+        margin: 40px;
+      }
+      #editor .ProseMirror {
+        width: 480px;
+        min-height: 160px;
+        padding: 4px;
+        border: 1px solid #888;
+        font:
+          14px/1.4 Menlo,
+          monospace;
+      }
+      #editor p {
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>VimText fixture: ProseMirror</h1>
+    <!-- Bold, italic, a link and a list. Kept free of whitespace between tags (whitespace is a projection rule of its own), hence the prettier-ignore. -->
+    <!-- prettier-ignore -->
+    <template id="source"><p>the <strong>quick brown</strong> fox</p><p>jumps <em>over</em> the <a href="https://example.com/">lazy dog</a></p><ul><li><p>first item</p></li><li><p>second <strong>item</strong></p></li></ul><p>wait-x here</p></template>
+    <div id="editor"></div>
+    <script src="prosemirror.js"></script>
+  </body>
+</html>

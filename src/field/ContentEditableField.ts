@@ -26,7 +26,10 @@ const REMOVED_ATOMS_KEPT = 200;
  * block (`quick <b>brown</b>` minus `quick` loses the space), and the text
  * typed there next would join the bold run. A replacement that starts in the
  * plain text keeps that node, and `insertText` writes a no-break space where a
- * plain one would collapse (the projection reads it as a space).
+ * plain one would collapse (the projection reads it as a space). Only a space
+ * the edit would leave at a line's or a table cell's edge is at risk and taken along: one taken
+ * mid-line is written back in the style of the span's start, so `cw` on the
+ * last word of a bold run would turn the plain space after it bold (#46).
  */
 function keepAdjacentSpaces(
   old: string,
@@ -37,15 +40,43 @@ function keepAdjacentSpaces(
   let to = diff.endOld;
   let insert = text.slice(diff.start, diff.endNew);
   if (to === from) return { from, to, insert };
-  if (old[to] === " ") {
+  // A line's edge or a table cell's (cells join by a tab).
+  const atLineStart = from === 0 || old[from - 1] === "\n" || old[from - 1] === "\t";
+  const atLineEnd = to === old.length || old[to] === "\n" || old[to] === "\t";
+  if (old[to] === " " && atLineStart) {
     to++;
     insert += " ";
   }
-  if (old[from - 1] === " ") {
+  if (old[from - 1] === " " && atLineEnd) {
     from--;
     insert = " " + insert;
   }
   return { from, to, insert };
+}
+
+/**
+ * Whole lines added or removed are written at the end of the line above, as
+ * Enter or Backspace there would. The diff places a linewise insertion
+ * (`o`, a linewise `p`: `X\n` after a `\n`) at the start of the next line,
+ * inside the next block, so it lands in the list below; and a linewise
+ * deletion (`dd`: `X\n` after a `\n`) from the start of the line to the start
+ * of the next, which merges the next block into this one's element (the
+ * paragraph below a list becomes a list item). Sliding the span left by the
+ * newline it ends with is the same text change: `\nX` at the end of the
+ * line above, so a new block is the current line's kind and a removed line
+ * leaves its neighbours in their own blocks.
+ */
+function breakAtLineEnd(
+  old: string,
+  span: { from: number; to: number; insert: string },
+): { from: number; to: number; insert: string } {
+  const { from, to, insert } = span;
+  if (old[from - 1] !== "\n") return span;
+  if (from === to && insert.endsWith("\n")) {
+    return { from: from - 1, to: from - 1, insert: "\n" + insert.slice(0, -1) };
+  }
+  if (!insert && to > from && old[to - 1] === "\n") return { from: from - 1, to: to - 1, insert };
+  return span;
 }
 
 /**
@@ -89,7 +120,7 @@ export class ContentEditableField implements Field {
     const projection = project(this.element);
     const old = projection.text;
     if (old === text) return;
-    const span = keepAdjacentSpaces(old, diffText(old, text), text);
+    const span = breakAtLineEnd(old, keepAdjacentSpaces(old, diffText(old, text), text));
     this.writing = true;
     try {
       const restored = this.takeRemovedAtoms(span.insert.split(ATOM_CHAR).length - 1);

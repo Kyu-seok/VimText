@@ -6,7 +6,8 @@
     "popup/popup.ts",
     "options/options.ts",
     "tools/*.mjs",
-    "tests/fixtures/react.tsx"
+    "tests/fixtures/react.tsx",
+    "tests/fixtures/prosemirror.ts"
   ],
   "project": ["src/**/*.ts", "popup/**/*.ts", "options/**/*.ts", "tools/**/*.mjs", "tests/**/*.{ts,tsx}"]
 }
