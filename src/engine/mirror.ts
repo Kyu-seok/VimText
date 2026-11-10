@@ -140,6 +140,11 @@ export class Mirror {
     content.style.overflowWrap = style.overflowWrap;
     content.style.tabSize = style.tabSize;
     this.view.dom.style.width = `${style.contentWidth}px`;
+    // The mirror sits offscreen, where CodeMirror skips measuring unless a
+    // scroll target is set: without one, line heights stay estimates and the
+    // first `j` on long unwrapped lines lands at the end of the text
+    // (docs/engine-seams.md, Layout).
+    this.view.dispatch({ effects: EditorView.scrollIntoView(this.view.state.selection.main.head) });
   }
 
   onUpdate(handler: (docChanged: boolean, selectionSet: boolean) => void): () => void {

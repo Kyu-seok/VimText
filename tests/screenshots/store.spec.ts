@@ -34,16 +34,9 @@ async function openCommentForm(page: Page): Promise<void> {
   await activateAtStart(page, "#comment");
 }
 
-// The first key after Activation is never a vertical motion: the mirror is
-// laid out off-screen, so CodeMirror keeps its estimated line heights until a
-// key has been dispatched, and a first `j` on an unwrapped line longer than
-// about 30 characters lands at the end of the text (a bridge gotcha found by
-// this fixture; the e2e fixture's lines are too short to show it). The scenes
-// park the cursor with `w` first.
-
 test("1: Normal mode shown on the Status Line of the comment Field", async ({ page }) => {
   await openCommentForm(page);
-  await page.keyboard.type("wjW");
+  await page.keyboard.type("j2W");
   // The picture also shows the block cursor; the scene does not check it.
   expect(await statusText(page)).toContain("NORMAL");
   await shoot(page, "1-normal.png");
@@ -51,14 +44,14 @@ test("1: Normal mode shown on the Status Line of the comment Field", async ({ pa
 
 test("2: a Visual selection", async ({ page }) => {
   await openCommentForm(page);
-  await page.keyboard.type("wjWv4e");
+  await page.keyboard.type("j2Wv4e");
   expect(await statusText(page)).toContain("VISUAL");
   await shoot(page, "2-visual.png");
 });
 
 test("3: the command line holding a :s command, not yet entered", async ({ page }) => {
   await openCommentForm(page);
-  await page.keyboard.type("wj:s/teh/the/");
+  await page.keyboard.type("j:s/teh/the/");
   // Not entered: the typo is still there, and focus is in the Status Line
   // host, whose command-line input is its only focusable element (the mirror
   // is hidden). The document reports a focus inside a shadow root as its host.
