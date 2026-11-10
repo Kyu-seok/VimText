@@ -148,7 +148,10 @@ primary range is highlighted.
   which is the oracle where a case is ambiguous: a block-level computed `display` boundary,
   a `<br>` (not the trailing placeholder `<br>` of an empty block), a `\n` in
   `white-space: pre*` text; table cells in a row are joined by a tab; collapsed whitespace
-  projects as rendered. Formatting is not in the projection.
+  projects as rendered. Formatting is not in the projection. Two departures from `innerText`,
+  where it is not what renders: each block is one line (`innerText` puts a blank line on each
+  side of a `<p>`, and in Chrome of a heading), and a break that ends its block (`<div>a<br></div>`,
+  a trailing `\n` in `pre`) makes no line of its own (docs/engine-seams.md "innerText as the oracle").
 - _Atoms_: a mention chip, an inline image, a `contenteditable="false"` island projects as
   one `U+FFFC`. Motions count it as one non-blank char; `x`/`dw` delete it whole. A yank
   stores the Atom's visible text (`@alice`, an image's `alt`, otherwise nothing), never `U+FFFC`.
@@ -157,7 +160,15 @@ primary range is highlighted.
   `insertParagraph` (what Enter does in the editor), a deleted one merges blocks through
   `delete`. The editor's own handling is a Controlled Field rewrite (ADR 0004). An edit the
   editor refuses (`execCommand` false, or the DOM unchanged) is dropped: the Field wins, the
-  mirror resyncs, and the Status Line says the page refused the edit.
+  mirror resyncs, and the Status Line says the page refused the edit. Both cases show as the
+  projection unchanged after the write, and that alone decides it: `execCommand` returns true
+  for an edit the editor's `input` handler then puts back, so its return value is not read.
+  The same test holds on every Field kind: a textarea or input whose page puts its whole value
+  back after a write gets the message, and the change leaves the undo history, where a page that
+  writes anything else is a Controlled Field rewrite. A `U+FFFC` an undo writes back for an Atom
+  VimText no longer holds the element of is written as nothing, which is not a refusal.
+  The formatting at a write's edge is the editor's: text written at the end of a mark run takes
+  the mark, as typing there would (`J` after an italic word makes the joining space italic).
 - _Insert_: the editor owns typing as on every Field; the mirror re-projects the whole host
   on every `input`. No size budget until a measured finding asks for one.
 - _Key Policy_: a multi-line contenteditable follows the textarea rows: `Enter` in Normal is
@@ -357,6 +368,11 @@ it is outside the gate, so PNG churn never fails `npm run check`.
   as user edits, so Cmd+Z in Insert can undo them; the self-heal resyncs on the next key.
   Notion's blocks are one Field each, so `j`/`k` stop at a block's edge. A contenteditable
   in a closed shadow root is unreachable.
+- contenteditable (M4): `u` restores the text, not always its markup or marks. An undone line
+  merge can leave the text in another block element, a character put back at the start of a
+  bold run is plain, and a `plaintext-only` host keeps the `<br>` a merge left. An Atom comes
+  back from `u` only while VimText still holds its element (the last 200 removed in that Field);
+  an older one, or one the page took out without an `input` event, comes back as nothing.
 
 ## Milestones
 
