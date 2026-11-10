@@ -27,7 +27,7 @@ VimText gives Vim's modal editing to the text fields of ordinary web pages
 (textarea and single-line text inputs), editing the page's own field in
 place: no native host, no replacement editor. Chrome only.
 
-Install: <CHROME-WEB-STORE-URL>
+Install: from the Chrome Web Store once its review passes; the README links the store page.
 Source, issues, design and the accepted limitations: https://github.com/Kyu-seok/VimText
 
 0.3.0 is the first version on the Chrome Web Store. It closes M3. What is
