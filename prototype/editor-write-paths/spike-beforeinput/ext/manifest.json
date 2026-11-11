@@ -1,0 +1,2 @@
+{"manifest_version": 3, "name": "vt-bi-spike", "version": "0.0.1",
+ "content_scripts": [{"matches": ["http://localhost/*"], "js": ["cs.js"], "run_at": "document_start", "all_frames": true}]}

@@ -1,0 +1,43 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.core.css" rel="stylesheet">
+</head><body>
+<div id="lex" contenteditable="true"></div>
+<div id="quill"></div>
+<div id="slate"></div>
+<script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
+<script type="module">
+import * as L from 'https://esm.sh/lexical@0.53.0';
+import {registerRichText} from 'https://esm.sh/@lexical/rich-text@0.53.0?deps=lexical@0.53.0';
+import {registerHistory, createEmptyHistoryState} from 'https://esm.sh/@lexical/history@0.53.0?deps=lexical@0.53.0';
+import React from 'https://esm.sh/react@18.3.1';
+import {createRoot} from 'https://esm.sh/react-dom@18.3.1/client?deps=react@18.3.1';
+import {createEditor as createSlate, Node as SNode} from 'https://esm.sh/slate@0.147.4';
+import {Slate, Editable, withReact} from 'https://esm.sh/slate-react@0.147.5?deps=react@18.3.1,react-dom@18.3.1,slate@0.147.4,slate-dom@0.147.3';
+import {withHistory} from 'https://esm.sh/slate-history@0.144.0?deps=slate@0.147.4';
+window.EDITORS = {};
+window.EDITORS.lexical = (paras) => {
+  const root = document.getElementById('lex');
+  const ed = L.createEditor({onError: e => {window.LEXERR = String(e); }});
+  ed.setRootElement(root); window.LEX = ed; window.L = L;
+  registerRichText(ed); registerHistory(ed, createEmptyHistoryState(), 300);
+  ed.update(() => { const r = L.$getRoot(); r.clear(); for (const t of paras) r.append(L.$createParagraphNode().append(L.$createTextNode(t))); }, {discrete: true});
+  root.focus();
+  return {root, model: () => ed.getEditorState().read(() => L.$getRoot().getChildren().map(n => n.getTextContent())), undo: () => ed.dispatchCommand(L.UNDO_COMMAND, undefined)};
+};
+window.EDITORS.quill = (paras) => {
+  const q = new Quill('#quill', {});
+  q.setText(paras.join('\n') + '\n');
+  q.history.clear();
+  q.focus();
+  return {root: q.root, model: () => q.getText().replace(/\n$/, '').split('\n'), undo: () => q.history.undo()};
+};
+window.EDITORS.slate = (paras) => new Promise(res => {
+  const ed = withHistory(withReact(createSlate()));
+  const init = paras.map(t => ({type: 'paragraph', children: [{text: t}]}));
+  createRoot(document.getElementById('slate')).render(
+    React.createElement(Slate, {editor: ed, initialValue: init}, React.createElement(Editable, {id: 'slateed'})));
+  setTimeout(() => { const root = document.getElementById('slateed'); root.focus();
+    res({root, model: () => ed.children.map(n => SNode.string(n)), undo: () => ed.undo()}); }, 300);
+});
+window.READY = true;
+</script></body></html>

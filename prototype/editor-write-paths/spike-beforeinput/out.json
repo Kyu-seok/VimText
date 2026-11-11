@@ -1,0 +1,3910 @@
+[
+ {
+  "editor": "bare",
+  "caseName": "delNode",
+  "cfg": {
+   "mode": "exec"
+  },
+  "log": [
+   {
+    "cmd": "delete",
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "he world",
+    "second line"
+   ],
+   "model": [
+    "he world",
+    "second line"
+   ]
+  },
+  "exp": [
+   "he world",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "he worldQ",
+    "second line"
+   ],
+   "model": [
+    "he worldQ",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "he worldQ",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "T:insertText"
+   ],
+   "input": [
+    "deleteContentBackward",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "bare",
+  "caseName": "delWhole",
+  "cfg": {
+   "mode": "exec"
+  },
+  "log": [
+   {
+    "cmd": "delete",
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello  end",
+    "second line"
+   ],
+   "model": [
+    "hello  end",
+    "second line"
+   ]
+  },
+  "exp": [
+   "hello  end",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "hello  endQ",
+    "second line"
+   ],
+   "model": [
+    "hello  endQ",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "hello  endQ",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "T:insertText"
+   ],
+   "input": [
+    "deleteContentBackward",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "bare",
+  "caseName": "insXY",
+  "cfg": {
+   "mode": "exec"
+  },
+  "log": [
+   {
+    "cmd": "insertText",
+    "value": "XY",
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "helloXY world",
+    "second line"
+   ],
+   "model": [
+    "helloXY world",
+    "second line"
+   ]
+  },
+  "exp": [
+   "helloXY world",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "helloXY worldQ",
+    "second line"
+   ],
+   "model": [
+    "helloXY worldQ",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "helloXY worldQ",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "T:insertText"
+   ],
+   "input": [
+    "insertText",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "bare",
+  "caseName": "delBound",
+  "cfg": {
+   "mode": "exec"
+  },
+  "log": [
+   {
+    "cmd": "delete",
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello worldsecond line"
+   ],
+   "model": [
+    "hello worldsecond line"
+   ]
+  },
+  "exp": [
+   "hello worldsecond line"
+  ],
+  "typed": {
+   "dom": [
+    "hello worldsecond lineQ"
+   ],
+   "model": [
+    "hello worldsecond lineQ"
+   ]
+  },
+  "typedExp": [
+   "hello worldsecond lineQ"
+  ],
+  "events": {
+   "bi": [
+    "T:insertText"
+   ],
+   "input": [
+    "deleteContentBackward",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "bare",
+  "caseName": "delBold",
+  "cfg": {
+   "mode": "exec"
+  },
+  "log": [
+   {
+    "cmd": "delete",
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "helrld end",
+    "second line"
+   ],
+   "model": [
+    "helrld end",
+    "second line"
+   ]
+  },
+  "exp": [
+   "helrld end",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "helrld endQ",
+    "second line"
+   ],
+   "model": [
+    "helrld endQ",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "helrld endQ",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "T:insertText"
+   ],
+   "input": [
+    "deleteContentBackward",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "bare",
+  "caseName": "r",
+  "cfg": {
+   "mode": "exec"
+  },
+  "log": [
+   {
+    "cmd": "insertText",
+    "value": "J",
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "Jello world",
+    "second line"
+   ],
+   "model": [
+    "Jello world",
+    "second line"
+   ]
+  },
+  "exp": [
+   "Jello world",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "Jello worldQ",
+    "second line"
+   ],
+   "model": [
+    "Jello worldQ",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "Jello worldQ",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "T:insertText"
+   ],
+   "input": [
+    "insertText",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "bare",
+  "caseName": "insX",
+  "cfg": {
+   "mode": "exec"
+  },
+  "log": [
+   {
+    "cmd": "insertText",
+    "value": "X",
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "helloX world",
+    "second line"
+   ],
+   "model": [
+    "helloX world",
+    "second line"
+   ]
+  },
+  "exp": [
+   "helloX world",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "helloX worldQ",
+    "second line"
+   ],
+   "model": [
+    "helloX worldQ",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "helloX worldQ",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "T:insertText"
+   ],
+   "input": [
+    "insertText",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "bare",
+  "caseName": "cw",
+  "cfg": {
+   "mode": "exec"
+  },
+  "log": [
+   {
+    "cmd": "insertText",
+    "value": "there",
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello there",
+    "second line"
+   ],
+   "model": [
+    "hello there",
+    "second line"
+   ]
+  },
+  "exp": [
+   "hello there",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "hello thereQ",
+    "second line"
+   ],
+   "model": [
+    "hello thereQ",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "hello thereQ",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "T:insertText"
+   ],
+   "input": [
+    "insertText",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "bare",
+  "caseName": "J",
+  "cfg": {
+   "mode": "exec"
+  },
+  "log": [
+   {
+    "cmd": "delete",
+    "exec": true
+   },
+   {
+    "cmd": "insertText",
+    "value": " ",
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello world second line"
+   ],
+   "model": [
+    "hello world second line"
+   ]
+  },
+  "exp": [
+   "hello world second line"
+  ],
+  "typed": {
+   "dom": [
+    "hello world second lineQ"
+   ],
+   "model": [
+    "hello world second lineQ"
+   ]
+  },
+  "typedExp": [
+   "hello world second lineQ"
+  ],
+  "events": {
+   "bi": [
+    "T:insertText"
+   ],
+   "input": [
+    "deleteContentBackward",
+    "insertText",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "bare",
+  "caseName": "o",
+  "cfg": {
+   "mode": "exec"
+  },
+  "log": [
+   {
+    "cmd": "insertParagraph",
+    "exec": true
+   },
+   {
+    "cmd": "insertText",
+    "value": "new",
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello world",
+    "new",
+    "second line"
+   ],
+   "model": [
+    "hello world",
+    "new",
+    "second line"
+   ]
+  },
+  "exp": [
+   "hello world",
+   "new",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "hello worldQ",
+    "new",
+    "second line"
+   ],
+   "model": [
+    "hello worldQ",
+    "new",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "hello worldQ",
+   "new",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "T:insertText"
+   ],
+   "input": [
+    "insertParagraph",
+    "insertText",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "bare",
+  "caseName": "dd",
+  "cfg": {
+   "mode": "exec"
+  },
+  "log": [
+   {
+    "cmd": "delete",
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello world"
+   ],
+   "model": [
+    "hello world"
+   ]
+  },
+  "exp": [
+   "hello world"
+  ],
+  "typed": {
+   "dom": [
+    "hello worldQ"
+   ],
+   "model": [
+    "hello worldQ"
+   ]
+  },
+  "typedExp": [
+   "hello worldQ"
+  ],
+  "events": {
+   "bi": [
+    "T:insertText"
+   ],
+   "input": [
+    "deleteContentBackward",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "bare",
+  "caseName": "rCR",
+  "cfg": {
+   "mode": "exec"
+  },
+  "log": [
+   {
+    "cmd": "insertParagraph",
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello",
+    "world",
+    "second line"
+   ],
+   "model": [
+    "hello",
+    "world",
+    "second line"
+   ]
+  },
+  "exp": [
+   "hello",
+   "world",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "helloQ",
+    "world",
+    "second line"
+   ],
+   "model": [
+    "helloQ",
+    "world",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "helloQ",
+   "world",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "T:insertText"
+   ],
+   "input": [
+    "insertParagraph",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "bare",
+  "caseName": "insCross",
+  "cfg": {
+   "mode": "exec"
+  },
+  "log": [
+   {
+    "cmd": "insertText",
+    "value": "Z",
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello woZond line"
+   ],
+   "model": [
+    "hello woZond line"
+   ]
+  },
+  "exp": [
+   "hello woZond line"
+  ],
+  "typed": {
+   "dom": [
+    "hello woZond lineQ"
+   ],
+   "model": [
+    "hello woZond lineQ"
+   ]
+  },
+  "typedExp": [
+   "hello woZond lineQ"
+  ],
+  "events": {
+   "bi": [
+    "T:insertText"
+   ],
+   "input": [
+    "insertText",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "bare",
+  "caseName": "delVis",
+  "cfg": {
+   "mode": "exec"
+  },
+  "log": [
+   {
+    "cmd": "delete",
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello woond line"
+   ],
+   "model": [
+    "hello woond line"
+   ]
+  },
+  "exp": [
+   "hello woond line"
+  ],
+  "typed": {
+   "dom": [
+    "hello woond lineQ"
+   ],
+   "model": [
+    "hello woond lineQ"
+   ]
+  },
+  "typedExp": [
+   "hello woond lineQ"
+  ],
+  "events": {
+   "bi": [
+    "T:insertText"
+   ],
+   "input": [
+    "deleteContentBackward",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "bare",
+  "caseName": "seq",
+  "cfg": {
+   "mode": "exec"
+  },
+  "log": [
+   {
+    "cmd": "insertText",
+    "value": "ab",
+    "exec": true
+   },
+   {
+    "cmd": "delete",
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "abhelo world",
+    "second line"
+   ],
+   "model": [
+    "abhelo world",
+    "second line"
+   ]
+  },
+  "exp": [
+   "abhelo world",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "abhelo worldQ",
+    "second line"
+   ],
+   "model": [
+    "abhelo worldQ",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "abhelo worldQ",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "T:insertText"
+   ],
+   "input": [
+    "insertText",
+    "deleteContentBackward",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "bare",
+  "caseName": "split",
+  "cfg": {
+   "mode": "exec"
+  },
+  "log": [
+   {
+    "cmd": "insertText",
+    "value": "A",
+    "exec": true
+   },
+   {
+    "cmd": "insertParagraph",
+    "exec": true
+   },
+   {
+    "cmd": "insertText",
+    "value": "B",
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "helloA",
+    "B world",
+    "second line"
+   ],
+   "model": [
+    "helloA",
+    "B world",
+    "second line"
+   ]
+  },
+  "exp": [
+   "helloA",
+   "B world",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "helloAQ",
+    "B world",
+    "second line"
+   ],
+   "model": [
+    "helloAQ",
+    "B world",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "helloAQ",
+   "B world",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "T:insertText"
+   ],
+   "input": [
+    "insertText",
+    "insertParagraph",
+    "insertText",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "bare",
+  "caseName": "insXY",
+  "cfg": {
+   "mode": "bi",
+   "target": "host",
+   "deleteType": "deleteContentBackward"
+  },
+  "log": [
+   {
+    "cmd": "insertText",
+    "value": "XY",
+    "inputType": "insertText",
+    "prevented": false,
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "helloXY world",
+    "second line"
+   ],
+   "model": [
+    "helloXY world",
+    "second line"
+   ]
+  },
+  "exp": [
+   "helloXY world",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "helloXY worldQ",
+    "second line"
+   ],
+   "model": [
+    "helloXY worldQ",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "helloXY worldQ",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "S:insertText",
+    "T:insertText"
+   ],
+   "input": [
+    "insertText",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "bare",
+  "caseName": "cw",
+  "cfg": {
+   "mode": "bi",
+   "target": "host",
+   "deleteType": "deleteContentBackward"
+  },
+  "log": [
+   {
+    "cmd": "insertText",
+    "value": "there",
+    "inputType": "insertText",
+    "prevented": false,
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello there",
+    "second line"
+   ],
+   "model": [
+    "hello there",
+    "second line"
+   ]
+  },
+  "exp": [
+   "hello there",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "hello thereQ",
+    "second line"
+   ],
+   "model": [
+    "hello thereQ",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "hello thereQ",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "S:insertText",
+    "T:insertText"
+   ],
+   "input": [
+    "insertText",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "bare",
+  "caseName": "delNode",
+  "cfg": {
+   "mode": "bi",
+   "target": "host",
+   "deleteType": "deleteContentBackward"
+  },
+  "log": [
+   {
+    "cmd": "delete",
+    "inputType": "deleteContentBackward",
+    "prevented": false,
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "he world",
+    "second line"
+   ],
+   "model": [
+    "he world",
+    "second line"
+   ]
+  },
+  "exp": [
+   "he world",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "he worldQ",
+    "second line"
+   ],
+   "model": [
+    "he worldQ",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "he worldQ",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "S:deleteContentBackward",
+    "T:insertText"
+   ],
+   "input": [
+    "deleteContentBackward",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "bare",
+  "caseName": "insX",
+  "cfg": {
+   "mode": "bi",
+   "target": "host",
+   "deleteType": "deleteContentBackward"
+  },
+  "log": [
+   {
+    "cmd": "insertText",
+    "value": "X",
+    "inputType": "insertText",
+    "prevented": false,
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "helloX world",
+    "second line"
+   ],
+   "model": [
+    "helloX world",
+    "second line"
+   ]
+  },
+  "exp": [
+   "helloX world",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "helloX worldQ",
+    "second line"
+   ],
+   "model": [
+    "helloX worldQ",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "helloX worldQ",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "S:insertText",
+    "T:insertText"
+   ],
+   "input": [
+    "insertText",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "bare",
+  "caseName": "seqBlocks",
+  "cfg": {
+   "mode": "exec"
+  },
+  "log": [
+   {
+    "cmd": "insertParagraph",
+    "exec": true
+   },
+   {
+    "cmd": "insertText",
+    "value": "new",
+    "exec": true
+   },
+   {
+    "cmd": "delete",
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello world",
+    "new",
+    " line"
+   ],
+   "model": [
+    "hello world",
+    "new",
+    " line"
+   ]
+  },
+  "exp": [
+   "hello world",
+   "new",
+   " line"
+  ],
+  "typed": {
+   "dom": [
+    "hello worldQ",
+    "new",
+    " line"
+   ],
+   "model": [
+    "hello worldQ",
+    "new",
+    " line"
+   ]
+  },
+  "typedExp": [
+   "hello worldQ",
+   "new",
+   " line"
+  ],
+  "events": {
+   "bi": [
+    "T:insertText"
+   ],
+   "input": [
+    "insertParagraph",
+    "insertText",
+    "deleteContentBackward",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "bare",
+  "caseName": "r",
+  "cfg": {
+   "mode": "bi",
+   "target": "host",
+   "deleteType": "deleteContentBackward"
+  },
+  "log": [
+   {
+    "cmd": "insertText",
+    "value": "J",
+    "inputType": "insertText",
+    "prevented": false,
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "Jello world",
+    "second line"
+   ],
+   "model": [
+    "Jello world",
+    "second line"
+   ]
+  },
+  "exp": [
+   "Jello world",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "Jello worldQ",
+    "second line"
+   ],
+   "model": [
+    "Jello worldQ",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "Jello worldQ",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "S:insertText",
+    "T:insertText"
+   ],
+   "input": [
+    "insertText",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "bare",
+  "caseName": "delWhole",
+  "cfg": {
+   "mode": "bi",
+   "target": "host",
+   "deleteType": "deleteContentBackward"
+  },
+  "log": [
+   {
+    "cmd": "delete",
+    "inputType": "deleteContentBackward",
+    "prevented": false,
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello  end",
+    "second line"
+   ],
+   "model": [
+    "hello  end",
+    "second line"
+   ]
+  },
+  "exp": [
+   "hello  end",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "hello  endQ",
+    "second line"
+   ],
+   "model": [
+    "hello  endQ",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "hello  endQ",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "S:deleteContentBackward",
+    "T:insertText"
+   ],
+   "input": [
+    "deleteContentBackward",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "bare",
+  "caseName": "delBold",
+  "cfg": {
+   "mode": "bi",
+   "target": "host",
+   "deleteType": "deleteContentBackward"
+  },
+  "log": [
+   {
+    "cmd": "delete",
+    "inputType": "deleteContentBackward",
+    "prevented": false,
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "helrld end",
+    "second line"
+   ],
+   "model": [
+    "helrld end",
+    "second line"
+   ]
+  },
+  "exp": [
+   "helrld end",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "helrld endQ",
+    "second line"
+   ],
+   "model": [
+    "helrld endQ",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "helrld endQ",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "S:deleteContentBackward",
+    "T:insertText"
+   ],
+   "input": [
+    "deleteContentBackward",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "bare",
+  "caseName": "o",
+  "cfg": {
+   "mode": "bi",
+   "target": "host",
+   "deleteType": "deleteContentBackward"
+  },
+  "log": [
+   {
+    "cmd": "insertParagraph",
+    "inputType": "insertParagraph",
+    "prevented": false,
+    "exec": true
+   },
+   {
+    "cmd": "insertText",
+    "value": "new",
+    "inputType": "insertText",
+    "prevented": false,
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello world",
+    "new",
+    "second line"
+   ],
+   "model": [
+    "hello world",
+    "new",
+    "second line"
+   ]
+  },
+  "exp": [
+   "hello world",
+   "new",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "hello worldQ",
+    "new",
+    "second line"
+   ],
+   "model": [
+    "hello worldQ",
+    "new",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "hello worldQ",
+   "new",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "S:insertParagraph",
+    "S:insertText",
+    "T:insertText"
+   ],
+   "input": [
+    "insertParagraph",
+    "insertText",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "bare",
+  "caseName": "dd",
+  "cfg": {
+   "mode": "bi",
+   "target": "host",
+   "deleteType": "deleteContentBackward"
+  },
+  "log": [
+   {
+    "cmd": "delete",
+    "inputType": "deleteContentBackward",
+    "prevented": false,
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello world"
+   ],
+   "model": [
+    "hello world"
+   ]
+  },
+  "exp": [
+   "hello world"
+  ],
+  "typed": {
+   "dom": [
+    "hello worldQ"
+   ],
+   "model": [
+    "hello worldQ"
+   ]
+  },
+  "typedExp": [
+   "hello worldQ"
+  ],
+  "events": {
+   "bi": [
+    "S:deleteContentBackward",
+    "T:insertText"
+   ],
+   "input": [
+    "deleteContentBackward",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "bare",
+  "caseName": "split",
+  "cfg": {
+   "mode": "bi",
+   "target": "host",
+   "deleteType": "deleteContentBackward"
+  },
+  "log": [
+   {
+    "cmd": "insertText",
+    "value": "A",
+    "inputType": "insertText",
+    "prevented": false,
+    "exec": true
+   },
+   {
+    "cmd": "insertParagraph",
+    "inputType": "insertParagraph",
+    "prevented": false,
+    "exec": true
+   },
+   {
+    "cmd": "insertText",
+    "value": "B",
+    "inputType": "insertText",
+    "prevented": false,
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "helloA",
+    "B world",
+    "second line"
+   ],
+   "model": [
+    "helloA",
+    "B world",
+    "second line"
+   ]
+  },
+  "exp": [
+   "helloA",
+   "B world",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "helloAQ",
+    "B world",
+    "second line"
+   ],
+   "model": [
+    "helloAQ",
+    "B world",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "helloAQ",
+   "B world",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "S:insertText",
+    "S:insertParagraph",
+    "S:insertText",
+    "T:insertText"
+   ],
+   "input": [
+    "insertText",
+    "insertParagraph",
+    "insertText",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "bare",
+  "caseName": "rCR",
+  "cfg": {
+   "mode": "bi",
+   "target": "host",
+   "deleteType": "deleteContentBackward"
+  },
+  "log": [
+   {
+    "cmd": "insertParagraph",
+    "inputType": "insertParagraph",
+    "prevented": false,
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello",
+    "world",
+    "second line"
+   ],
+   "model": [
+    "hello",
+    "world",
+    "second line"
+   ]
+  },
+  "exp": [
+   "hello",
+   "world",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "helloQ",
+    "world",
+    "second line"
+   ],
+   "model": [
+    "helloQ",
+    "world",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "helloQ",
+   "world",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "S:insertParagraph",
+    "T:insertText"
+   ],
+   "input": [
+    "insertParagraph",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "bare",
+  "caseName": "delVis",
+  "cfg": {
+   "mode": "bi",
+   "target": "host",
+   "deleteType": "deleteContentBackward"
+  },
+  "log": [
+   {
+    "cmd": "delete",
+    "inputType": "deleteContentBackward",
+    "prevented": false,
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello woond line"
+   ],
+   "model": [
+    "hello woond line"
+   ]
+  },
+  "exp": [
+   "hello woond line"
+  ],
+  "typed": {
+   "dom": [
+    "hello woond lineQ"
+   ],
+   "model": [
+    "hello woond lineQ"
+   ]
+  },
+  "typedExp": [
+   "hello woond lineQ"
+  ],
+  "events": {
+   "bi": [
+    "S:deleteContentBackward",
+    "T:insertText"
+   ],
+   "input": [
+    "deleteContentBackward",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "bare",
+  "caseName": "insCross",
+  "cfg": {
+   "mode": "bi",
+   "target": "host",
+   "deleteType": "deleteContentBackward"
+  },
+  "log": [
+   {
+    "cmd": "insertText",
+    "value": "Z",
+    "inputType": "insertText",
+    "prevented": false,
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello woZond line"
+   ],
+   "model": [
+    "hello woZond line"
+   ]
+  },
+  "exp": [
+   "hello woZond line"
+  ],
+  "typed": {
+   "dom": [
+    "hello woZond lineQ"
+   ],
+   "model": [
+    "hello woZond lineQ"
+   ]
+  },
+  "typedExp": [
+   "hello woZond lineQ"
+  ],
+  "events": {
+   "bi": [
+    "S:insertText",
+    "T:insertText"
+   ],
+   "input": [
+    "insertText",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "bare",
+  "caseName": "delBound",
+  "cfg": {
+   "mode": "bi",
+   "target": "host",
+   "deleteType": "deleteContentBackward"
+  },
+  "log": [
+   {
+    "cmd": "delete",
+    "inputType": "deleteContentBackward",
+    "prevented": false,
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello worldsecond line"
+   ],
+   "model": [
+    "hello worldsecond line"
+   ]
+  },
+  "exp": [
+   "hello worldsecond line"
+  ],
+  "typed": {
+   "dom": [
+    "hello worldsecond lineQ"
+   ],
+   "model": [
+    "hello worldsecond lineQ"
+   ]
+  },
+  "typedExp": [
+   "hello worldsecond lineQ"
+  ],
+  "events": {
+   "bi": [
+    "S:deleteContentBackward",
+    "T:insertText"
+   ],
+   "input": [
+    "deleteContentBackward",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "bare",
+  "caseName": "J",
+  "cfg": {
+   "mode": "bi",
+   "target": "host",
+   "deleteType": "deleteContentBackward"
+  },
+  "log": [
+   {
+    "cmd": "delete",
+    "inputType": "deleteContentBackward",
+    "prevented": false,
+    "exec": true
+   },
+   {
+    "cmd": "insertText",
+    "value": " ",
+    "inputType": "insertText",
+    "prevented": false,
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello world second line"
+   ],
+   "model": [
+    "hello world second line"
+   ]
+  },
+  "exp": [
+   "hello world second line"
+  ],
+  "typed": {
+   "dom": [
+    "hello world second lineQ"
+   ],
+   "model": [
+    "hello world second lineQ"
+   ]
+  },
+  "typedExp": [
+   "hello world second lineQ"
+  ],
+  "events": {
+   "bi": [
+    "S:deleteContentBackward",
+    "S:insertText",
+    "T:insertText"
+   ],
+   "input": [
+    "deleteContentBackward",
+    "insertText",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "bare",
+  "caseName": "seqBlocks",
+  "cfg": {
+   "mode": "bi",
+   "target": "host",
+   "deleteType": "deleteContentBackward"
+  },
+  "log": [
+   {
+    "cmd": "insertParagraph",
+    "inputType": "insertParagraph",
+    "prevented": false,
+    "exec": true
+   },
+   {
+    "cmd": "insertText",
+    "value": "new",
+    "inputType": "insertText",
+    "prevented": false,
+    "exec": true
+   },
+   {
+    "cmd": "delete",
+    "inputType": "deleteContentBackward",
+    "prevented": false,
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello world",
+    "new",
+    " line"
+   ],
+   "model": [
+    "hello world",
+    "new",
+    " line"
+   ]
+  },
+  "exp": [
+   "hello world",
+   "new",
+   " line"
+  ],
+  "typed": {
+   "dom": [
+    "hello worldQ",
+    "new",
+    " line"
+   ],
+   "model": [
+    "hello worldQ",
+    "new",
+    " line"
+   ]
+  },
+  "typedExp": [
+   "hello worldQ",
+   "new",
+   " line"
+  ],
+  "events": {
+   "bi": [
+    "S:insertParagraph",
+    "S:insertText",
+    "S:deleteContentBackward",
+    "T:insertText"
+   ],
+   "input": [
+    "insertParagraph",
+    "insertText",
+    "deleteContentBackward",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "prosemirror",
+  "caseName": "insX",
+  "cfg": {
+   "mode": "exec"
+  },
+  "log": [
+   {
+    "cmd": "insertText",
+    "value": "X",
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "helloX world",
+    "second line"
+   ],
+   "model": [
+    "helloX world",
+    "second line"
+   ]
+  },
+  "exp": [
+   "helloX world",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "helloX worldQ",
+    "second line"
+   ],
+   "model": [
+    "helloX worldQ",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "helloX worldQ",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "T:insertText"
+   ],
+   "input": [
+    "insertText",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "bare",
+  "caseName": "seq",
+  "cfg": {
+   "mode": "bi",
+   "target": "host",
+   "deleteType": "deleteContentBackward"
+  },
+  "log": [
+   {
+    "cmd": "insertText",
+    "value": "ab",
+    "inputType": "insertText",
+    "prevented": false,
+    "exec": true
+   },
+   {
+    "cmd": "delete",
+    "inputType": "deleteContentBackward",
+    "prevented": false,
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "abhelo world",
+    "second line"
+   ],
+   "model": [
+    "abhelo world",
+    "second line"
+   ]
+  },
+  "exp": [
+   "abhelo world",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "abhelo worldQ",
+    "second line"
+   ],
+   "model": [
+    "abhelo worldQ",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "abhelo worldQ",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "S:insertText",
+    "S:deleteContentBackward",
+    "T:insertText"
+   ],
+   "input": [
+    "insertText",
+    "deleteContentBackward",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "prosemirror",
+  "caseName": "insXY",
+  "cfg": {
+   "mode": "exec"
+  },
+  "log": [
+   {
+    "cmd": "insertText",
+    "value": "XY",
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "helloXY world",
+    "second line"
+   ],
+   "model": [
+    "helloXY world",
+    "second line"
+   ]
+  },
+  "exp": [
+   "helloXY world",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "helloXY worldQ",
+    "second line"
+   ],
+   "model": [
+    "helloXY worldQ",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "helloXY worldQ",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "T:insertText"
+   ],
+   "input": [
+    "insertText",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "prosemirror",
+  "caseName": "r",
+  "cfg": {
+   "mode": "exec"
+  },
+  "log": [
+   {
+    "cmd": "insertText",
+    "value": "J",
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "Jello world",
+    "second line"
+   ],
+   "model": [
+    "Jello world",
+    "second line"
+   ]
+  },
+  "exp": [
+   "Jello world",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "Jello worldQ",
+    "second line"
+   ],
+   "model": [
+    "Jello worldQ",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "Jello worldQ",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "T:insertText"
+   ],
+   "input": [
+    "insertText",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "prosemirror",
+  "caseName": "delBold",
+  "cfg": {
+   "mode": "exec"
+  },
+  "log": [
+   {
+    "cmd": "delete",
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "helrld end",
+    "second line"
+   ],
+   "model": [
+    "helrld end",
+    "second line"
+   ]
+  },
+  "exp": [
+   "helrld end",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "helrld endQ",
+    "second line"
+   ],
+   "model": [
+    "helrld endQ",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "helrld endQ",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "T:insertText"
+   ],
+   "input": [
+    "deleteContentBackward",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "prosemirror",
+  "caseName": "delNode",
+  "cfg": {
+   "mode": "exec"
+  },
+  "log": [
+   {
+    "cmd": "delete",
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "he world",
+    "second line"
+   ],
+   "model": [
+    "he world",
+    "second line"
+   ]
+  },
+  "exp": [
+   "he world",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "he worldQ",
+    "second line"
+   ],
+   "model": [
+    "he worldQ",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "he worldQ",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "T:insertText"
+   ],
+   "input": [
+    "deleteContentBackward",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "prosemirror",
+  "caseName": "cw",
+  "cfg": {
+   "mode": "exec"
+  },
+  "log": [
+   {
+    "cmd": "insertText",
+    "value": "there",
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello there",
+    "second line"
+   ],
+   "model": [
+    "hello there",
+    "second line"
+   ]
+  },
+  "exp": [
+   "hello there",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "hello thereQ",
+    "second line"
+   ],
+   "model": [
+    "hello thereQ",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "hello thereQ",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "T:insertText"
+   ],
+   "input": [
+    "insertText",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "prosemirror",
+  "caseName": "delBound",
+  "cfg": {
+   "mode": "exec"
+  },
+  "log": [
+   {
+    "cmd": "delete",
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello worldsecond line"
+   ],
+   "model": [
+    "hello worldsecond line"
+   ]
+  },
+  "exp": [
+   "hello worldsecond line"
+  ],
+  "typed": {
+   "dom": [
+    "hello worldsecond lineQ"
+   ],
+   "model": [
+    "hello worldsecond lineQ"
+   ]
+  },
+  "typedExp": [
+   "hello worldsecond lineQ"
+  ],
+  "events": {
+   "bi": [
+    "T:insertText"
+   ],
+   "input": [
+    "deleteContentBackward",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "prosemirror",
+  "caseName": "delWhole",
+  "cfg": {
+   "mode": "exec"
+  },
+  "log": [
+   {
+    "cmd": "delete",
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello  end",
+    "second line"
+   ],
+   "model": [
+    "hello  end",
+    "second line"
+   ]
+  },
+  "exp": [
+   "hello  end",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "hello  endQ",
+    "second line"
+   ],
+   "model": [
+    "hello  endQ",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "hello  endQ",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "T:insertText"
+   ],
+   "input": [
+    "deleteContentBackward",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "prosemirror",
+  "caseName": "dd",
+  "cfg": {
+   "mode": "exec"
+  },
+  "log": [
+   {
+    "cmd": "delete",
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello world"
+   ],
+   "model": [
+    "hello world"
+   ]
+  },
+  "exp": [
+   "hello world"
+  ],
+  "typed": {
+   "dom": [
+    "hello worldQ"
+   ],
+   "model": [
+    "hello worldQ"
+   ]
+  },
+  "typedExp": [
+   "hello worldQ"
+  ],
+  "events": {
+   "bi": [
+    "T:insertText"
+   ],
+   "input": [
+    "deleteContentBackward",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "prosemirror",
+  "caseName": "insCross",
+  "cfg": {
+   "mode": "exec"
+  },
+  "log": [
+   {
+    "cmd": "insertText",
+    "value": "Z",
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello woZond line"
+   ],
+   "model": [
+    "hello woZond line"
+   ]
+  },
+  "exp": [
+   "hello woZond line"
+  ],
+  "typed": {
+   "dom": [
+    "hello woZond lineQ"
+   ],
+   "model": [
+    "hello woZond lineQ"
+   ]
+  },
+  "typedExp": [
+   "hello woZond lineQ"
+  ],
+  "events": {
+   "bi": [
+    "T:insertText"
+   ],
+   "input": [
+    "insertText",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "prosemirror",
+  "caseName": "J",
+  "cfg": {
+   "mode": "exec"
+  },
+  "log": [
+   {
+    "cmd": "delete",
+    "exec": true
+   },
+   {
+    "cmd": "insertText",
+    "value": " ",
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello world second line"
+   ],
+   "model": [
+    "hello world second line"
+   ]
+  },
+  "exp": [
+   "hello world second line"
+  ],
+  "typed": {
+   "dom": [
+    "hello world second lineQ"
+   ],
+   "model": [
+    "hello world second lineQ"
+   ]
+  },
+  "typedExp": [
+   "hello world second lineQ"
+  ],
+  "events": {
+   "bi": [
+    "T:insertText"
+   ],
+   "input": [
+    "deleteContentBackward",
+    "insertText",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "prosemirror",
+  "caseName": "rCR",
+  "cfg": {
+   "mode": "exec"
+  },
+  "log": [
+   {
+    "cmd": "insertParagraph",
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello",
+    "world",
+    "second line"
+   ],
+   "model": [
+    "hello",
+    "world",
+    "second line"
+   ]
+  },
+  "exp": [
+   "hello",
+   "world",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "helloQ",
+    "world",
+    "second line"
+   ],
+   "model": [
+    "helloQ",
+    "world",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "helloQ",
+   "world",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "T:insertText"
+   ],
+   "input": [
+    "insertParagraph",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "prosemirror",
+  "caseName": "delVis",
+  "cfg": {
+   "mode": "exec"
+  },
+  "log": [
+   {
+    "cmd": "delete",
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello woond line"
+   ],
+   "model": [
+    "hello woond line"
+   ]
+  },
+  "exp": [
+   "hello woond line"
+  ],
+  "typed": {
+   "dom": [
+    "hello woond lineQ"
+   ],
+   "model": [
+    "hello woond lineQ"
+   ]
+  },
+  "typedExp": [
+   "hello woond lineQ"
+  ],
+  "events": {
+   "bi": [
+    "T:insertText"
+   ],
+   "input": [
+    "deleteContentBackward",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "prosemirror",
+  "caseName": "o",
+  "cfg": {
+   "mode": "exec"
+  },
+  "log": [
+   {
+    "cmd": "insertParagraph",
+    "exec": true
+   },
+   {
+    "cmd": "insertText",
+    "value": "new",
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello world",
+    "new",
+    "second line"
+   ],
+   "model": [
+    "hello world",
+    "new",
+    "second line"
+   ]
+  },
+  "exp": [
+   "hello world",
+   "new",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "hello worldQ",
+    "new",
+    "second line"
+   ],
+   "model": [
+    "hello worldQ",
+    "new",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "hello worldQ",
+   "new",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "T:insertText"
+   ],
+   "input": [
+    "insertParagraph",
+    "insertText",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "prosemirror",
+  "caseName": "seq",
+  "cfg": {
+   "mode": "exec"
+  },
+  "log": [
+   {
+    "cmd": "insertText",
+    "value": "ab",
+    "exec": true
+   },
+   {
+    "cmd": "delete",
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "abhelo world",
+    "second line"
+   ],
+   "model": [
+    "abhelo world",
+    "second line"
+   ]
+  },
+  "exp": [
+   "abhelo world",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "abhelo worldQ",
+    "second line"
+   ],
+   "model": [
+    "abhelo worldQ",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "abhelo worldQ",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "T:insertText"
+   ],
+   "input": [
+    "insertText",
+    "deleteContentBackward",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "prosemirror",
+  "caseName": "seqBlocks",
+  "cfg": {
+   "mode": "exec"
+  },
+  "log": [
+   {
+    "cmd": "insertParagraph",
+    "exec": true
+   },
+   {
+    "cmd": "insertText",
+    "value": "new",
+    "exec": true
+   },
+   {
+    "cmd": "delete",
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello world",
+    "new",
+    " line"
+   ],
+   "model": [
+    "hello world",
+    "new",
+    " line"
+   ]
+  },
+  "exp": [
+   "hello world",
+   "new",
+   " line"
+  ],
+  "typed": {
+   "dom": [
+    "hello worldQ",
+    "new",
+    " line"
+   ],
+   "model": [
+    "hello worldQ",
+    "new",
+    " line"
+   ]
+  },
+  "typedExp": [
+   "hello worldQ",
+   "new",
+   " line"
+  ],
+  "events": {
+   "bi": [
+    "T:insertText"
+   ],
+   "input": [
+    "insertParagraph",
+    "insertText",
+    "deleteContentBackward",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "prosemirror",
+  "caseName": "split",
+  "cfg": {
+   "mode": "exec"
+  },
+  "log": [
+   {
+    "cmd": "insertText",
+    "value": "A",
+    "exec": true
+   },
+   {
+    "cmd": "insertParagraph",
+    "exec": true
+   },
+   {
+    "cmd": "insertText",
+    "value": "B",
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "helloA",
+    "B world",
+    "second line"
+   ],
+   "model": [
+    "helloA",
+    "B world",
+    "second line"
+   ]
+  },
+  "exp": [
+   "helloA",
+   "B world",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "helloAQ",
+    "B world",
+    "second line"
+   ],
+   "model": [
+    "helloAQ",
+    "B world",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "helloAQ",
+   "B world",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "T:insertText"
+   ],
+   "input": [
+    "insertText",
+    "insertParagraph",
+    "insertText",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "prosemirror",
+  "caseName": "insX",
+  "cfg": {
+   "mode": "bi",
+   "target": "host",
+   "deleteType": "deleteContentBackward"
+  },
+  "log": [
+   {
+    "cmd": "insertText",
+    "value": "X",
+    "inputType": "insertText",
+    "prevented": false,
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "helloX world",
+    "second line"
+   ],
+   "model": [
+    "helloX world",
+    "second line"
+   ]
+  },
+  "exp": [
+   "helloX world",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "helloX worldQ",
+    "second line"
+   ],
+   "model": [
+    "helloX worldQ",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "helloX worldQ",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "S:insertText",
+    "T:insertText"
+   ],
+   "input": [
+    "insertText",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "prosemirror",
+  "caseName": "r",
+  "cfg": {
+   "mode": "bi",
+   "target": "host",
+   "deleteType": "deleteContentBackward"
+  },
+  "log": [
+   {
+    "cmd": "insertText",
+    "value": "J",
+    "inputType": "insertText",
+    "prevented": false,
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "Jello world",
+    "second line"
+   ],
+   "model": [
+    "Jello world",
+    "second line"
+   ]
+  },
+  "exp": [
+   "Jello world",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "Jello worldQ",
+    "second line"
+   ],
+   "model": [
+    "Jello worldQ",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "Jello worldQ",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "S:insertText",
+    "T:insertText"
+   ],
+   "input": [
+    "insertText",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "prosemirror",
+  "caseName": "delNode",
+  "cfg": {
+   "mode": "bi",
+   "target": "host",
+   "deleteType": "deleteContentBackward"
+  },
+  "log": [
+   {
+    "cmd": "delete",
+    "inputType": "deleteContentBackward",
+    "prevented": false,
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "he world",
+    "second line"
+   ],
+   "model": [
+    "he world",
+    "second line"
+   ]
+  },
+  "exp": [
+   "he world",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "he worldQ",
+    "second line"
+   ],
+   "model": [
+    "he worldQ",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "he worldQ",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "S:deleteContentBackward",
+    "T:insertText"
+   ],
+   "input": [
+    "deleteContentBackward",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "prosemirror",
+  "caseName": "insXY",
+  "cfg": {
+   "mode": "bi",
+   "target": "host",
+   "deleteType": "deleteContentBackward"
+  },
+  "log": [
+   {
+    "cmd": "insertText",
+    "value": "XY",
+    "inputType": "insertText",
+    "prevented": false,
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "helloXY world",
+    "second line"
+   ],
+   "model": [
+    "helloXY world",
+    "second line"
+   ]
+  },
+  "exp": [
+   "helloXY world",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "helloXY worldQ",
+    "second line"
+   ],
+   "model": [
+    "helloXY worldQ",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "helloXY worldQ",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "S:insertText",
+    "T:insertText"
+   ],
+   "input": [
+    "insertText",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "prosemirror",
+  "caseName": "cw",
+  "cfg": {
+   "mode": "bi",
+   "target": "host",
+   "deleteType": "deleteContentBackward"
+  },
+  "log": [
+   {
+    "cmd": "insertText",
+    "value": "there",
+    "inputType": "insertText",
+    "prevented": false,
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello there",
+    "second line"
+   ],
+   "model": [
+    "hello there",
+    "second line"
+   ]
+  },
+  "exp": [
+   "hello there",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "hello thereQ",
+    "second line"
+   ],
+   "model": [
+    "hello thereQ",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "hello thereQ",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "S:insertText",
+    "T:insertText"
+   ],
+   "input": [
+    "insertText",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "prosemirror",
+  "caseName": "delWhole",
+  "cfg": {
+   "mode": "bi",
+   "target": "host",
+   "deleteType": "deleteContentBackward"
+  },
+  "log": [
+   {
+    "cmd": "delete",
+    "inputType": "deleteContentBackward",
+    "prevented": false,
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello  end",
+    "second line"
+   ],
+   "model": [
+    "hello  end",
+    "second line"
+   ]
+  },
+  "exp": [
+   "hello  end",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "hello  endQ",
+    "second line"
+   ],
+   "model": [
+    "hello  endQ",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "hello  endQ",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "S:deleteContentBackward",
+    "T:insertText"
+   ],
+   "input": [
+    "deleteContentBackward",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "prosemirror",
+  "caseName": "delBound",
+  "cfg": {
+   "mode": "bi",
+   "target": "host",
+   "deleteType": "deleteContentBackward"
+  },
+  "log": [
+   {
+    "cmd": "delete",
+    "inputType": "deleteContentBackward",
+    "prevented": false,
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello worldsecond line"
+   ],
+   "model": [
+    "hello worldsecond line"
+   ]
+  },
+  "exp": [
+   "hello worldsecond line"
+  ],
+  "typed": {
+   "dom": [
+    "hello worldsecond lineQ"
+   ],
+   "model": [
+    "hello worldsecond lineQ"
+   ]
+  },
+  "typedExp": [
+   "hello worldsecond lineQ"
+  ],
+  "events": {
+   "bi": [
+    "S:deleteContentBackward",
+    "T:insertText"
+   ],
+   "input": [
+    "deleteContentBackward",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "prosemirror",
+  "caseName": "delBold",
+  "cfg": {
+   "mode": "bi",
+   "target": "host",
+   "deleteType": "deleteContentBackward"
+  },
+  "log": [
+   {
+    "cmd": "delete",
+    "inputType": "deleteContentBackward",
+    "prevented": false,
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "helrld end",
+    "second line"
+   ],
+   "model": [
+    "helrld end",
+    "second line"
+   ]
+  },
+  "exp": [
+   "helrld end",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "helrld endQ",
+    "second line"
+   ],
+   "model": [
+    "helrld endQ",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "helrld endQ",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "S:deleteContentBackward",
+    "T:insertText"
+   ],
+   "input": [
+    "deleteContentBackward",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "prosemirror",
+  "caseName": "dd",
+  "cfg": {
+   "mode": "bi",
+   "target": "host",
+   "deleteType": "deleteContentBackward"
+  },
+  "log": [
+   {
+    "cmd": "delete",
+    "inputType": "deleteContentBackward",
+    "prevented": false,
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello world"
+   ],
+   "model": [
+    "hello world"
+   ]
+  },
+  "exp": [
+   "hello world"
+  ],
+  "typed": {
+   "dom": [
+    "hello worldQ"
+   ],
+   "model": [
+    "hello worldQ"
+   ]
+  },
+  "typedExp": [
+   "hello worldQ"
+  ],
+  "events": {
+   "bi": [
+    "S:deleteContentBackward",
+    "T:insertText"
+   ],
+   "input": [
+    "deleteContentBackward",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "prosemirror",
+  "caseName": "insCross",
+  "cfg": {
+   "mode": "bi",
+   "target": "host",
+   "deleteType": "deleteContentBackward"
+  },
+  "log": [
+   {
+    "cmd": "insertText",
+    "value": "Z",
+    "inputType": "insertText",
+    "prevented": false,
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello woZond line"
+   ],
+   "model": [
+    "hello woZond line"
+   ]
+  },
+  "exp": [
+   "hello woZond line"
+  ],
+  "typed": {
+   "dom": [
+    "hello woZond lineQ"
+   ],
+   "model": [
+    "hello woZond lineQ"
+   ]
+  },
+  "typedExp": [
+   "hello woZond lineQ"
+  ],
+  "events": {
+   "bi": [
+    "S:insertText",
+    "T:insertText"
+   ],
+   "input": [
+    "insertText",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "prosemirror",
+  "caseName": "J",
+  "cfg": {
+   "mode": "bi",
+   "target": "host",
+   "deleteType": "deleteContentBackward"
+  },
+  "log": [
+   {
+    "cmd": "delete",
+    "inputType": "deleteContentBackward",
+    "prevented": false,
+    "exec": true
+   },
+   {
+    "cmd": "insertText",
+    "value": " ",
+    "inputType": "insertText",
+    "prevented": false,
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello world second line"
+   ],
+   "model": [
+    "hello world second line"
+   ]
+  },
+  "exp": [
+   "hello world second line"
+  ],
+  "typed": {
+   "dom": [
+    "hello world second lineQ"
+   ],
+   "model": [
+    "hello world second lineQ"
+   ]
+  },
+  "typedExp": [
+   "hello world second lineQ"
+  ],
+  "events": {
+   "bi": [
+    "S:deleteContentBackward",
+    "S:insertText",
+    "T:insertText"
+   ],
+   "input": [
+    "deleteContentBackward",
+    "insertText",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "prosemirror",
+  "caseName": "o",
+  "cfg": {
+   "mode": "bi",
+   "target": "host",
+   "deleteType": "deleteContentBackward"
+  },
+  "log": [
+   {
+    "cmd": "insertParagraph",
+    "inputType": "insertParagraph",
+    "prevented": false,
+    "exec": true
+   },
+   {
+    "cmd": "insertText",
+    "value": "new",
+    "inputType": "insertText",
+    "prevented": false,
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello world",
+    "new",
+    "second line"
+   ],
+   "model": [
+    "hello world",
+    "new",
+    "second line"
+   ]
+  },
+  "exp": [
+   "hello world",
+   "new",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "hello worldQ",
+    "new",
+    "second line"
+   ],
+   "model": [
+    "hello worldQ",
+    "new",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "hello worldQ",
+   "new",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "S:insertParagraph",
+    "S:insertText",
+    "T:insertText"
+   ],
+   "input": [
+    "insertParagraph",
+    "insertText",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "prosemirror",
+  "caseName": "delVis",
+  "cfg": {
+   "mode": "bi",
+   "target": "host",
+   "deleteType": "deleteContentBackward"
+  },
+  "log": [
+   {
+    "cmd": "delete",
+    "inputType": "deleteContentBackward",
+    "prevented": false,
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello woond line"
+   ],
+   "model": [
+    "hello woond line"
+   ]
+  },
+  "exp": [
+   "hello woond line"
+  ],
+  "typed": {
+   "dom": [
+    "hello woond lineQ"
+   ],
+   "model": [
+    "hello woond lineQ"
+   ]
+  },
+  "typedExp": [
+   "hello woond lineQ"
+  ],
+  "events": {
+   "bi": [
+    "S:deleteContentBackward",
+    "T:insertText"
+   ],
+   "input": [
+    "deleteContentBackward",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "prosemirror",
+  "caseName": "seq",
+  "cfg": {
+   "mode": "bi",
+   "target": "host",
+   "deleteType": "deleteContentBackward"
+  },
+  "log": [
+   {
+    "cmd": "insertText",
+    "value": "ab",
+    "inputType": "insertText",
+    "prevented": false,
+    "exec": true
+   },
+   {
+    "cmd": "delete",
+    "inputType": "deleteContentBackward",
+    "prevented": false,
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "abhelo world",
+    "second line"
+   ],
+   "model": [
+    "abhelo world",
+    "second line"
+   ]
+  },
+  "exp": [
+   "abhelo world",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "abhelo worldQ",
+    "second line"
+   ],
+   "model": [
+    "abhelo worldQ",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "abhelo worldQ",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "S:insertText",
+    "S:deleteContentBackward",
+    "T:insertText"
+   ],
+   "input": [
+    "insertText",
+    "deleteContentBackward",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "prosemirror",
+  "caseName": "rCR",
+  "cfg": {
+   "mode": "bi",
+   "target": "host",
+   "deleteType": "deleteContentBackward"
+  },
+  "log": [
+   {
+    "cmd": "insertParagraph",
+    "inputType": "insertParagraph",
+    "prevented": false,
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello",
+    "world",
+    "second line"
+   ],
+   "model": [
+    "hello",
+    "world",
+    "second line"
+   ]
+  },
+  "exp": [
+   "hello",
+   "world",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "helloQ",
+    "world",
+    "second line"
+   ],
+   "model": [
+    "helloQ",
+    "world",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "helloQ",
+   "world",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "S:insertParagraph",
+    "T:insertText"
+   ],
+   "input": [
+    "insertParagraph",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "prosemirror",
+  "caseName": "split",
+  "cfg": {
+   "mode": "bi",
+   "target": "host",
+   "deleteType": "deleteContentBackward"
+  },
+  "log": [
+   {
+    "cmd": "insertText",
+    "value": "A",
+    "inputType": "insertText",
+    "prevented": false,
+    "exec": true
+   },
+   {
+    "cmd": "insertParagraph",
+    "inputType": "insertParagraph",
+    "prevented": false,
+    "exec": true
+   },
+   {
+    "cmd": "insertText",
+    "value": "B",
+    "inputType": "insertText",
+    "prevented": false,
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "helloA",
+    "B world",
+    "second line"
+   ],
+   "model": [
+    "helloA",
+    "B world",
+    "second line"
+   ]
+  },
+  "exp": [
+   "helloA",
+   "B world",
+   "second line"
+  ],
+  "typed": {
+   "dom": [
+    "helloAQ",
+    "B world",
+    "second line"
+   ],
+   "model": [
+    "helloAQ",
+    "B world",
+    "second line"
+   ]
+  },
+  "typedExp": [
+   "helloAQ",
+   "B world",
+   "second line"
+  ],
+  "events": {
+   "bi": [
+    "S:insertText",
+    "S:insertParagraph",
+    "S:insertText",
+    "T:insertText"
+   ],
+   "input": [
+    "insertText",
+    "insertParagraph",
+    "insertText",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ },
+ {
+  "editor": "prosemirror",
+  "caseName": "seqBlocks",
+  "cfg": {
+   "mode": "bi",
+   "target": "host",
+   "deleteType": "deleteContentBackward"
+  },
+  "log": [
+   {
+    "cmd": "insertParagraph",
+    "inputType": "insertParagraph",
+    "prevented": false,
+    "exec": true
+   },
+   {
+    "cmd": "insertText",
+    "value": "new",
+    "inputType": "insertText",
+    "prevented": false,
+    "exec": true
+   },
+   {
+    "cmd": "delete",
+    "inputType": "deleteContentBackward",
+    "prevented": false,
+    "exec": true
+   }
+  ],
+  "after": {
+   "dom": [
+    "hello world",
+    "new",
+    " line"
+   ],
+   "model": [
+    "hello world",
+    "new",
+    " line"
+   ]
+  },
+  "exp": [
+   "hello world",
+   "new",
+   " line"
+  ],
+  "typed": {
+   "dom": [
+    "hello worldQ",
+    "new",
+    " line"
+   ],
+   "model": [
+    "hello worldQ",
+    "new",
+    " line"
+   ]
+  },
+  "typedExp": [
+   "hello worldQ",
+   "new",
+   " line"
+  ],
+  "events": {
+   "bi": [
+    "S:insertParagraph",
+    "S:insertText",
+    "S:deleteContentBackward",
+    "T:insertText"
+   ],
+   "input": [
+    "insertParagraph",
+    "insertText",
+    "deleteContentBackward",
+    "insertText"
+   ]
+  },
+  "errs": [],
+  "outcome": "correct"
+ }
+]

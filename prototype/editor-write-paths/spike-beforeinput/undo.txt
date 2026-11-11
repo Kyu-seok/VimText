@@ -1,0 +1,194 @@
+
+== bare {"mode":"bi","target":"host","deleteType":"deleteContentBackward"}
+insX       correct                    insertText[-]+x                                  model ["helloX world","second line"] | undo x1 -> ["hello world","second line"] restored
+insXY      correct                    insertText[-]+x                                  model ["helloXY world","second line"] | undo x1 -> ["hello world","second line"] restored
+r          correct                    insertText[-]+x                                  model ["Jello world","second line"] | undo x1 -> ["hello world","second line"] restored
+cw         correct                    insertText[-]+x                                  model ["hello there","second line"] | undo x1 -> ["hello world","second line"] restored
+delNode    correct                    delete[-]+x                                      model ["he world","second line"] | undo x1 -> ["hello world","second line"] restored
+delBold    correct                    delete[-]+x                                      model ["helrld end","second line"] | undo x1 -> ["hello world end","second line"] restored
+delWhole   correct                    delete[-]+x                                      model ["hello  end","second line"] | undo x1 -> ["hello world end","second line"] restored
+delBound   correct                    delete[-]+x                                      model ["hello worldsecond line"] | undo x1 -> ["hello world","second line"] restored
+dd         correct                    delete[-]+x                                      model ["hello world"] | undo x1 -> ["hello world","second line"] restored
+delVis     correct                    delete[-]+x                                      model ["hello woond line"] | undo x1 -> ["hello world","second line"] restored
+J          correct                    delete[-]+x insertText[-]+x                      model ["hello world second line"] | undo x1 -> ["hello world","second line"] restored
+insCross   correct                    insertText[-]+x                                  model ["hello woZond line"] | undo x1 -> ["hello world","second line"] restored
+o          correct                    insertParagraph[-]+x insertText[-]+x             model ["hello world","new","second line"] | undo x1 -> ["hello world","second line"] restored
+rCR        correct                    insertParagraph[-]+x                             model ["hello","world","second line"] | undo x1 -> ["hello world","second line"] restored
+split      correct                    insertText[-]+x insertParagraph[-]+x insertText[-]+x model ["helloA","B world","second line"] | undo x1 -> ["hello world","second line"] restored
+seq        correct                    insertText[-]+x delete[-]+x                      model ["abhelo world","second line"] | undo x2 -> ["hello world","second line"] restored
+seqBlocks  correct                    insertParagraph[-]+x insertText[-]+x delete[-]+x model ["hello world","new"," line"] | undo x2 -> ["hello world","second line"] restored
+
+== bare {"mode":"bi","target":"host","deleteType":"deleteContentBackward","timing":"ms20"}
+insX       correct                    insertText[-]+x                                  model ["helloX world","second line"] | undo x1 -> ["hello world","second line"] restored
+insXY      correct                    insertText[-]+x                                  model ["helloXY world","second line"] | undo x1 -> ["hello world","second line"] restored
+r          correct                    insertText[-]+x                                  model ["Jello world","second line"] | undo x1 -> ["hello world","second line"] restored
+cw         correct                    insertText[-]+x                                  model ["hello there","second line"] | undo x1 -> ["hello world","second line"] restored
+delNode    correct                    delete[-]+x                                      model ["he world","second line"] | undo x1 -> ["hello world","second line"] restored
+delBold    correct                    delete[-]+x                                      model ["helrld end","second line"] | undo x1 -> ["hello world end","second line"] restored
+delWhole   correct                    delete[-]+x                                      model ["hello  end","second line"] | undo x1 -> ["hello world end","second line"] restored
+delBound   correct                    delete[-]+x                                      model ["hello worldsecond line"] | undo x1 -> ["hello world","second line"] restored
+dd         correct                    delete[-]+x                                      model ["hello world"] | undo x1 -> ["hello world","second line"] restored
+delVis     correct                    delete[-]+x                                      model ["hello woond line"] | undo x1 -> ["hello world","second line"] restored
+J          correct                    delete[-]+x insertText[-]+x                      model ["hello world second line"] | undo x1 -> ["hello world","second line"] restored
+insCross   correct                    insertText[-]+x                                  model ["hello woZond line"] | undo x1 -> ["hello world","second line"] restored
+o          correct                    insertParagraph[-]+x insertText[-]+x             model ["hello world","new","second line"] | undo x1 -> ["hello world","second line"] restored
+rCR        correct                    insertParagraph[-]+x                             model ["hello","world","second line"] | undo x1 -> ["hello world","second line"] restored
+split      correct                    insertText[-]+x insertParagraph[-]+x insertText[-]+x model ["helloA","B world","second line"] | undo x1 -> ["hello world","second line"] restored
+seq        correct                    insertText[-]+x delete[-]+x                      model ["abhelo world","second line"] | undo x2 -> ["hello world","second line"] restored
+seqBlocks  correct                    insertParagraph[-]+x insertText[-]+x delete[-]+x model ["hello world","new"," line"] | undo x2 -> ["hello world","second line"] restored
+
+== prosemirror {"mode":"bi","target":"host","deleteType":"deleteContentBackward"}
+insX       correct                    insertText[-]+x                                  model ["helloX world","second line"] | undo x1 -> ["hello world","second line"] restored
+insXY      correct                    insertText[-]+x                                  model ["helloXY world","second line"] | undo x1 -> ["hello world","second line"] restored
+r          correct                    insertText[-]+x                                  model ["Jello world","second line"] | undo x1 -> ["hello world","second line"] restored
+cw         correct                    insertText[-]+x                                  model ["hello there","second line"] | undo x1 -> ["hello world","second line"] restored
+delNode    correct                    delete[-]+x                                      model ["he world","second line"] | undo x1 -> ["hello world","second line"] restored
+delBold    correct                    delete[-]+x                                      model ["helrld end","second line"] | undo x1 -> ["hello world end","second line"] restored
+delWhole   correct                    delete[-]+x                                      model ["hello  end","second line"] | undo x1 -> ["hello world end","second line"] restored
+delBound   correct                    delete[-]+x                                      model ["hello worldsecond line"] | undo x1 -> ["hello world","second line"] restored
+dd         correct                    delete[-]+x                                      model ["hello world"] | undo x1 -> ["hello world","second line"] restored
+delVis     correct                    delete[-]+x                                      model ["hello woond line"] | undo x1 -> ["hello world","second line"] restored
+J          correct                    delete[-]+x insertText[-]+x                      model ["hello world second line"] | undo x1 -> ["hello world","second line"] restored
+insCross   correct                    insertText[-]+x                                  model ["hello woZond line"] | undo x1 -> ["hello world","second line"] restored
+o          correct                    insertParagraph[-]+x insertText[-]+x             model ["hello world","new","second line"] | undo x1 -> ["hello world","second line"] restored
+rCR        correct                    insertParagraph[-]+x                             model ["hello","world","second line"] | undo x1 -> ["hello world","second line"] restored
+split      correct                    insertText[-]+x insertParagraph[-]+x insertText[-]+x model ["helloA","B world","second line"] | undo x1 -> ["hello world","second line"] restored
+seq        correct                    insertText[-]+x delete[-]+x                      model ["abhelo world","second line"] | undo x2 -> ["hello world","second line"] restored
+seqBlocks  correct                    insertParagraph[-]+x insertText[-]+x delete[-]+x model ["hello world","new"," line"] | undo x2 -> ["hello world","second line"] restored
+
+== prosemirror {"mode":"bi","target":"host","deleteType":"deleteContentBackward","timing":"ms20"}
+insX       correct                    insertText[-]+x                                  model ["helloX world","second line"] | undo x1 -> ["hello world","second line"] restored
+insXY      correct                    insertText[-]+x                                  model ["helloXY world","second line"] | undo x1 -> ["hello world","second line"] restored
+r          correct                    insertText[-]+x                                  model ["Jello world","second line"] | undo x1 -> ["hello world","second line"] restored
+cw         correct                    insertText[-]+x                                  model ["hello there","second line"] | undo x1 -> ["hello world","second line"] restored
+delNode    correct                    delete[-]+x                                      model ["he world","second line"] | undo x1 -> ["hello world","second line"] restored
+delBold    correct                    delete[-]+x                                      model ["helrld end","second line"] | undo x1 -> ["hello world end","second line"] restored
+delWhole   correct                    delete[-]+x                                      model ["hello  end","second line"] | undo x1 -> ["hello world end","second line"] restored
+delBound   correct                    delete[-]+x                                      model ["hello worldsecond line"] | undo x1 -> ["hello world","second line"] restored
+dd         correct                    delete[-]+x                                      model ["hello world"] | undo x1 -> ["hello world","second line"] restored
+delVis     correct                    delete[-]+x                                      model ["hello woond line"] | undo x1 -> ["hello world","second line"] restored
+J          correct                    delete[-]+x insertText[-]+x                      model ["hello world second line"] | undo x1 -> ["hello world","second line"] restored
+insCross   correct                    insertText[-]+x                                  model ["hello woZond line"] | undo x1 -> ["hello world","second line"] restored
+o          correct                    insertParagraph[-]+x insertText[-]+x             model ["hello world","new","second line"] | undo x1 -> ["hello world","second line"] restored
+rCR        correct                    insertParagraph[-]+x                             model ["hello","world","second line"] | undo x1 -> ["hello world","second line"] restored
+split      correct                    insertText[-]+x insertParagraph[-]+x insertText[-]+x model ["helloA","B world","second line"] | undo x1 -> ["hello world","second line"] restored
+seq        correct                    insertText[-]+x delete[-]+x                      model ["abhelo world","second line"] | undo x2 -> ["hello world","second line"] restored
+seqBlocks  correct                    insertParagraph[-]+x insertText[-]+x delete[-]+x model ["hello world","new"," line"] | undo x2 -> ["hello world","second line"] restored
+
+== lexical {"mode":"bi","target":"host","deleteType":"deleteContentBackward"}
+insX       correct                    insertText[-]+x                                  model ["helloX world","second line"] | undo x1 -> ["hello world","second line"] restored
+insXY      correct                    insertText[-]+x                                  model ["helloXY world","second line"] | undo x1 -> ["hello world","second line"] restored
+r          correct                    insertText[P]                                    model ["Jello world","second line"] | undo x1 -> ["hello world","second line"] restored
+cw         correct                    insertText[P]                                    model ["hello there","second line"] | undo x1 -> ["hello world","second line"] restored
+delNode    correct                    delete[P]                                        model ["he world","second line"] | undo x1 -> ["hello world","second line"] restored
+delBold    correct                    delete[P]                                        model ["helrld end","second line"] | undo x1 -> ["hello world end","second line"] restored
+delWhole   correct                    delete[P]                                        model ["hello  end","second line"] | undo x1 -> ["hello world end","second line"] restored
+delBound   correct                    delete[P]                                        model ["hello worldsecond line"] | undo x1 -> ["hello world","second line"] restored
+dd         correct                    delete[P]                                        model ["hello world"] | undo x1 -> ["hello world","second line"] restored
+delVis     correct                    delete[P]                                        model ["hello woond line"] | undo x1 -> ["hello world","second line"] restored
+J          correct                    delete[P] insertText[P]                          model ["hello world second line"] | undo x1 -> ["hello world","second line"] restored
+insCross   correct                    insertText[P]                                    model ["hello woZond line"] | undo x1 -> ["hello world","second line"] restored
+o          correct                    insertParagraph[P] insertText[P]                 model ["hello world","new","second line"] | undo x1 -> ["hello world","second line"] restored
+rCR        correct                    insertParagraph[P]                               model ["hello","world","second line"] | undo x1 -> ["hello world","second line"] restored
+split      wrong                      insertText[-]+x insertParagraph[P] insertText[-]+x model ["helloA"," world","second line"] | undo x1 -> ["hello world","second line"] restored
+seq        wrong                      insertText[-]+x delete[P]                        model ["ahello world","second line"] | undo x1 -> ["hello world","second line"] restored
+seqBlocks FAIL Error: page.evaluate: TypeError: Failed to execute 'createTreeWalker' on 'Document': parameter 1 is not of type 'Node'.
+    at window.textAt (http://localhost:8781/:67:51)
+    at window.sel (http://lo
+
+== lexical {"mode":"bi","target":"host","deleteType":"deleteContentBackward","timing":"ms20"}
+insX       correct                    insertText[-]+x                                  model ["helloX world","second line"] | undo x1 -> ["hello world","second line"] restored
+insXY      correct                    insertText[-]+x                                  model ["helloXY world","second line"] | undo x1 -> ["hello world","second line"] restored
+r          correct                    insertText[P]                                    model ["Jello world","second line"] | undo x1 -> ["hello world","second line"] restored
+cw         correct                    insertText[P]                                    model ["hello there","second line"] | undo x1 -> ["hello world","second line"] restored
+delNode    correct                    delete[P]                                        model ["he world","second line"] | undo x1 -> ["hello world","second line"] restored
+delBold    correct                    delete[P]                                        model ["helrld end","second line"] | undo x1 -> ["hello world end","second line"] restored
+delWhole   correct                    delete[P]                                        model ["hello  end","second line"] | undo x1 -> ["hello world end","second line"] restored
+delBound   correct                    delete[P]                                        model ["hello worldsecond line"] | undo x1 -> ["hello world","second line"] restored
+dd         correct                    delete[P]                                        model ["hello world"] | undo x1 -> ["hello world","second line"] restored
+delVis     correct                    delete[P]                                        model ["hello woond line"] | undo x1 -> ["hello world","second line"] restored
+J          correct                    delete[P] insertText[-]+x                        model ["hello world second line"] | undo x2 -> ["hello world","second line"] restored
+insCross   correct                    insertText[P]                                    model ["hello woZond line"] | undo x1 -> ["hello world","second line"] restored
+o          correct                    insertParagraph[P] insertText[P]                 model ["hello world","new","second line"] | undo x2 -> ["hello world","second line"] restored
+rCR        correct                    insertParagraph[P]                               model ["hello","world","second line"] | undo x1 -> ["hello world","second line"] restored
+split      correct                    insertText[-]+x insertParagraph[P] insertText[-]+x model ["helloA","B world","second line"] | undo x3 -> ["hello world","second line"] restored
+seq        correct                    insertText[-]+x delete[P]                        model ["abhelo world","second line"] | undo x2 -> ["hello world","second line"] restored
+seqBlocks  correct                    insertParagraph[P] insertText[P] delete[P]       model ["hello world","new"," line"] | undo x3 -> ["hello world","second line"] restored
+
+== quill {"mode":"bi","target":"host","deleteType":"deleteContentBackward"}
+insX       correct                    insertText[-]+x                                  model ["helloX world","second line"] | undo x1 -> ["hello world","second line"] restored
+insXY      correct                    insertText[-]+x                                  model ["helloXY world","second line"] | undo x1 -> ["hello world","second line"] restored
+r          correct                    insertText[P]                                    model ["Jello world","second line"] | undo x1 -> ["hello world","second line"] restored
+cw         correct                    insertText[P]                                    model ["hello there","second line"] | undo x1 -> ["hello world","second line"] restored
+delNode    correct                    delete[-]+x                                      model ["he world","second line"] | undo x1 -> ["hello world","second line"] restored
+delBold    correct                    delete[-]+x                                      model ["helrld end","second line"] | undo x1 -> ["hello world end","second line"] restored
+delWhole   correct                    delete[-]+x                                      model ["hello  end","second line"] | undo x1 -> ["hello world end","second line"] restored
+delBound   correct                    delete[-]+x                                      model ["hello worldsecond line"] | undo x1 -> ["hello world","second line"] restored
+dd         correct                    delete[-]+x                                      model ["hello world"] | undo x1 -> ["hello world","second line"] restored
+delVis     correct                    delete[-]+x                                      model ["hello woond line"] | undo x1 -> ["hello world","second line"] restored
+J          correct                    delete[-]+x insertText[-]+x                      model ["hello world second line"] | undo x1 -> ["hello world","second line"] restored
+insCross   correct                    insertText[P]                                    model ["hello woZond line"] | undo x1 -> ["hello world","second line"] restored
+o          correct                    insertParagraph[-]+x insertText[-]+x             model ["hello world","new","second line"] | undo x1 -> ["hello world","second line"] restored
+rCR        correct                    insertParagraph[-]+x                             model ["hello","world","second line"] | undo x1 -> ["hello world","second line"] restored
+split      correct                    insertText[-]+x insertParagraph[-]+x insertText[-]+x model ["helloA","B world","second line"] | undo x1 -> ["hello world","second line"] restored
+seq        correct                    insertText[-]+x delete[-]+x                      model ["abhelo world","second line"] | undo x1 -> ["hello world","second line"] restored
+seqBlocks  correct                    insertParagraph[-]+x insertText[-]+x delete[-]+x model ["hello world","new"," line"] | undo x1 -> ["hello world","second line"] restored
+
+== quill {"mode":"bi","target":"host","deleteType":"deleteContentBackward","timing":"ms20"}
+insX       correct                    insertText[-]+x                                  model ["helloX world","second line"] | undo x1 -> ["hello world","second line"] restored
+insXY      correct                    insertText[-]+x                                  model ["helloXY world","second line"] | undo x1 -> ["hello world","second line"] restored
+r          correct                    insertText[P]                                    model ["Jello world","second line"] | undo x1 -> ["hello world","second line"] restored
+cw         correct                    insertText[P]                                    model ["hello there","second line"] | undo x1 -> ["hello world","second line"] restored
+delNode    correct                    delete[-]+x                                      model ["he world","second line"] | undo x1 -> ["hello world","second line"] restored
+delBold    correct                    delete[-]+x                                      model ["helrld end","second line"] | undo x1 -> ["hello world end","second line"] restored
+delWhole   correct                    delete[-]+x                                      model ["hello  end","second line"] | undo x1 -> ["hello world end","second line"] restored
+delBound   correct                    delete[-]+x                                      model ["hello worldsecond line"] | undo x1 -> ["hello world","second line"] restored
+dd         correct                    delete[-]+x                                      model ["hello world"] | undo x1 -> ["hello world","second line"] restored
+delVis     correct                    delete[-]+x                                      model ["hello woond line"] | undo x1 -> ["hello world","second line"] restored
+J          correct                    delete[-]+x insertText[-]+x                      model ["hello world second line"] | undo x1 -> ["hello world","second line"] restored
+insCross   correct                    insertText[P]                                    model ["hello woZond line"] | undo x1 -> ["hello world","second line"] restored
+o          correct                    insertParagraph[-]+x insertText[-]+x             model ["hello world","new","second line"] | undo x1 -> ["hello world","second line"] restored
+rCR        correct                    insertParagraph[-]+x                             model ["hello","world","second line"] | undo x1 -> ["hello world","second line"] restored
+split      correct                    insertText[-]+x insertParagraph[-]+x insertText[-]+x model ["helloA","B world","second line"] | undo x1 -> ["hello world","second line"] restored
+seq        correct                    insertText[-]+x delete[-]+x                      model ["abhelo world","second line"] | undo x1 -> ["hello world","second line"] restored
+seqBlocks  correct                    insertParagraph[-]+x insertText[-]+x delete[-]+x model ["hello world","new"," line"] | undo x1 -> ["hello world","second line"] restored
+
+== slate {"mode":"bi","target":"host","deleteType":"deleteContentBackward"}
+insX       correct                    insertText[-]+x                                  model ["helloX world","second line"] | undo x1 -> ["hello world","second line"] restored
+insXY      correct                    insertText[P]                                    model ["helloXY world","second line"] | undo x1 -> ["hello world","second line"] restored
+r          correct                    insertText[P]                                    model ["Jello world","second line"] | undo x1 -> ["hello world","second line"] restored
+cw         correct                    insertText[P]                                    model ["hello there","second line"] | undo x1 -> ["hello world","second line"] restored
+delNode    correct                    delete[P]                                        model ["he world","second line"] | undo x1 -> ["hello world","second line"] restored
+delBold    correct                    delete[P]                                        model ["helrld end","second line"] | undo x1 -> ["hello world end","second line"] restored
+delWhole   correct                    delete[P]                                        model ["hello  end","second line"] | undo x1 -> ["hello world end","second line"] restored
+delBound   correct                    delete[P]                                        model ["hello worldsecond line"] | undo x1 -> ["hello world","second line"] restored
+dd         correct                    delete[P]                                        model ["hello world"] | undo x1 -> ["hello world","second line"] restored
+delVis     correct                    delete[P]                                        model ["hello woond line"] | undo x1 -> ["hello world","second line"] restored
+J          diverged                   delete[P] insertText[-]+x                        model ["hello world second line"] DOM ["hello world second linesecond line"] | undo x1 -> ["hello world","second line"] restored ERR ["console: NotFoundError: Failed to execute 'removeChild' on 'Node': The node to be removed is not a child of this node.\n    at Js (https://esm.sh/react-dom@18.3.1/X-ZHJlY","NotFoundError: Failed to execute 'removeChild' on 'Node': The node to be removed is not a child of this node.","Uncaught NotFoundError: Failed to execute 'removeChild' on 'Node': The node to be removed is not a child of this node."]
+insCross   correct                    insertText[P]                                    model ["hello woZond line"] | undo x1 -> ["hello world","second line"] restored
+o          correct                    insertParagraph[P] insertText[P]                 model ["hello world","new","second line"] | undo x1 -> ["hello world","second line"] restored
+rCR        correct                    insertParagraph[P]                               model ["hello","world","second line"] | undo x1 -> ["hello world","second line"] restored
+split      correct                    insertText[-]+x insertParagraph[P] insertText[P] model ["helloA","B world","second line"] | undo x1 -> ["hello world","second line"] restored
+seq        wrong                      insertText[P] delete[P]                          model ["ahello world","second line"] | undo x1 -> ["hello world","second line"] restored
+seqBlocks FAIL Error: page.evaluate: TypeError: Failed to execute 'createTreeWalker' on 'Document': parameter 1 is not of type 'Node'.
+    at window.textAt (http://localhost:8781/:67:51)
+    at window.sel (http://lo
+
+== slate {"mode":"bi","target":"host","deleteType":"deleteContentBackward","timing":"ms20"}
+insX       correct                    insertText[-]+x                                  model ["helloX world","second line"] | undo x1 -> ["hello world","second line"] restored
+insXY      correct                    insertText[P]                                    model ["helloXY world","second line"] | undo x1 -> ["hello world","second line"] restored
+r          correct                    insertText[P]                                    model ["Jello world","second line"] | undo x1 -> ["hello world","second line"] restored
+cw         correct                    insertText[P]                                    model ["hello there","second line"] | undo x1 -> ["hello world","second line"] restored
+delNode    correct                    delete[P]                                        model ["he world","second line"] | undo x1 -> ["hello world","second line"] restored
+delBold    correct                    delete[P]                                        model ["helrld end","second line"] | undo x1 -> ["hello world end","second line"] restored
+delWhole   correct                    delete[P]                                        model ["hello  end","second line"] | undo x1 -> ["hello world end","second line"] restored
+delBound   correct                    delete[P]                                        model ["hello worldsecond line"] | undo x1 -> ["hello world","second line"] restored
+dd         correct                    delete[P]                                        model ["hello world"] | undo x1 -> ["hello world","second line"] restored
+delVis     correct                    delete[P]                                        model ["hello woond line"] | undo x1 -> ["hello world","second line"] restored
+J          correct                    delete[P] insertText[-]+x                        model ["hello world second line"] | undo x2 -> ["hello world","second line"] restored
+insCross   correct                    insertText[P]                                    model ["hello woZond line"] | undo x1 -> ["hello world","second line"] restored
+o          correct                    insertParagraph[P] insertText[P]                 model ["hello world","new","second line"] | undo x2 -> ["hello world","second line"] restored
+rCR        correct                    insertParagraph[P]                               model ["hello","world","second line"] | undo x1 -> ["hello world","second line"] restored
+split      correct                    insertText[-]+x insertParagraph[P] insertText[P] model ["helloA","B world","second line"] | undo x3 -> ["hello world","second line"] restored
+seq        correct                    insertText[P] delete[P]                          model ["abhelo world","second line"] | undo x2 -> ["hello world","second line"] restored
+seqBlocks  correct                    insertParagraph[P] insertText[P] delete[P]       model ["hello world","new"," line"] | undo x3 -> ["hello world","second line"] restored
