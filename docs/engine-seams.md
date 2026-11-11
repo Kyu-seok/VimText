@@ -12,7 +12,10 @@ The bridge (`src/engine/mirror.ts`, `src/bridge/Session.ts`) depends on the seam
 below. Each entry is a gotcha the source does not state; the function names in
 parentheses are the grep targets. One entry per seam, as a list rather than a
 table, so two branches adding an entry each merge cleanly (prettier re-pads a
-whole table for one new row).
+whole table for one new row). `.gitattributes` merges this file with
+`merge=union`: entries two branches append at the same place both land, with
+no conflict. An entry both branches edited lands twice, old and new, so whoever
+merges keeps the newer one.
 
 - **Feeding keys** (adapter `vimPlugin.handleKey(e, view)`, reached as `cm.state.vimPlugin.handleKey`): takes a KeyboardEvent-shaped object and calls `preventDefault` itself when consumed. Returns false for Esc in Normal mode even when it just cancelled a pending operator or count, so the bridge re-prevents Esc whenever input was pending.
 - **Key names** (engine `vimKeyFromEvent`): `' '` → `<Space>`, `Escape` → `<Esc>`. The default keymap maps `<C-[>` and `<C-c>` to `<Esc>` in Insert mode; the bridge normalises Ctrl-[ to Escape itself and never forwards Ctrl-c (copy on Windows).
