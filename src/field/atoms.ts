@@ -27,12 +27,24 @@ const REPLACED = new Set([
 /**
  * Whether an element inside an editing host is an Atom: a replaced element, or
  * a non-editable island (`contenteditable="false"`, so its `isContentEditable`
- * is false while the host around it is editable). A nested editable inside an
- * island is part of the island.
+ * is false while the host around it is editable) with text or a replaced
+ * element of its own. A nested editable inside an island is part of the island.
  */
 export function isAtom(el: Element): boolean {
   if (REPLACED.has(el.localName)) return true;
-  return el instanceof HTMLElement && !el.isContentEditable;
+  return el instanceof HTMLElement && !el.isContentEditable && !isDecoration(el);
+}
+
+/**
+ * A non-editable element with no text and no replaced element inside: it draws
+ * only decoration, as Quill's list marker (an empty `ql-ui` span whose
+ * `::before` is the bullet, #60) does. It is no text of its line and not an
+ * Atom; the projection leaves it out.
+ */
+export function isDecoration(el: Element): boolean {
+  if (!(el instanceof HTMLElement) || el.isContentEditable || el.textContent !== "") return false;
+  for (const name of REPLACED) if (el.querySelector(name)) return false;
+  return true;
 }
 
 /** What a yank stores for an Atom: an image's `alt`, an island's rendered text, nothing for other replaced elements. */

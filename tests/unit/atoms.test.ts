@@ -60,6 +60,37 @@ describe("Atoms in the projection", () => {
     expect(p.fromDom(chip.parentNode!, 2)).toBe(i + 1);
     expect(p.fromDom(chip.firstChild!, 2)).toBe(i);
   });
+
+  // #60: Quill 2 starts each list item with an empty non-editable
+  // `<span class="ql-ui">` that draws the bullet through `::before`. It is no
+  // text of the item's, so the projection leaves it out and a line's start is
+  // the text after it.
+  const LIST = '<ol><li><span class="ql-ui" contenteditable="false"></span>first</li><li>next</li></ol>';
+
+  it("a non-editable element with no text of its own is not an Atom: it projects as nothing", () => {
+    expect(project(editableHost(LIST)).text).toBe("first\nnext");
+    expect(project(editableHost(LIST)).atoms).toEqual([]);
+  });
+
+  it("a line's start after such an element maps into the text after it, and back", () => {
+    const host = editableHost(LIST);
+    const p = project(host);
+    const text = host.querySelector("li")!.lastChild!;
+    expect(p.toDom(0)).toEqual({ node: text, offset: 0 });
+    for (let k = 0; k <= p.text.length; k++) {
+      const { node, offset } = p.toDom(k);
+      expect(p.fromDom(node, offset), `offset ${k}`).toBe(k);
+    }
+    const li = host.querySelector("li")!;
+    expect(p.fromDom(li, 0)).toBe(0);
+    expect(p.fromDom(li, 1)).toBe(0);
+  });
+
+  it("a non-editable element holding an image is still an Atom", () => {
+    expect(project(editableHost('<p>a <span contenteditable="false"><img alt="x"></span> b</p>')).text).toBe(
+      `a ${OBJ} b`,
+    );
+  });
 });
 
 describe("motions over Atoms", () => {

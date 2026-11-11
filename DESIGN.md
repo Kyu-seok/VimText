@@ -163,7 +163,11 @@ primary range is highlighted.
   Any element inside the host whose `isContentEditable` is false is an Atom, and so is every
   replaced element or form control (`img`, `video`, `canvas`, `iframe`, `svg`, `input`,
   `button`, `select`, `textarea`, …; the list is `src/field/atoms.ts`): none is text the
-  editor writes through.
+  editor writes through. The one exception (#60, owner decision of 2026-11-12): a
+  non-editable element with no text and no replaced element of its own draws only
+  decoration, as Quill's list marker (an empty `ql-ui` span whose `::before` is the bullet)
+  does. It is not an Atom and projects as nothing, so a list item's line starts at its text
+  and `0x`, `I`, `dd` and `J` act on it as on a plain line.
 - _Writes_ (non-Insert Modes): never a DOM mutation. The bridge selects the DOM range of
   the diff and, per step, offers the editor a cancelable synthetic `beforeinput`
   (`insertText`, `deleteContentBackward`, `insertParagraph`, with the range as its target);
