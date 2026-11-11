@@ -189,7 +189,8 @@ primary range is highlighted.
   The same test holds on every Field kind: a textarea or input whose page puts its whole value
   back after a write gets the message, and the change leaves the undo history, where a page that
   writes anything else is a Controlled Field rewrite. A `U+FFFC` an undo writes back for an Atom
-  VimText no longer holds the element of is written as nothing, which is not a refusal.
+  VimText no longer holds the element of is written as nothing, which is not a refusal; nor is
+  one whose restore the editor took over and left undone (#62, accepted limitations below).
   The formatting at a write's edge is the editor's: text written at the end of a mark run takes
   the mark, as typing there would (`J` after an italic word makes the joining space italic).
 - _Insert_: the editor owns typing as on every Field; the mirror re-projects the whole host
@@ -407,6 +408,13 @@ it is outside the gate, so PNG churn never fails `npm run check`.
   bold run is plain, and a `plaintext-only` host keeps the `<br>` a merge left. An Atom comes
   back from `u` only while VimText still holds its element (the last 200 removed in that Field);
   an older one, or one the page took out without an `input` event, comes back as nothing.
+  The restore is offered to the editor first, as a `beforeinput` of `insertFromPaste` with the
+  Atom's markup as `text/html`; an editor that cancels it gets no `insertHTML`, and the Atom
+  comes back only if that editor brings it back itself. Lexical cancels it and does nothing, so
+  on Lexical `u` after deleting a decorator restores the text around it, without the decorator
+  (#62). Chosen over restoring the decorator: Lexical cannot take a decorator back through the
+  DOM (the `insertHTML` restore turned its whole line into the decorator's text), and pasting
+  it back needs Lexical's own clipboard JSON, which the isolated world never holds.
 
 ## Milestones
 

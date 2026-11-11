@@ -162,6 +162,46 @@ describe("undoing Atom deletions", () => {
     expect(host.querySelector("span")?.textContent).toBe("@alice");
     expect(host.querySelector("img")?.getAttribute("alt")).toBe("cat");
   });
+
+  // #62: Lexical cancels a `beforeinput` of `insertFromPaste` and does nothing
+  // (it pastes only from a real `paste` event), and a decorator cannot come
+  // back through the DOM: `insertHTML` there turned the whole line into the
+  // decorator's text. The restore is offered to the page first; a page that
+  // takes it over gets no `insertHTML`, so u restores the text without the Atom.
+  it("a page that takes over the offered restore gets no insertHTML: u restores the text around the Atom, without it", async () => {
+    const { host, field } = open('<p>a cat <span contenteditable="false">@cat</span> here</p><p>next</p>');
+    const offered: string[] = [];
+    host.addEventListener("beforeinput", (e) => {
+      if (e.inputType !== "insertFromPaste") return;
+      offered.push(e.dataTransfer?.getData("text/html") ?? "");
+      e.preventDefault();
+    });
+    const commands = vi.spyOn(document, "execCommand");
+    await keys("wwx");
+    expect(field.getValue()).toBe("a cat  here\nnext");
+    await keys("u");
+    expect(offered).toEqual(['<span contenteditable="false">@cat</span>']);
+    expect(commands.mock.calls.map((c) => c[0])).not.toContain("insertHTML");
+    expect(field.getValue()).toBe("a cat  here\nnext");
+    expect(host.querySelector("span")).toBeNull();
+    expect(statusText()).not.toContain("refused");
+    // The mirror follows the Field: the next edit lands on the text there.
+    await keys("0x");
+    expect(field.getValue()).toBe(" cat  here\nnext");
+  });
+
+  it("a page that lets the offered restore through gets the Atom back through insertHTML", async () => {
+    const { host, field } = open('<p>a cat <span contenteditable="false">@cat</span> here</p>');
+    const offered: string[] = [];
+    host.addEventListener("beforeinput", (e) => {
+      if (e.inputType === "insertFromPaste") offered.push(e.dataTransfer?.getData("text/html") ?? "");
+    });
+    await keys("wwx");
+    await keys("u");
+    expect(offered).toHaveLength(1);
+    expect(field.getValue()).toBe(`a cat ${OBJ} here`);
+    expect(host.querySelector("span")?.textContent).toBe("@cat");
+  });
 });
 
 describe("undo puts back the Atom removed at that place", () => {

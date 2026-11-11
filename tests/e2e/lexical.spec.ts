@@ -1,4 +1,4 @@
-import { test, expect, ready, activateAtStart, modelText } from "./extension";
+import { test, expect, ready, activateAtStart, modelText, statusText } from "./extension";
 import type { Page } from "@playwright/test";
 
 /**
@@ -166,7 +166,7 @@ test("o and linewise p open a new block below; r<CR> splits a line without losin
     .toEqual(["the quick ", "Brown fox", "new para"]);
 });
 
-test("x on the decorator deletes it; u puts its text in place of the line (a bug, pinned)", async ({
+test("x on the decorator deletes it; u restores the text around it, without the decorator (#62)", async ({
   page,
 }) => {
   await page.keyboard.type("4jwwx");
@@ -175,16 +175,19 @@ test("x on the decorator deletes it; u puts its text in place of the line (a bug
   await expect.poll(async () => (await modelText(page))[4]).toBe("a cat Z here");
   await page.keyboard.type("u");
   await expect.poll(async () => (await modelText(page))[4]).toBe("a cat  here");
-  // Pins a bug found by #53 (to be filed; it loses text), not what Vim does:
-  // the line should read `a cat ￼ here`. The
-  // restore writes the decorator's kept markup through `insertHTML` (an
-  // `execCommand` only, ADR 0008), which leaves the caret inside the island.
-  // Lexical's `input` handler reads that text node (`@cat`) into the TextNode
-  // it had selected, and its MutationObserver removes the foreign element.
+  // The decorator's restore is offered as a `beforeinput` of `insertFromPaste`;
+  // Lexical cancels it and does nothing, and a decorator cannot come back
+  // through the DOM (`insertHTML` turned the line into `@cat`), so u restores
+  // the text without it: DESIGN.md, "u restores text, not always marks or
+  // markup". No Refused Edit: the Field's text stands.
   await page.keyboard.type("u");
-  await expect.poll(async () => (await modelText(page))[4]).toBe("@cat");
-  const others = (lines: string[]) => lines.filter((_, i) => i !== 4);
-  await expect.poll(async () => others(await modelText(page))).toEqual(others(ORIGINAL));
+  await expect(page.locator(`${HOST} .mention`)).toHaveCount(0);
+  await expect.poll(() => modelText(page)).toEqual(ORIGINAL.map((l) => l.replace(ATOM, "")));
+  expect(await statusText(page)).not.toContain("refused");
+  // VimText follows the Field: a real keystroke and an x after it land on that text.
+  await typeAfter(page, "Q");
+  await page.keyboard.type("0x");
+  await expect.poll(async () => (await modelText(page))[4]).toBe(" cat Q here");
 });
 
 test("u and Ctrl-r restore Lexical's text", async ({ page }) => {

@@ -194,9 +194,36 @@ export function settleEditor(host: Element): void {
 }
 
 /**
- * Inserts an Atom's markup at the caret through the editor's own
- * `insertHTML`, the one editing command that can bring back an element
- * (an undone Atom deletion). Returns false when the browser refused it.
+ * Offers an Atom's restore (an undone Atom deletion) to the page's editor at
+ * the caret, as each write step is offered (ADR 0008): a cancelable synthetic
+ * `beforeinput` of `insertFromPaste` carrying the Atom's markup as
+ * `text/html`. Returns true when a listener cancelled it: the editor has taken
+ * the restore over, whatever it then does, and gets no `insertHTML`. Lexical
+ * cancels it and does nothing (it pastes only from a real `paste` event), and
+ * a decorator cannot come back through the DOM there: `insertHTML` turned its
+ * whole line into the decorator's text (#62).
+ */
+export function restoreTakenOver(host: Element, html: string): boolean {
+  const data = new DataTransfer();
+  data.setData("text/html", html);
+  const offered = new InputEvent("beforeinput", {
+    inputType: "insertFromPaste",
+    dataTransfer: data,
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+    targetRanges: selectedRange(host),
+  });
+  const taken = !host.dispatchEvent(offered);
+  settleEditor(host);
+  return taken;
+}
+
+/**
+ * Inserts an Atom's markup at the caret through the browser's own
+ * `insertHTML`, the one editing command that can bring back an element,
+ * once the page has let the offered restore through (`restoreTakenOver`).
+ * Returns false when the browser refused it.
  */
 export function insertAtomHtml(html: string): boolean {
   return document.execCommand("insertHTML", false, html);

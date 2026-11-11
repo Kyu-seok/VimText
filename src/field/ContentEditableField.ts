@@ -2,7 +2,14 @@ import type { Field, FieldSelection, WrappingStyle } from "./Field";
 import { diffHunks, diffText, type TextDiff } from "./diff";
 import { project, type DomPoint, type Projection } from "./projection";
 import { readDomSelection, selectDom } from "./domSelection";
-import { insertAtomHtml, nextTask, replaceDomRange, settleEditor, type Pauses } from "./editingCommands";
+import {
+  insertAtomHtml,
+  nextTask,
+  replaceDomRange,
+  restoreTakenOver,
+  settleEditor,
+  type Pauses,
+} from "./editingCommands";
 import { ATOM_CHAR, atomText } from "./atoms";
 
 /**
@@ -353,10 +360,19 @@ export class ContentEditableField implements Field {
    * Puts an Atom's element back at offset `at` through `insertHTML`, with a
    * marker character after it while it lands: Chrome moves a non-editable
    * element inserted at the end of a block out of that block, and leaves the
-   * caret inside it, where no later editing command applies.
+   * caret inside it, where no later editing command applies. The restore is
+   * offered to the page first (`restoreTakenOver`); a page that takes it over
+   * gets neither the marker nor `insertHTML`, and the U+FFFC stands for
+   * whatever it did (Lexical: nothing, so `u` restores the text without the
+   * Atom, #62), which the Session folds like a Controlled Field rewrite.
    */
   private async insertAtom(at: number, html: string): Promise<boolean> {
     const here = project(this.element).toDom(at);
+    selectDom(this.element, here, here);
+    settleEditor(this.element);
+    if (!(await this.pause())) return false;
+    if (restoreTakenOver(this.element, html)) return false;
+    if (!(await this.pause())) return false;
     await replaceDomRange(this.element, here, here, MARKER, this.pauses);
     if (!(await this.pause())) return false;
     const before = project(this.element).toDom(at);
