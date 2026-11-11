@@ -1,5 +1,5 @@
 import type { DomPoint } from "./projection";
-import { selectDom } from "./domSelection";
+import { readDomSelection, selectDom } from "./domSelection";
 
 /**
  * Resolves in a later task (a message on a fresh channel: no timer clamping),
@@ -24,11 +24,12 @@ export type Pause = () => Promise<boolean>;
 
 /**
  * Replaces the DOM between `from` and `to` with `text` the way typing would
- * (ADR 0007): the range is selected and the browser's own editing commands
- * run on it, so the page's editor applies the edit and its model stays the
- * truth. A `\n` is `insertParagraph` (what Enter makes in that editor), other
- * text `insertText`, a pure deletion `delete`; the first command replaces the
- * selection. No DOM node is touched here.
+ * (ADR 0007, ADR 0008): the range is selected and each step is offered to the
+ * page's editor as a synthetic `beforeinput`, the browser's own editing
+ * command running only if the editor did not take it, so the page's editor
+ * applies the edit and its model stays the truth. A `\n` is `insertParagraph`
+ * (what Enter makes in that editor), other text `insertText`, a pure deletion
+ * `delete`; the first step replaces the selection. No DOM node is touched here.
  *
  * Each step is followed by a `selectionchange` (see `settleEditor`). The first
  * step runs before this returns its promise; each later one waits on `pause`
@@ -61,10 +62,51 @@ export async function replaceDomRange(
   return ok;
 }
 
+/** The `inputType` a step offers the editor (ADR 0008): any deletion is `deleteContentBackward`, never `deleteContent`, which Lexical and Slate cancel and drop. */
+const INPUT_TYPE: Record<string, string> = {
+  insertText: "insertText",
+  insertParagraph: "insertParagraph",
+  delete: "deleteContentBackward",
+};
+
+/**
+ * One step of a write (ADR 0008): the editor is offered the edit as a
+ * cancelable synthetic `beforeinput` on the host, its target the selected
+ * range; only if no listener cancelled it does the browser's own editing
+ * command run. Either way a `selectionchange` follows. An editor that
+ * cancelled it applies the edit itself (or not: a Refused Edit, judged from
+ * the projection once the write has settled).
+ */
 function run(host: Element, command: string, value?: string): boolean {
-  const ok = document.execCommand(command, false, value);
+  const offered = new InputEvent("beforeinput", {
+    inputType: INPUT_TYPE[command],
+    data: command === "insertText" ? value : null,
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+    targetRanges: selectedRange(host),
+  });
+  const ok = host.dispatchEvent(offered) ? document.execCommand(command, false, value) : true;
   settleEditor(host);
   return ok;
+}
+
+/** The selection inside `host` as a `StaticRange`, start before end; none when it lies outside. */
+function selectedRange(host: Element): StaticRange[] {
+  const sel = readDomSelection(host);
+  if (!sel) return [];
+  let [start, end] = [sel.anchor, sel.focus];
+  const range = document.createRange();
+  range.setStart(start.node, start.offset);
+  if (range.comparePoint(end.node, end.offset) < 0) [start, end] = [end, start];
+  return [
+    new StaticRange({
+      startContainer: start.node,
+      startOffset: start.offset,
+      endContainer: end.node,
+      endOffset: end.offset,
+    }),
+  ];
 }
 
 /**

@@ -5,8 +5,13 @@
 //   #editor .ProseMirror   the editing host (contenteditable Field under test)
 //   window.pmDoc()         ProseMirror's document read back from the editor
 //                          (describeDoc), not from the DOM
-import { mountProseMirror, describeDoc } from "./prosemirror-editor";
+//   window.modelText()     ProseMirror's own text, one line per textblock
+//                          (modelLines), as every rich-editor fixture has it
+import { mountProseMirror, describeDoc, modelLines } from "./prosemirror-editor";
 
 const source = document.getElementById("source") as HTMLTemplateElement;
 const view = mountProseMirror(document.getElementById("editor")!, source.innerHTML);
-Object.assign(window, { pmDoc: () => describeDoc(view.state.doc) });
+Object.assign(window, {
+  pmDoc: () => describeDoc(view.state.doc),
+  modelText: () => modelLines(view.state.doc),
+});

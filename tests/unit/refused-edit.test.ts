@@ -10,9 +10,10 @@ import { statusText } from "./dom";
  * Field's text as it was, so the Field wins, the engine's change is dropped
  * from the undo history, and the Status Line says so.
  *
- * Chrome's editing commands fire `input` but not `beforeinput` (docs/engine-seams.md
- * "Refused edits"), so a page that cancels `beforeinput` does not stop them.
- * The refusal these tests stage is one that does happen: the page's `input`
+ * Each write step offers the page a synthetic `beforeinput` and runs the
+ * editing command only if no listener cancelled it (ADR 0008), so a page that
+ * cancels `beforeinput` and does nothing refuses the edit (the last describe).
+ * The refusal most tests here stage is the other kind: the page's `input`
  * handler puts back its last accepted markup when an edit touched a locked
  * span, as an editor re-rendering from its own model does.
  *
@@ -171,13 +172,16 @@ describe("A refused write on a Field that keeps its value", () => {
   });
 });
 
-describe('What Chromium refuses (docs/engine-seams.md "Refused edits")', () => {
-  it("a page that cancels beforeinput does not stop the write: the editing command fires none", async () => {
+describe("A page that cancels beforeinput (ADR 0008)", () => {
+  it("cancelling every beforeinput and doing nothing is a Refused Edit: the text stays and the Status Line says so", async () => {
     const opened = activeHost("<p>hello world</p>");
     current = opened;
     opened.host.addEventListener("beforeinput", (e) => e.preventDefault());
     await keys("x");
-    expect(blockTexts(opened.host)).toEqual(["ello world"]);
-    expect(statusText()).not.toContain(REFUSED);
+    expect(blockTexts(opened.host)).toEqual(["hello world"]);
+    expect(statusText()).toContain(REFUSED);
+    await keys("wdw");
+    expect(blockTexts(opened.host)).toEqual(["hello world"]);
+    expect(statusText()).toContain(REFUSED);
   });
 });

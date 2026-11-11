@@ -1,0 +1,39 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>VimText fixture: Lexical</title>
+    <style>
+      body {
+        font-family: system-ui;
+        margin: 40px;
+      }
+      #editor {
+        width: 480px;
+        min-height: 200px;
+        padding: 4px;
+        border: 1px solid #888;
+        font:
+          14px/1.4 Menlo,
+          monospace;
+      }
+      #editor p,
+      #editor h1,
+      #editor ul {
+        margin: 0;
+      }
+      #editor h1 {
+        font-size: inherit;
+      }
+      #editor .mention {
+        background: #def;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>VimText fixture: Lexical</h1>
+    <!-- lexical.js is bundled from lexical.ts by tools/build.mjs and gitignored. -->
+    <div id="editor" contenteditable="true"></div>
+    <script src="lexical.js"></script>
+  </body>
+</html>
