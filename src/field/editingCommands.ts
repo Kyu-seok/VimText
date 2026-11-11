@@ -17,10 +17,26 @@ export function nextTask(): Promise<void> {
 }
 
 /**
- * Waits between two steps of a write; resolves false when the write must stop
- * there (its Field was destroyed, its host left the document).
+ * Waits between two steps of a write, or before a write selects its range;
+ * resolves false when the write must stop there (its Field was destroyed, its
+ * host left the document).
  */
-export type Pause = () => Promise<boolean>;
+type Pause = () => Promise<boolean>;
+
+/** How the Field spaces a write (ADR 0008). */
+export interface Pauses {
+  /** Between two steps, and between selecting the range and the first step. */
+  step: Pause;
+  /** Before selecting the range again: until the editor has settled from the host's last change. */
+  settle: Pause;
+}
+
+/**
+ * How many times a write selects its range when the editor put its own
+ * selection back before the first step. Slate's case below needs a second;
+ * the bound keeps a page that always moves the selection from holding a write.
+ */
+const SELECT_ATTEMPTS = 3;
 
 /**
  * Replaces the DOM between `from` and `to` with `text` the way typing would
@@ -31,10 +47,22 @@ export type Pause = () => Promise<boolean>;
  * (what Enter makes in that editor), other text `insertText`, a pure deletion
  * `delete`; the first step replaces the selection. No DOM node is touched here.
  *
- * Each step is followed by a `selectionchange` (see `settleEditor`). The first
- * step runs before this returns its promise; each later one waits on `pause`
- * (ADR 0008: the steps are spaced so the editor catches up), and none runs
- * once `pause` says stop.
+ * The caller projects the range once the editor has settled from the host's
+ * last change, and the first step waits a task after it is selected
+ * (`pauses.step`) for the editor to take that selection. Slate takes a
+ * selection on a throttled timer: one it took just before the write, not yet
+ * rendered by React, makes it read no selection at the step's `beforeinput`
+ * (its node map is dirty) and apply the step at the one it took, and its
+ * render then puts that selection back into the DOM. So when the selection
+ * after that task is not the range, the range is selected again once the
+ * editor has settled (`pauses.settle`). Without this `dw` deleted only the
+ * Normal cursor's character, and `cw` only its first (tests/e2e/slate.spec.ts,
+ * "dw on a whole bold word", "x r cw inside the bold run"; docs/engine-seams.md,
+ * "Slate takes a selection late").
+ *
+ * Each step is followed by a `selectionchange` (see `settleEditor`) and each
+ * later step waits on `pauses.step` (ADR 0008: the steps are spaced so the
+ * editor catches up). Nothing more runs once a pause says stop.
  *
  * Resolves false when the browser refused a command (no editable selection,
  * an editor that cancelled it) or the write stopped.
@@ -44,10 +72,17 @@ export async function replaceDomRange(
   from: DomPoint,
   to: DomPoint,
   text: string,
-  pause: Pause,
+  pauses: Pauses,
 ): Promise<boolean> {
-  selectDom(host, from, to);
-  settleEditor(host);
+  for (let attempt = 1; ; attempt++) {
+    selectDom(host, from, to);
+    settleEditor(host);
+    if (!(await pauses.step())) return false;
+    if (attempt === SELECT_ATTEMPTS || isSelected(host, from, to)) break;
+    if (!(await pauses.settle())) return false;
+    // The editor re-rendered the range away: the write stops, and is judged.
+    if (!host.contains(from.node) || !host.contains(to.node)) return false;
+  }
   if (!text) return run(host, "delete");
   const steps: [string, string?][] = [];
   text.split("\n").forEach((part, i) => {
@@ -56,10 +91,18 @@ export async function replaceDomRange(
   });
   let ok = true;
   for (const [i, [command, value]] of steps.entries()) {
-    if (i > 0 && !(await pause())) return false;
+    if (i > 0 && !(await pauses.step())) return false;
     ok = run(host, command, value) && ok;
   }
   return ok;
+}
+
+/** Whether the selection inside `host` is still from `from` to `to`, either way round. */
+function isSelected(host: Element, from: DomPoint, to: DomPoint): boolean {
+  const sel = readDomSelection(host);
+  if (!sel) return false;
+  const same = (a: DomPoint, b: DomPoint) => a.node === b.node && a.offset === b.offset;
+  return (same(sel.anchor, from) && same(sel.focus, to)) || (same(sel.anchor, to) && same(sel.focus, from));
 }
 
 /** The `inputType` a step offers the editor (ADR 0008): any deletion is `deleteContentBackward`, never `deleteContent`, which Lexical and Slate cancel and drop. */

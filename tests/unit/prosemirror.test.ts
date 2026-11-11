@@ -215,9 +215,9 @@ describe("undo", () => {
       caretAt(view.dom.querySelector("p")!.firstChild!, 0);
       dispatchKey(view.dom, "Escape");
       dispatchKey(view.dom, "x");
-      await settle();
+      // The write lands asynchronously (ADR 0008).
+      await expect.poll(() => describeDoc(view.state.doc)[0]).toBe("he <b>quick</b> fox");
       const after = describeDoc(view.state.doc);
-      expect(after[0]).toBe("he <b>quick</b> fox");
       for (const mod of [{ metaKey: true }, { ctrlKey: true }]) {
         expect(dispatchKey(view.dom, "z", mod).defaultPrevented).toBe(true);
         await settle();

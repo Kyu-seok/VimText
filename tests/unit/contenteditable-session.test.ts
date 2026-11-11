@@ -59,7 +59,8 @@ describe("Activation on a contenteditable host", () => {
     expect(keydownOn(host, "Escape").defaultPrevented).toBe(true);
     expect(statusText()).toContain("NORMAL");
     keydownOn(host.querySelector("b")!, "x");
-    expect(blockTexts(host)[0]).toBe("he quick brown fox");
+    // The write lands asynchronously (ADR 0008).
+    await expect.poll(() => blockTexts(host)[0]).toBe("he quick brown fox");
   });
 
   it("the Session ends when the host stops being editable", async () => {

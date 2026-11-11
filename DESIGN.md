@@ -155,6 +155,8 @@ primary range is highlighted.
   where it is not what renders: each block is one line (`innerText` puts a blank line on each
   side of a `<p>`), and a break that ends its block (`<div>a<br></div>`,
   a trailing `\n` in `pre`) makes no line of its own (docs/engine-seams.md "innerText as the oracle").
+  A zero-width no-break space (U+FEFF, Slate's placeholder in an empty leaf) is nothing
+  (docs/engine-seams.md "Zero-width no-break space").
 - _Atoms_: a mention chip, an inline image, a `contenteditable="false"` island projects as
   one `U+FFFC`. Motions count it as one non-blank char; `x`/`dw` delete it whole. A yank
   stores the Atom's visible text (`@alice`, an image's `alt`, otherwise nothing), never `U+FFFC`.
@@ -167,7 +169,9 @@ primary range is highlighted.
   (`insertText`, `deleteContentBackward`, `insertParagraph`, with the range as its target);
   only if no listener cancels it does it run `document.execCommand('insertText' | 'delete')`
   (ADR 0008). An inserted `\n` is `insertParagraph` (what Enter does in the editor), a deleted
-  one merges blocks through the delete. The write is asynchronous: its steps are spaced so the
+  one merges blocks through the delete. The write is asynchronous: each span is selected once
+  the editor has settled from the host's last change (20 ms, set by the Slate fixture) and again
+  if the editor puts its own selection back; its steps are spaced so the
   editor catches up, a render due meanwhile is merged into the next write, and the refusal and
   Controlled Field rules below read the Field once the write has settled. A write reaches the
   editor's model on the editors a pinned fixture covers (Lexical, Slate, Quill, ProseMirror);

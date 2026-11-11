@@ -2,7 +2,7 @@ import type { Field, FieldSelection, WrappingStyle } from "./Field";
 import { diffHunks, diffText, type TextDiff } from "./diff";
 import { project, type Projection } from "./projection";
 import { readDomSelection, selectDom } from "./domSelection";
-import { insertAtomHtml, nextTask, replaceDomRange, settleEditor } from "./editingCommands";
+import { insertAtomHtml, nextTask, replaceDomRange, settleEditor, type Pauses } from "./editingCommands";
 import { ATOM_CHAR, atomText } from "./atoms";
 
 /**
@@ -17,6 +17,33 @@ interface RemovedAtom {
 
 /** Holds an Atom's place while it is inserted (see `insertAtom`). */
 const MARKER = "\u200b";
+
+/**
+ * The least time between the host's last change, whoever made it (a DOM
+ * mutation inside it, or a `selectionchange`), and the selection that starts
+ * a span of a write (ADR 0008: the minimum gap between writes, and between
+ * the spans of one). Slate ignores `selectionchange` from the moment it
+ * renders until a `setTimeout` it set then has fired (docs/engine-seams.md,
+ * "Slate ignores selectionchange after it renders"), and it takes a deletion
+ * at its own selection, not the event's target, so a span selected sooner is
+ * deleted at Slate's stale caret. A render that only moves the selection (Slate
+ * putting back its own after taking VimText's cursor) changes no node, and
+ * shows only as a `selectionchange`.
+ *
+ * Set by the Slate fixture's cases in tests/e2e/slate.spec.ts. "x r cw inside
+ * the bold run": a `!` Slate typed itself, then Esc and `0dw` at Playwright's
+ * pace, deleted the `!` instead of `the ` unless the write waited 15–20 ms
+ * from Slate's render of the `!` (a gap counted only from VimText's own last
+ * write missed it), which is why the gap counts from any change to the host.
+ * "u and Ctrl-r restore Slate's text": `G` then `dd` merged the first two
+ * lines at Slate's stale caret, Slate having re-rendered only its selection
+ * after `G`, which is why a `selectionchange` counts. With the reselection in
+ * `replaceDomRange`, those two, "Slate's own history" and `J` failed at 0 ms
+ * and every case passed four runs at 10 ms; 20 ms, what the spike measured,
+ * leaves a margin of two. (tests/unit/slate.test.ts, "dd then dd in one
+ * burst", first set it at 6 ms, before the reselection made it pass at 0.)
+ */
+const WRITE_GAP_MS = 20;
 
 /** How many removed Atoms a Field keeps for undo; older ones come back as nothing. */
 const REMOVED_ATOMS_KEPT = 200;
@@ -89,15 +116,22 @@ function breakAtLineEnd(
  * projection. `setValue` writes only the span that differs, through the
  * browser's editing commands (`replaceDomRange`), never by mutating the DOM.
  *
- * A write is asynchronous (ADR 0008): its first step runs inside `setValue`,
- * each later one a task after the one before, and the promise resolves a task
- * after the last, once the editor has caught up. The host's `input` events
+ * A write is asynchronous (ADR 0008): each span is selected once the editor
+ * has settled from the host's last change (`WRITE_GAP_MS`), each step comes a
+ * task after the selection or the step before, and the promise resolves a
+ * task after the last, once the editor has caught up. The host's `input` events
  * until then are the write's own. `destroy` stops a write between two steps,
  * and so does the host leaving the document.
  */
 export class ContentEditableField implements Field {
   private writing = false;
   private destroyed = false;
+  /** When the host last changed (`performance.now()`): a span waits `WRITE_GAP_MS` from it. */
+  private lastChangeAt = -Infinity;
+  private readonly noteChange = () => {
+    this.lastChangeAt = performance.now();
+  };
+  private readonly changes = new MutationObserver(this.noteChange);
   private inputHandlers = new Set<() => void>();
   /** The last selection set or read inside the host, answered while the native one is elsewhere. */
   private lastSelection: FieldSelection = { anchor: 0, head: 0 };
@@ -115,6 +149,8 @@ export class ContentEditableField implements Field {
     readonly singleLine = false,
   ) {
     element.addEventListener("input", this.handleInput);
+    this.changes.observe(element, { subtree: true, childList: true, characterData: true });
+    element.ownerDocument.addEventListener("selectionchange", this.noteChange);
     this.noteAtoms(project(element));
   }
 
@@ -147,10 +183,7 @@ export class ContentEditableField implements Field {
     this.writing = true;
     const write = async (): Promise<void> => {
       try {
-        for (const [i, stage] of stages.entries()) {
-          if (i > 0 && !(await this.pause())) return;
-          await this.writeSpan(stage);
-        }
+        for (const stage of stages) await this.writeSpan(stage);
         // The editor's answer to the last step (a re-render, a rewrite) is part of the write.
         await nextTask();
       } finally {
@@ -161,8 +194,13 @@ export class ContentEditableField implements Field {
     return write();
   }
 
-  /** Writes the one span by which the host's text differs from `text`; its first step runs before it yields. */
+  /**
+   * Writes the one span by which the host's text differs from `text`, once
+   * the editor has settled from the host's last change: it is projected after
+   * that wait, which an editor's render may have changed the DOM in.
+   */
   private async writeSpan(text: string): Promise<void> {
+    if (!(await this.settle())) return;
     const projection = project(this.element);
     const old = projection.text;
     if (old === text) return;
@@ -171,17 +209,46 @@ export class ContentEditableField implements Field {
     this.keepRemovedAtoms(projection, span.from, span.to);
     if (!span.insert.includes(ATOM_CHAR)) {
       const [from, to] = [projection.toDom(span.from), projection.toDom(span.to)];
-      await replaceDomRange(this.element, from, to, span.insert, this.pause);
+      await replaceDomRange(this.element, from, to, span.insert, this.pauses);
     } else {
       await this.writeWithAtoms(span.from, span.to, span.insert, restored);
     }
   }
 
-  /** The wait between two steps of a write: false once the write must stop (ADR 0008). */
+  /**
+   * The wait before a span selects its range: until `WRITE_GAP_MS` have
+   * passed since the host or the selection last changed, measured once, so a
+   * page that keeps changing its DOM delays a span by `WRITE_GAP_MS` at most.
+   * False once the write must stop.
+   */
+  private settle = async (): Promise<boolean> => {
+    // A change made in this task has not reached the observer's callback yet.
+    if (this.changes.takeRecords().length > 0) this.lastChangeAt = performance.now();
+    const left = this.lastChangeAt + WRITE_GAP_MS - performance.now();
+    if (left > 0) await new Promise((resolve) => setTimeout(resolve, left));
+    return !this.destroyed && this.element.isConnected;
+  };
+
+  /**
+   * The wait between selecting a span's range and its first step, and between
+   * two steps: a task (ADR 0008). Set by the Slate fixture: Slate takes a
+   * selection and applies a step it took over when React renders, a task
+   * later, and with only a microtask after the selection, `dw` on a bold word
+   * deleted its first letter and `cw` the first of the word it changed
+   * (tests/e2e/slate.spec.ts, "dw on a whole bold word", "x r cw inside the
+   * bold run"; see `replaceDomRange`). Between two steps a microtask was
+   * enough for the fixture's `J` under React 19.3 (the spike's `J`, under
+   * React 18.3, duplicated the joined line and threw a React `removeChild`
+   * error without a task), and ProseMirror reads each step in its
+   * MutationObserver callback before the next (#52). False once the write
+   * must stop.
+   */
   private pause = async (): Promise<boolean> => {
     await nextTask();
     return !this.destroyed && this.element.isConnected;
   };
+
+  private readonly pauses: Pauses = { step: this.pause, settle: this.settle };
 
   /** The Atoms in the text: each one's offset and the visible text a yank stores for it. */
   atoms(): { offset: number; text: string }[] {
@@ -242,7 +309,7 @@ export class ContentEditableField implements Field {
     if (first || from !== to) {
       started = true;
       const p = project(this.element);
-      await replaceDomRange(this.element, p.toDom(from), p.toDom(to), first!, this.pause);
+      await replaceDomRange(this.element, p.toDom(from), p.toDom(to), first!, this.pauses);
     }
     let at = from + first!.length;
     for (const [i, part] of rest.entries()) {
@@ -256,7 +323,7 @@ export class ContentEditableField implements Field {
       if (started && !(await this.pause())) return;
       started = true;
       const caret = project(this.element).toDom(at);
-      await replaceDomRange(this.element, caret, caret, part, this.pause);
+      await replaceDomRange(this.element, caret, caret, part, this.pauses);
       at += part.length;
     }
   }
@@ -269,7 +336,7 @@ export class ContentEditableField implements Field {
    */
   private async insertAtom(at: number, html: string): Promise<boolean> {
     const here = project(this.element).toDom(at);
-    await replaceDomRange(this.element, here, here, MARKER, this.pause);
+    await replaceDomRange(this.element, here, here, MARKER, this.pauses);
     if (!(await this.pause())) return false;
     const before = project(this.element).toDom(at);
     selectDom(this.element, before, before);
@@ -277,7 +344,7 @@ export class ContentEditableField implements Field {
     if (!(await this.pause())) return false;
     const p = project(this.element);
     if (p.text[at + 1] === MARKER) {
-      await replaceDomRange(this.element, p.toDom(at + 1), p.toDom(at + 2), "", this.pause);
+      await replaceDomRange(this.element, p.toDom(at + 1), p.toDom(at + 2), "", this.pauses);
     }
     return project(this.element).text[at] === ATOM_CHAR;
   }
@@ -358,6 +425,8 @@ export class ContentEditableField implements Field {
 
   destroy(): void {
     this.destroyed = true;
+    this.changes.disconnect();
+    this.element.ownerDocument.removeEventListener("selectionchange", this.noteChange);
     this.element.removeEventListener("input", this.handleInput);
     this.inputHandlers.clear();
   }
