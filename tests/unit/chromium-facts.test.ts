@@ -131,6 +131,13 @@ describe("innerText as the oracle", () => {
   });
 });
 
+describe("Zero-width no-break space", () => {
+  it("innerText reads a U+FEFF as a character, beside text and before an empty block's <br>", () => {
+    expect(host("<div>a﻿b</div>").innerText).toBe("a﻿b");
+    expect(host("<div>﻿<br></div>").innerText).toBe("﻿\n");
+  });
+});
+
 describe("Whitespace in the offset map", () => {
   it("Chrome exposes the white-space-collapse longhand", () => {
     const el = host("<p>a</p><pre>b</pre>");

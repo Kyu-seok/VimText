@@ -50,6 +50,11 @@ describe("Atoms in the projection", () => {
     expect(project(editableHost(ATOMS)).text).toBe(`hi ${OBJ} and ${OBJ} ok\nnext`);
   });
 
+  it("a non-editable replaced element is an Atom, not decoration", async () => {
+    const host = editableHost('<p>a<img contenteditable="false" alt="x">b</p>');
+    expect(project(host).text).toBe(`a${OBJ}b`);
+  });
+
   it("an Atom's character maps to the DOM positions around its element", async () => {
     const host = editableHost(ATOMS);
     const p = project(host);
@@ -199,6 +204,25 @@ describe("undoing Atom deletions", () => {
     await keys("wwx");
     await keys("u");
     expect(offered).toHaveLength(1);
+    expect(field.getValue()).toBe(`a cat ${OBJ} here`);
+    expect(host.querySelector("span")?.textContent).toBe("@cat");
+  });
+
+  // The restore holds the Atom's place with a U+200B marker while
+  // `insertHTML` lands. An editor that takes `insertText` into its model but
+  // lets the restore through must never be offered that marker, or it keeps it.
+  it("a page that takes insertText over and lets the restore through is never offered the marker", async () => {
+    const { host, field } = open('<p>a cat <span contenteditable="false">@cat</span> here</p>');
+    const taken: string[] = [];
+    host.addEventListener("beforeinput", (e) => {
+      if (e.inputType !== "insertText") return;
+      taken.push(e.data ?? "");
+      e.preventDefault();
+      document.execCommand("insertText", false, e.data ?? "");
+    });
+    await keys("wwx");
+    await keys("u");
+    expect(taken.join("")).not.toContain("​");
     expect(field.getValue()).toBe(`a cat ${OBJ} here`);
     expect(host.querySelector("span")?.textContent).toBe("@cat");
   });

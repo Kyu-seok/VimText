@@ -1,7 +1,8 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { Session } from "../../src/bridge/Session";
 import { TextareaField } from "../../src/field/TextareaField";
-import { activeHost, blockTexts, inputLog, selectedText } from "./contenteditable";
+import { ContentEditableField } from "../../src/field/ContentEditableField";
+import { activeHost, blockTexts, caretAt, editableHost, inputLog, selectedText } from "./contenteditable";
 import { keyDriver, settledKeyDriver } from "./keys";
 import { statusText } from "./dom";
 
@@ -16,9 +17,10 @@ import { statusText } from "./dom";
  * the Status Line.
  *
  * Coverage (CODING_STANDARDS rule 5): Normal and Visual on a contenteditable
- * host in the document, Normal on a textarea. Insert typing is native and
- * writes nothing; Replace, a Single-line host and a host in a shadow root
- * write through the same render, and their suites run on this path too.
+ * host in the document, Normal on a textarea and an input. Insert typing while
+ * a write settles (`Session.typeWhileWriting`) on a multi-line host, a
+ * Single-line host and a host in an open shadow root. Replace writes through
+ * the same render, and its suite runs on this path too.
  */
 
 const REFUSED = "VimText: the page refused the edit";
@@ -37,8 +39,8 @@ const { keydown, keys } = keyDriver(() => current!.session);
 /** Keys pressed each once the writes before it have settled. */
 const settledKeys = settledKeyDriver(() => current!.session).keys;
 
-function open(html: string) {
-  const opened = activeHost(html);
+function open(html: string, opts: Parameters<typeof activeHost>[1] = {}) {
+  const opened = activeHost(html, opts);
   current = opened;
   return opened;
 }
@@ -83,6 +85,43 @@ describe("Keys pressed while a write is pending", () => {
     expect(session.mode).toBe("normal");
     await settledKeys("u");
     expect(blockTexts(host)).toEqual(["abc", "econd"]);
+  });
+
+  it("on a Single-line host, Enter typed in Insert meanwhile stays the page's; characters land with the merged write", async () => {
+    const host = editableHost("<p>hello</p>", { attrs: { "aria-multiline": "false" } });
+    host.focus();
+    caretAt(host, 0);
+    const field = new ContentEditableField(host, true);
+    const session = new Session(field, { vimrc: "" });
+    current = {
+      session,
+      destroy() {
+        session.destroy();
+        field.destroy();
+      },
+    };
+    keys("xia");
+    const enter = keydown("Enter");
+    expect(enter.defaultPrevented).toBe(false);
+    keys("b");
+    keydown("Escape");
+    await session.settled();
+    expect(blockTexts(host)).toEqual(["abello"]);
+  });
+
+  it("on a host in an open shadow root, text typed in Insert meanwhile lands where the engine's cursor is", async () => {
+    const component = document.createElement("div");
+    document.body.appendChild(component);
+    const root = component.attachShadow({ mode: "open" });
+    const { host, session } = open("<p>abc</p><p>second</p>", { parent: root });
+    keys("jxOtop");
+    keydown("Backspace");
+    keydown("Enter");
+    keys("y");
+    keydown("Escape");
+    await session.settled();
+    expect(blockTexts(host)).toEqual(["abc", "to", "y", "econd"]);
+    expect(session.mode).toBe("normal");
   });
 
   it("an Atom past the end of the text those keys shortened does not break the page's next rewrite", async () => {
@@ -223,7 +262,30 @@ describe("A Session that ends mid-write", () => {
   });
 });
 
-describe("A textarea write", () => {
+describe("A Session that ends mid-write with keys queued", () => {
+  it("never writes the merged render of the keys pressed during the write", async () => {
+    const { host, session, field } = open("<p>abcdef</p>");
+    const log = inputLog(host);
+    const ended = new Promise<void>((resolve) =>
+      host.addEventListener(
+        "input",
+        () => {
+          session.destroy();
+          field.destroy();
+          resolve();
+        },
+        { once: true },
+      ),
+    );
+    keys("xxx"); // the first `x` writes; the other two wait in a merged render
+    await ended;
+    await new Promise((r) => setTimeout(r, 50));
+    expect(inputs(log)).toEqual(["input:deleteContentBackward"]);
+    expect(blockTexts(host)).toEqual(["bcdef"]);
+  });
+});
+
+describe("A textarea or input write", () => {
   it("stays synchronous: the Field holds the text right after the key", () => {
     const ta = document.createElement("textarea");
     ta.value = "hello\nworld";
@@ -243,5 +305,26 @@ describe("A textarea write", () => {
     expect(ta.value).toBe("ello\nworld");
     keys("yyp");
     expect(ta.value).toBe("ello\nello\nworld");
+  });
+
+  it("stays synchronous on an input: the Field holds the text right after the key", () => {
+    const input = document.createElement("input");
+    input.value = "hello world";
+    document.body.appendChild(input);
+    input.focus();
+    input.setSelectionRange(0, 0);
+    const field = new TextareaField(input);
+    const session = new Session(field, { vimrc: "" });
+    current = {
+      session,
+      destroy() {
+        session.destroy();
+        field.destroy();
+      },
+    };
+    keys("x");
+    expect(input.value).toBe("ello world");
+    keys("dw");
+    expect(input.value).toBe("world");
   });
 });

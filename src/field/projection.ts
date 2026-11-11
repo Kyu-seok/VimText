@@ -12,7 +12,7 @@
  * a table row) is a new kind and its handler, not an edit to the others.
  */
 
-import { ATOM_CHAR, isAtom, isDecoration } from "./atoms";
+import { ATOM_CHAR, atomKind } from "./atoms";
 
 /** A DOM boundary point: a child index in an element, or a character offset in a text node. */
 export interface DomPoint {
@@ -74,8 +74,8 @@ function kindOf(node: Node): Kind {
   if (display === "none") return "skip";
   if (node.localName === "br") return "br";
   if (display === "table-cell") return "cell";
-  if (isDecoration(node)) return "skip";
-  if (isAtom(node)) return "atom";
+  const atom = atomKind(node);
+  if (atom) return atom === "atom" ? "atom" : "skip";
   return isBlockDisplay(display) ? "block" : "inline";
 }
 

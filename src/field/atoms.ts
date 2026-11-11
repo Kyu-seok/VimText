@@ -25,26 +25,26 @@ const REPLACED = new Set([
 ]);
 
 /**
- * Whether an element inside an editing host is an Atom: a replaced element, or
- * a non-editable island (`contenteditable="false"`, so its `isContentEditable`
- * is false while the host around it is editable) with text or a replaced
- * element of its own. A nested editable inside an island is part of the island.
+ * What an element inside an editing host is to the projection.
+ *
+ * An Atom: a replaced element (non-editable or not), or a non-editable island
+ * (`contenteditable="false"`, so its `isContentEditable` is false while the
+ * host around it is editable) with text or a replaced element of its own. A
+ * nested editable inside an island is part of the island.
+ *
+ * Decoration: any other non-editable element, with no text and no replaced
+ * element inside. It draws only decoration, as Quill's list marker (an empty
+ * `ql-ui` span whose `::before` is the bullet, #60) does; it is no text of its
+ * line and not an Atom, and the projection leaves it out.
+ *
+ * Null: neither, an editable element whose content is projected.
  */
-export function isAtom(el: Element): boolean {
-  if (REPLACED.has(el.localName)) return true;
-  return el instanceof HTMLElement && !el.isContentEditable && !isDecoration(el);
-}
-
-/**
- * A non-editable element with no text and no replaced element inside: it draws
- * only decoration, as Quill's list marker (an empty `ql-ui` span whose
- * `::before` is the bullet, #60) does. It is no text of its line and not an
- * Atom; the projection leaves it out.
- */
-export function isDecoration(el: Element): boolean {
-  if (!(el instanceof HTMLElement) || el.isContentEditable || el.textContent !== "") return false;
-  for (const name of REPLACED) if (el.querySelector(name)) return false;
-  return true;
+export function atomKind(el: Element): "atom" | "decoration" | null {
+  if (REPLACED.has(el.localName)) return "atom";
+  if (!(el instanceof HTMLElement) || el.isContentEditable) return null;
+  if (el.textContent !== "") return "atom";
+  for (const name of REPLACED) if (el.querySelector(name)) return "atom";
+  return "decoration";
 }
 
 /** What a yank stores for an Atom: an image's `alt`, an island's rendered text, nothing for other replaced elements. */
