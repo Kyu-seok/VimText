@@ -38,6 +38,22 @@ export interface Pauses {
  */
 const SELECT_ATTEMPTS = 3;
 
+/** A write of `text` over the DOM between `from` and `to`. */
+export interface DomEdit {
+  from: DomPoint;
+  to: DomPoint;
+  text: string;
+  /**
+   * Where the write continues once it has written `written` characters, read
+   * after the editor's re-render: the caret is put there after a paragraph
+   * break (`placeCaret`). None leaves the caret where it is.
+   */
+  caretAfter?: (written: number) => DomPoint | null;
+}
+
+/** One editing command of a write. */
+type Step = { command: "insertText"; text: string } | { command: "insertParagraph" } | { command: "delete" };
+
 /**
  * Replaces the DOM between `from` and `to` with `text` the way typing would
  * (ADR 0007, ADR 0008): the range is selected and each step is offered to the
@@ -67,14 +83,8 @@ const SELECT_ATTEMPTS = 3;
  * Resolves false when the browser refused a command (no editable selection,
  * an editor that cancelled it) or the write stopped.
  */
-export async function replaceDomRange(
-  host: Element,
-  from: DomPoint,
-  to: DomPoint,
-  text: string,
-  pauses: Pauses,
-  caretAfter?: (written: number) => DomPoint | null,
-): Promise<boolean> {
+export async function replaceDomRange(host: Element, edit: DomEdit, pauses: Pauses): Promise<boolean> {
+  const { from, to, text, caretAfter } = edit;
   for (let attempt = 1; ; attempt++) {
     selectDom(host, from, to);
     settleEditor(host);
@@ -84,21 +94,24 @@ export async function replaceDomRange(
     // The editor re-rendered the range away: the write stops, and is judged.
     if (!host.contains(from.node) || !host.contains(to.node)) return false;
   }
-  if (!text) return run(host, "delete");
-  const steps: [string, string?][] = [];
+  if (!text) return run(host, { command: "delete" });
+  const steps: Step[] = [];
   text.split("\n").forEach((part, i) => {
-    if (i > 0) steps.push(["insertParagraph"]);
-    if (part) steps.push(["insertText", part]);
+    if (i > 0) steps.push({ command: "insertParagraph" });
+    if (part) steps.push({ command: "insertText", text: part });
   });
   let ok = true;
   let written = 0;
-  for (const [i, [command, value]] of steps.entries()) {
+  for (const [i, step] of steps.entries()) {
     if (i > 0 && !(await pauses.step())) return false;
-    if (steps[i - 1]?.[0] === "insertParagraph" && !(await placeCaret(host, caretAfter?.(written), pauses))) {
+    if (
+      steps[i - 1]?.command === "insertParagraph" &&
+      !(await placeCaret(host, caretAfter?.(written), pauses))
+    ) {
       return false;
     }
-    ok = run(host, command, value) && ok;
-    written += command === "insertParagraph" ? 1 : value!.length;
+    ok = run(host, step) && ok;
+    written += step.command === "insertText" ? step.text.length : 1;
   }
   return ok;
 }
@@ -129,7 +142,7 @@ function isSelected(host: Element, from: DomPoint, to: DomPoint): boolean {
 }
 
 /** The `inputType` a step offers the editor (ADR 0008): any deletion is `deleteContentBackward`, never `deleteContent`, which Lexical and Slate cancel and drop. */
-const INPUT_TYPE: Record<string, string> = {
+const INPUT_TYPE: Record<Step["command"], string> = {
   insertText: "insertText",
   insertParagraph: "insertParagraph",
   delete: "deleteContentBackward",
@@ -143,18 +156,32 @@ const INPUT_TYPE: Record<string, string> = {
  * cancelled it applies the edit itself (or not: a Refused Edit, judged from
  * the projection once the write has settled).
  */
-function run(host: Element, command: string, value?: string): boolean {
+function run(host: Element, step: Step): boolean {
+  const data = step.command === "insertText" ? step.text : null;
+  const ok = offer(host, { inputType: INPUT_TYPE[step.command], data }) ? true : execute(step);
+  settleEditor(host);
+  return ok;
+}
+
+/** The browser's own editing command for `step`; false when it refused it. */
+function execute(step: Step): boolean {
+  return document.execCommand(step.command, false, step.command === "insertText" ? step.text : undefined);
+}
+
+/**
+ * Offers an edit to the page's editor as a cancelable synthetic `beforeinput`
+ * on the host, its target the selected range. True when a listener cancelled
+ * it: the editor has taken the edit over, whatever it then does.
+ */
+function offer(host: Element, init: Pick<InputEventInit, "inputType" | "data" | "dataTransfer">): boolean {
   const offered = new InputEvent("beforeinput", {
-    inputType: INPUT_TYPE[command],
-    data: command === "insertText" ? value : null,
+    ...init,
     bubbles: true,
     cancelable: true,
     composed: true,
     targetRanges: selectedRange(host),
   });
-  const ok = host.dispatchEvent(offered) ? document.execCommand(command, false, value) : true;
-  settleEditor(host);
-  return ok;
+  return !host.dispatchEvent(offered);
 }
 
 /** The selection inside `host` as a `StaticRange`, start before end; none when it lies outside. */
@@ -203,18 +230,10 @@ export function settleEditor(host: Element): void {
  * a decorator cannot come back through the DOM there: `insertHTML` turned its
  * whole line into the decorator's text (#62).
  */
-export function restoreTakenOver(host: Element, html: string): boolean {
-  const data = new DataTransfer();
-  data.setData("text/html", html);
-  const offered = new InputEvent("beforeinput", {
-    inputType: "insertFromPaste",
-    dataTransfer: data,
-    bubbles: true,
-    cancelable: true,
-    composed: true,
-    targetRanges: selectedRange(host),
-  });
-  const taken = !host.dispatchEvent(offered);
+export function offerRestore(host: Element, html: string): boolean {
+  const dataTransfer = new DataTransfer();
+  dataTransfer.setData("text/html", html);
+  const taken = offer(host, { inputType: "insertFromPaste", dataTransfer });
   settleEditor(host);
   return taken;
 }
@@ -222,9 +241,31 @@ export function restoreTakenOver(host: Element, html: string): boolean {
 /**
  * Inserts an Atom's markup at the caret through the browser's own
  * `insertHTML`, the one editing command that can bring back an element,
- * once the page has let the offered restore through (`restoreTakenOver`).
+ * once the page has let the offered restore through (`offerRestore`).
  * Returns false when the browser refused it.
  */
 export function insertAtomHtml(html: string): boolean {
   return document.execCommand("insertHTML", false, html);
+}
+
+/**
+ * Types the marker that holds an Atom's place while its restore lands
+ * (`ContentEditableField.insertAtom`) at the selection: the browser's own
+ * `insertText`, never offered as a `beforeinput`. An editor that took an
+ * offered `insertText` of it into its model would keep the marker there,
+ * whatever became of the DOM; the marker is no text of the Field's.
+ */
+export function insertMarker(host: Element, marker: string): boolean {
+  return runUnoffered(host, { command: "insertText", text: marker });
+}
+
+/** Deletes the selected marker (`insertMarker`) as it was typed: the browser's own `delete`, never offered. */
+export function deleteMarker(host: Element): boolean {
+  return runUnoffered(host, { command: "delete" });
+}
+
+function runUnoffered(host: Element, step: Step): boolean {
+  const ok = execute(step);
+  settleEditor(host);
+  return ok;
 }

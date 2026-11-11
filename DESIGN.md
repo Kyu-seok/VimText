@@ -410,7 +410,9 @@ it is outside the gate, so PNG churn never fails `npm run check`.
   an older one, or one the page took out without an `input` event, comes back as nothing.
   The restore is offered to the editor first, as a `beforeinput` of `insertFromPaste` with the
   Atom's markup as `text/html`; an editor that cancels it gets no `insertHTML`, and the Atom
-  comes back only if that editor brings it back itself. Lexical cancels it and does nothing, so
+  comes back only if that editor brings it back itself. The U+200B that holds the Atom's place
+  while `insertHTML` lands is typed and deleted by the browser's own commands, never offered as
+  a `beforeinput`, so no editor takes it into its model. Lexical cancels it and does nothing, so
   on Lexical `u` after deleting a decorator restores the text around it, without the decorator
   (#62). Chosen over restoring the decorator: Lexical cannot take a decorator back through the
   DOM (the `insertHTML` restore turned its whole line into the decorator's text), and pasting

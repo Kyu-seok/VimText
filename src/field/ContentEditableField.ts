@@ -3,10 +3,12 @@ import { diffHunks, diffText, type TextDiff } from "./diff";
 import { project, type DomPoint, type Projection } from "./projection";
 import { readDomSelection, selectDom } from "./domSelection";
 import {
+  deleteMarker,
   insertAtomHtml,
+  insertMarker,
   nextTask,
+  offerRestore,
   replaceDomRange,
-  restoreTakenOver,
   settleEditor,
   type Pauses,
 } from "./editingCommands";
@@ -138,7 +140,7 @@ export class ContentEditableField implements Field {
   private readonly noteChange = () => {
     this.lastChangeAt = performance.now();
   };
-  private readonly changes = new MutationObserver(this.noteChange);
+  private readonly hostMutations = new MutationObserver(this.noteChange);
   private inputHandlers = new Set<() => void>();
   /** The last selection set or read inside the host, answered while the native one is elsewhere. */
   private lastSelection: FieldSelection = { anchor: 0, head: 0 };
@@ -156,7 +158,7 @@ export class ContentEditableField implements Field {
     readonly singleLine = false,
   ) {
     element.addEventListener("input", this.handleInput);
-    this.changes.observe(element, { subtree: true, childList: true, characterData: true });
+    this.hostMutations.observe(element, { subtree: true, childList: true, characterData: true });
     element.ownerDocument.addEventListener("selectionchange", this.noteChange);
     this.noteAtoms(project(element));
   }
@@ -186,11 +188,11 @@ export class ContentEditableField implements Field {
     if (old === text) return Promise.resolve();
     // Each changed span on its own, first to last (`diffHunks`): the text
     // after the k-th is the new text up to its end and the old text after it.
-    const stages = diffHunks(old, text).map((h) => text.slice(0, h.toNew) + old.slice(h.toOld));
+    const textAfterEachSpan = diffHunks(old, text).map((h) => text.slice(0, h.toNew) + old.slice(h.toOld));
     this.writing = true;
     const write = async (): Promise<void> => {
       try {
-        for (const stage of stages) await this.writeSpan(stage);
+        for (const target of textAfterEachSpan) await this.writeSpan(target);
         // The editor's answer to the last step (a re-render, a rewrite) is part of the write.
         await nextTask();
       } finally {
@@ -215,8 +217,7 @@ export class ContentEditableField implements Field {
     const restored = this.takeRemovedAtoms(span.from, span.insert);
     this.keepRemovedAtoms(projection, span.from, span.to);
     if (!span.insert.includes(ATOM_CHAR)) {
-      const [from, to] = [projection.toDom(span.from), projection.toDom(span.to)];
-      await replaceDomRange(this.element, from, to, span.insert, this.pauses, this.caretFrom(span.from));
+      await this.replace(span.from, span.to, span.insert, projection);
     } else {
       await this.writeWithAtoms(span.from, span.to, span.insert, restored);
     }
@@ -230,10 +231,10 @@ export class ContentEditableField implements Field {
    */
   private settle = async (): Promise<boolean> => {
     // A change made in this task has not reached the observer's callback yet.
-    if (this.changes.takeRecords().length > 0) this.lastChangeAt = performance.now();
+    if (this.hostMutations.takeRecords().length > 0) this.lastChangeAt = performance.now();
     const left = this.lastChangeAt + WRITE_GAP_MS - performance.now();
     if (left > 0) await new Promise((resolve) => setTimeout(resolve, left));
-    return !this.destroyed && this.element.isConnected;
+    return this.canWrite();
   };
 
   /**
@@ -252,10 +253,36 @@ export class ContentEditableField implements Field {
    */
   private pause = async (): Promise<boolean> => {
     await nextTask();
-    return !this.destroyed && this.element.isConnected;
+    return this.canWrite();
   };
 
+  /** Whether a write may go on: the Field is not destroyed and its host is still in the document. */
+  private canWrite(): boolean {
+    return !this.destroyed && this.element.isConnected;
+  }
+
   private readonly pauses: Pauses = { step: this.pause, settle: this.settle };
+
+  /**
+   * Replaces the text from offset `from` to `to` with `insert` through
+   * `replaceDomRange`, the offsets mapped through `projection` (a fresh one
+   * by default), the caret after a paragraph break where the projection then
+   * puts the written text's end (`caretFrom`).
+   */
+  private replace(
+    from: number,
+    to: number,
+    insert: string,
+    projection = project(this.element),
+  ): Promise<boolean> {
+    const edit = {
+      from: projection.toDom(from),
+      to: projection.toDom(to),
+      text: insert,
+      caretAfter: this.caretFrom(from),
+    };
+    return replaceDomRange(this.element, edit, this.pauses);
+  }
 
   /**
    * Where a write that starts at offset `start` continues once it has written
@@ -329,15 +356,7 @@ export class ContentEditableField implements Field {
     let started = false;
     if (first || from !== to) {
       started = true;
-      const p = project(this.element);
-      await replaceDomRange(
-        this.element,
-        p.toDom(from),
-        p.toDom(to),
-        first!,
-        this.pauses,
-        this.caretFrom(from),
-      );
+      await this.replace(from, to, first!);
     }
     let at = from + first!.length;
     for (const [i, part] of rest.entries()) {
@@ -350,8 +369,7 @@ export class ContentEditableField implements Field {
       if (!part) continue;
       if (started && !(await this.pause())) return;
       started = true;
-      const caret = project(this.element).toDom(at);
-      await replaceDomRange(this.element, caret, caret, part, this.pauses, this.caretFrom(at));
+      await this.replace(at, at, part);
       at += part.length;
     }
   }
@@ -361,19 +379,24 @@ export class ContentEditableField implements Field {
    * marker character after it while it lands: Chrome moves a non-editable
    * element inserted at the end of a block out of that block, and leaves the
    * caret inside it, where no later editing command applies. The restore is
-   * offered to the page first (`restoreTakenOver`); a page that takes it over
+   * offered to the page first (`offerRestore`); a page that takes it over
    * gets neither the marker nor `insertHTML`, and the U+FFFC stands for
    * whatever it did (Lexical: nothing, so `u` restores the text without the
-   * Atom, #62), which the Session folds like a Controlled Field rewrite.
+   * Atom, #62), which the Session folds like a Controlled Field rewrite. The
+   * marker is typed and deleted by the browser's own commands, never offered
+   * to the page (`insertMarker`): an editor that took an offered `insertText`
+   * into its model would keep it there.
    */
   private async insertAtom(at: number, html: string): Promise<boolean> {
     const here = project(this.element).toDom(at);
     selectDom(this.element, here, here);
     settleEditor(this.element);
     if (!(await this.pause())) return false;
-    if (restoreTakenOver(this.element, html)) return false;
+    if (offerRestore(this.element, html)) return false;
     if (!(await this.pause())) return false;
-    await replaceDomRange(this.element, here, here, MARKER, this.pauses);
+    const caret = project(this.element).toDom(at);
+    selectDom(this.element, caret, caret);
+    insertMarker(this.element, MARKER);
     if (!(await this.pause())) return false;
     const before = project(this.element).toDom(at);
     selectDom(this.element, before, before);
@@ -381,7 +404,8 @@ export class ContentEditableField implements Field {
     if (!(await this.pause())) return false;
     const p = project(this.element);
     if (p.text[at + 1] === MARKER) {
-      await replaceDomRange(this.element, p.toDom(at + 1), p.toDom(at + 2), "", this.pauses);
+      selectDom(this.element, p.toDom(at + 1), p.toDom(at + 2));
+      deleteMarker(this.element);
     }
     return project(this.element).text[at] === ATOM_CHAR;
   }
@@ -462,7 +486,7 @@ export class ContentEditableField implements Field {
 
   destroy(): void {
     this.destroyed = true;
-    this.changes.disconnect();
+    this.hostMutations.disconnect();
     this.element.ownerDocument.removeEventListener("selectionchange", this.noteChange);
     this.element.removeEventListener("input", this.handleInput);
     this.inputHandlers.clear();
