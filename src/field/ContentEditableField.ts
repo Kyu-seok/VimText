@@ -1,6 +1,6 @@
 import type { Field, FieldSelection, WrappingStyle } from "./Field";
 import { diffHunks, diffText, type TextDiff } from "./diff";
-import { project, type Projection } from "./projection";
+import { project, type DomPoint, type Projection } from "./projection";
 import { readDomSelection, selectDom } from "./domSelection";
 import { insertAtomHtml, nextTask, replaceDomRange, settleEditor, type Pauses } from "./editingCommands";
 import { ATOM_CHAR, atomText } from "./atoms";
@@ -209,7 +209,7 @@ export class ContentEditableField implements Field {
     this.keepRemovedAtoms(projection, span.from, span.to);
     if (!span.insert.includes(ATOM_CHAR)) {
       const [from, to] = [projection.toDom(span.from), projection.toDom(span.to)];
-      await replaceDomRange(this.element, from, to, span.insert, this.pauses);
+      await replaceDomRange(this.element, from, to, span.insert, this.pauses, this.caretFrom(span.from));
     } else {
       await this.writeWithAtoms(span.from, span.to, span.insert, restored);
     }
@@ -249,6 +249,20 @@ export class ContentEditableField implements Field {
   };
 
   private readonly pauses: Pauses = { step: this.pause, settle: this.settle };
+
+  /**
+   * Where a write that starts at offset `start` continues once it has written
+   * `written` characters: the DOM point the projection gives that offset now,
+   * after the editor's re-render (`replaceDomRange` puts the caret there after
+   * a paragraph break). None past the text's end: the editor has not rendered
+   * the break, and the caret stays where it is.
+   */
+  private caretFrom(start: number): (written: number) => DomPoint | null {
+    return (written) => {
+      const p = project(this.element);
+      return start + written <= p.text.length ? p.toDom(start + written) : null;
+    };
+  }
 
   /** The Atoms in the text: each one's offset and the visible text a yank stores for it. */
   atoms(): { offset: number; text: string }[] {
@@ -309,7 +323,14 @@ export class ContentEditableField implements Field {
     if (first || from !== to) {
       started = true;
       const p = project(this.element);
-      await replaceDomRange(this.element, p.toDom(from), p.toDom(to), first!, this.pauses);
+      await replaceDomRange(
+        this.element,
+        p.toDom(from),
+        p.toDom(to),
+        first!,
+        this.pauses,
+        this.caretFrom(from),
+      );
     }
     let at = from + first!.length;
     for (const [i, part] of rest.entries()) {
@@ -323,7 +344,7 @@ export class ContentEditableField implements Field {
       if (started && !(await this.pause())) return;
       started = true;
       const caret = project(this.element).toDom(at);
-      await replaceDomRange(this.element, caret, caret, part, this.pauses);
+      await replaceDomRange(this.element, caret, caret, part, this.pauses, this.caretFrom(at));
       at += part.length;
     }
   }

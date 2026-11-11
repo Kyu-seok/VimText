@@ -62,6 +62,13 @@ describe("Block merges and splits", () => {
     expect([sel.anchorNode, sel.anchorOffset]).toEqual([el.children[1], 0]);
   });
 
+  it("insertParagraph at a heading's end makes a <div>, not another heading", () => {
+    const el = host("<h1>head</h1>");
+    caretAt(el.querySelector("h1")!.firstChild!, 4);
+    document.execCommand("insertParagraph");
+    expect(el.innerHTML).toBe("<h1>head</h1><div><br></div>");
+  });
+
   it("deleting from one block's start to the next's moves the next block's first line into the first block's element", () => {
     const el = host("<p>one</p><div>third<br>fourth</div>");
     select(el.querySelector("p")!.firstChild!, 0, el.querySelector("div")!.firstChild!, 0);

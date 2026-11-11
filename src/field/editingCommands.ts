@@ -73,6 +73,7 @@ export async function replaceDomRange(
   to: DomPoint,
   text: string,
   pauses: Pauses,
+  caretAfter?: (written: number) => DomPoint | null,
 ): Promise<boolean> {
   for (let attempt = 1; ; attempt++) {
     selectDom(host, from, to);
@@ -90,11 +91,33 @@ export async function replaceDomRange(
     if (part) steps.push(["insertText", part]);
   });
   let ok = true;
+  let written = 0;
   for (const [i, [command, value]] of steps.entries()) {
     if (i > 0 && !(await pauses.step())) return false;
+    if (steps[i - 1]?.[0] === "insertParagraph" && !(await placeCaret(host, caretAfter?.(written), pauses))) {
+      return false;
+    }
     ok = run(host, command, value) && ok;
+    written += command === "insertParagraph" ? 1 : value!.length;
   }
   return ok;
+}
+
+/**
+ * Puts the caret at `at` before the step after a paragraph break, unless it is
+ * there already. An editor may re-render the block the break made and leave
+ * the DOM caret elsewhere: Chromium's `insertParagraph` at the end of an
+ * `<h1>` makes a `<div>`, which Quill replaces with a `<p>` of its own, the
+ * caret left between the blocks (or wherever its re-render put it), and the
+ * text typed there landed in the heading or was lost (#61). `at` is where the
+ * projection puts the new line's start, read after the editor's re-render.
+ * The editor gets a task to take the caret, as after the first selection.
+ */
+async function placeCaret(host: Element, at: DomPoint | null | undefined, pauses: Pauses): Promise<boolean> {
+  if (!at || isSelected(host, at, at)) return true;
+  selectDom(host, at, at);
+  settleEditor(host);
+  return pauses.step();
 }
 
 /** Whether the selection inside `host` is still from `from` to `to`, either way round. */
