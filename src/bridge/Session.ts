@@ -519,7 +519,11 @@ export class Session {
 
   /** The mirror's text is the Field's now: give it the Field's Atoms for the register writes. */
   private readAtoms(): void {
-    if (this.field.atoms) this.withSyncing(() => this.mirror.setAtoms(this.field.atoms!()));
+    if (!this.field.atoms) return;
+    // Keys pressed during a write made the mirror's text newer than the
+    // Field's: the Field's offsets do not fit it. The merged render reads them.
+    if (this.field.getValue() !== this.mirror.view.state.doc.toString()) return;
+    this.withSyncing(() => this.mirror.setAtoms(this.field.atoms!()));
   }
 
   /** Runs our own mirror dispatches, whose updates must not queue a render: the caller renders. */

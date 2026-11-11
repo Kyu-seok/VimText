@@ -1,5 +1,5 @@
 import type { Field, FieldSelection, WrappingStyle } from "./Field";
-import { diffText, type TextDiff } from "./diff";
+import { diffHunks, diffText, type TextDiff } from "./diff";
 import { project, type Projection } from "./projection";
 import { readDomSelection, selectDom } from "./domSelection";
 import { insertAtomHtml, nextTask, replaceDomRange } from "./editingCommands";
@@ -139,20 +139,17 @@ export class ContentEditableField implements Field {
 
   /** Resolves once the write has settled. One write at a time: the Session waits for one before the next. */
   setValue(text: string): Promise<void> {
-    const projection = project(this.element);
-    const old = projection.text;
+    const old = project(this.element).text;
     if (old === text) return Promise.resolve();
-    const span = breakAtLineEnd(old, keepAdjacentSpaces(old, diffText(old, text), text));
+    // Each changed span on its own, first to last (`diffHunks`): the text
+    // after the k-th is the new text up to its end and the old text after it.
+    const stages = diffHunks(old, text).map((h) => text.slice(0, h.toNew) + old.slice(h.toOld));
     this.writing = true;
     const write = async (): Promise<void> => {
       try {
-        const restored = this.takeRemovedAtoms(span.from, span.insert);
-        this.keepRemovedAtoms(projection, span.from, span.to);
-        if (!span.insert.includes(ATOM_CHAR)) {
-          const [from, to] = [projection.toDom(span.from), projection.toDom(span.to)];
-          await replaceDomRange(this.element, from, to, span.insert, this.pause);
-        } else {
-          await this.writeWithAtoms(span.from, span.to, span.insert, restored);
+        for (const [i, stage] of stages.entries()) {
+          if (i > 0 && !(await this.pause())) return;
+          await this.writeSpan(stage);
         }
         // The editor's answer to the last step (a re-render, a rewrite) is part of the write.
         await nextTask();
@@ -162,6 +159,22 @@ export class ContentEditableField implements Field {
       }
     };
     return write();
+  }
+
+  /** Writes the one span by which the host's text differs from `text`; its first step runs before it yields. */
+  private async writeSpan(text: string): Promise<void> {
+    const projection = project(this.element);
+    const old = projection.text;
+    if (old === text) return;
+    const span = breakAtLineEnd(old, keepAdjacentSpaces(old, diffText(old, text), text));
+    const restored = this.takeRemovedAtoms(span.from, span.insert);
+    this.keepRemovedAtoms(projection, span.from, span.to);
+    if (!span.insert.includes(ATOM_CHAR)) {
+      const [from, to] = [projection.toDom(span.from), projection.toDom(span.to)];
+      await replaceDomRange(this.element, from, to, span.insert, this.pause);
+    } else {
+      await this.writeWithAtoms(span.from, span.to, span.insert, restored);
+    }
   }
 
   /** The wait between two steps of a write: false once the write must stop (ADR 0008). */

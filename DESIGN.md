@@ -193,7 +193,9 @@ primary range is highlighted.
 - _Keys during a write_ (#52): a page that refuses a write also refuses what keys pressed
   while it settled made on top of it (the Status Line says so); a page that rewrites it
   keeps both, its rewrite mapped under the keys' change and joined to that change's undo
-  step.
+  step. A write that changes text in several places (a merged one: two `dd` far apart)
+  writes each changed run of lines as a span of its own, first to last, so the lines
+  between them, an Atom's among them, are never rewritten.
 - _Key Policy_: a multi-line contenteditable follows the textarea rows: `Enter` in Normal is
   the Vim motion; a chat composer submits with Insert-mode `Enter` or Cmd/Ctrl+Enter.
 - _Registers_: plain text only. Cmd+V stays a Pass-through, so the editor's rich paste works.

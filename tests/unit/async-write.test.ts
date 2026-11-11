@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { Session } from "../../src/bridge/Session";
 import { TextareaField } from "../../src/field/TextareaField";
 import { activeHost, blockTexts, inputLog, selectedText } from "./contenteditable";
@@ -26,6 +26,7 @@ const REFUSED = "VimText: the page refused the edit";
 let current: { session: Session; destroy(): void } | null = null;
 
 afterEach(() => {
+  vi.restoreAllMocks();
   current?.destroy();
   current = null;
   document.body.innerHTML = "";
@@ -82,6 +83,38 @@ describe("Keys pressed while a write is pending", () => {
     expect(session.mode).toBe("normal");
     await settledKeys("u");
     expect(blockTexts(host)).toEqual(["abc", "econd"]);
+  });
+
+  it("an Atom past the end of the text those keys shortened does not break the page's next rewrite", async () => {
+    // When the `x` write settles, the Field's Atom sits at an offset past the
+    // end of the mirror's shorter text (the `jdd` is not written yet); the
+    // page then rewrites the merged write.
+    const { host, session } = open('<p>one</p><p>two</p><p>a <span contenteditable="false">@x</span></p>');
+    let writes = 0;
+    host.addEventListener("input", () => {
+      if (++writes === 2) queueMicrotask(() => (host.children[0]!.textContent = "NE"));
+    });
+    const errors = vi.spyOn(console, "error");
+    keys("xjdd");
+    await session.settled();
+    expect(blockTexts(host)).toEqual(["NE", "a @x"]);
+    await settledKeys("x");
+    expect(blockTexts(host)).toEqual(["E", "a @x"]); // the cursor follows the page's rewrite to its caret
+    expect(errors).not.toHaveBeenCalled();
+  });
+
+  it("a merged write that changes the lines on both sides of an Atom's line leaves the Atom in place", async () => {
+    const { host, session } = open(
+      '<p>one</p><p>two</p><p>a <span contenteditable="false">@x</span> b</p><p>three</p>',
+    );
+    const atom = host.querySelector('[contenteditable="false"]');
+    keys("xjddGdd"); // both dd merge into one write while the `x` one settles
+    await session.settled();
+    expect(blockTexts(host)).toEqual(["ne", "a @x b"]);
+    expect(host.querySelector('[contenteditable="false"]')).toBe(atom);
+    await settledKeys("uuu");
+    expect(blockTexts(host)).toEqual(["one", "two", "a @x b", "three"]);
+    expect(host.querySelectorAll('[contenteditable="false"]')).toHaveLength(1);
   });
 
   it("a cursor motion pressed meanwhile lands after the write", async () => {
