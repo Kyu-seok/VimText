@@ -116,6 +116,16 @@ export function blockTexts(page: Page | Frame, selector: string): Promise<string
 }
 
 /**
+ * The page editor's own text, one line per block, read through the fixture's
+ * `window.modelText()` from the editor's model, not the DOM: the read that
+ * shows a Diverged Edit, which the DOM hides. Each rich-editor fixture
+ * (tests/fixtures/quill.ts and the others) exposes it.
+ */
+export function modelText(page: Page | Frame): Promise<string[]> {
+  return page.evaluate(() => (window as unknown as { modelText(): string[] }).modelText());
+}
+
+/**
  * The text the native selection covers in that page or frame: a Normal-mode
  * cursor's character. With `shadowHost`, the selection inside that element's
  * open shadow root, read through Chromium's `ShadowRoot.getSelection`: the

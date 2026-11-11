@@ -1,0 +1,36 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>VimText fixture: Quill</title>
+    <!-- quill.js and .css are bundled from quill.ts by tools/build.mjs and gitignored. -->
+    <link rel="stylesheet" href="quill.css" />
+    <style>
+      body {
+        font-family: system-ui;
+        margin: 40px;
+      }
+      #editor {
+        width: 480px;
+        min-height: 200px;
+        border: 1px solid #888;
+      }
+      #editor .ql-editor {
+        padding: 4px;
+        font:
+          14px/1.4 Menlo,
+          monospace;
+      }
+      #editor img {
+        width: 1em;
+        height: 1em;
+        vertical-align: middle;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>VimText fixture: Quill</h1>
+    <div id="editor"></div>
+    <script src="quill.js"></script>
+  </body>
+</html>
