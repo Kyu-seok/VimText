@@ -81,7 +81,7 @@ function run(host: Element, command: string, value?: string): boolean {
  * previous one's marks), and rewrite inside the write, where the bridge's
  * re-read sees it (docs/engine-seams.md, "Editor catch-up").
  */
-function settleEditor(host: Element): void {
+export function settleEditor(host: Element): void {
   host.ownerDocument.dispatchEvent(new Event("selectionchange"));
 }
 

@@ -2,7 +2,7 @@ import type { Field, FieldSelection, WrappingStyle } from "./Field";
 import { diffHunks, diffText, type TextDiff } from "./diff";
 import { project, type Projection } from "./projection";
 import { readDomSelection, selectDom } from "./domSelection";
-import { insertAtomHtml, nextTask, replaceDomRange } from "./editingCommands";
+import { insertAtomHtml, nextTask, replaceDomRange, settleEditor } from "./editingCommands";
 import { ATOM_CHAR, atomText } from "./atoms";
 
 /**
@@ -304,6 +304,11 @@ export class ContentEditableField implements Field {
     // line, which closes on blur. The render on focus sets it.
     if (!this.hasFocus()) return;
     selectDom(this.element, projection.toDom(a), projection.toDom(h));
+    // The editor takes the cursor into its model now, as after a write step: it
+    // lands a task or more after the write (ADR 0008). Without this the
+    // ProseMirror e2e intermittently ended with a collapsed selection and an
+    // input rule that never ran (#52; cause not pinned down).
+    settleEditor(this.element);
   }
 
   hasFocus(): boolean {

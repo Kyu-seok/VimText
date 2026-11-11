@@ -190,18 +190,14 @@ test("a linewise p below a header loses the pasted line (#61)", async ({ page })
   await page.keyboard.type("yyjp");
   // Pins #61, not what Vim does: Chromium's insertParagraph at the end of an
   // <h1> makes a <div>, the insertText fills it, and Quill replaces the <div>
-  // with an empty <p>. The new line should read `the quick brown fox`.
-  await expect
-    .poll(() => modelText(page))
-    .toEqual([
-      "the quick brown fox",
-      "a heading",
-      "",
-      "first item",
-      "second item",
-      `a cat ${EMBED} here`,
-      "last line",
-    ]);
+  // with an empty <p>. The new line should read `the quick brown fox`. Since
+  // the write's steps are a task apart (#52, ADR 0008), whether Quill replaces
+  // the <div> before or after the insertText lands depends on timing, so the
+  // new line is either; every other line is as it should be.
+  await expect.poll(async () => (await modelText(page)).length).toBe(ORIGINAL.length + 1);
+  const lines = await modelText(page);
+  expect(["", "the quick brown fox"]).toContain(lines[2]);
+  expect(lines.filter((_, i) => i !== 2)).toEqual(ORIGINAL);
 });
 
 test("Quill's list marker counts as an Atom, so I and x on a list item go wrong (#60)", async ({ page }) => {
