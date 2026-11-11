@@ -1,11 +1,12 @@
-import { test, expect, ready, activateAtStart, selectedText } from "./extension";
+import { test, expect, ready, activateAtStart, modelText, selectedText } from "./extension";
 import type { Page } from "@playwright/test";
 
 /**
  * VimText on the pinned ProseMirror build (#46, ADR 0007) through the built
  * extension: real keys, ProseMirror's own document read back from the editor
  * (`pmDoc`, see tests/fixtures/prosemirror.ts), not the DOM. Marks print as
- * `<b>`, `<i>`, `<a>`; a list as `ul[li[…],…]`.
+ * `<b>`, `<i>`, `<a>`; a list as `ul[li[…],…]`. Its plain text, one line per
+ * textblock, is `modelText`, the read every rich-editor fixture shares.
  */
 
 const HOST = "#editor .ProseMirror";
@@ -80,17 +81,31 @@ test("o, dd, linewise p and J split and merge paragraphs and list items in Prose
       ORIGINAL[1],
       "ul[li[first item],li[the quick brown fox second <b>item</b>]]",
     ]);
+  await expect
+    .poll(() => modelText(page))
+    .toEqual([
+      "the quick brown fox",
+      "new para",
+      "jumps over the lazy dog",
+      "first item",
+      "the quick brown fox second item",
+    ]);
 });
 
-/** ProseMirror's document without its marks: `u` restores the text, and a re-inserted character takes the marks of where it is typed (docs/engine-seams.md, "Block merges and splits"). */
-async function pmText(page: Page): Promise<string[]> {
-  return (await pmDoc(page)).map((block) => block.replace(/<\/?[a-z]+>/g, ""));
-}
-
+// `u` restores ProseMirror's text (`modelText`, its marks left out): a
+// re-inserted character takes the marks of where it is typed
+// (docs/engine-seams.md, "Block merges and splits").
 test("u restores the text and ProseMirror accepts it; Cmd+Z and Ctrl+Z in Normal are swallowed", async ({
   page,
 }) => {
-  const original = await pmText(page);
+  const original = await modelText(page);
+  expect(original).toEqual([
+    "the quick brown fox",
+    "jumps over the lazy dog",
+    "first item",
+    "second item",
+    "wait-x here",
+  ]);
   await page.keyboard.type("wx");
   await page.keyboard.type("jdd");
   await expect.poll(async () => (await pmDoc(page)).length).toBe(ORIGINAL.length - 1);
@@ -99,10 +114,10 @@ test("u restores the text and ProseMirror accepts it; Cmd+Z and Ctrl+Z in Normal
   await page.keyboard.press("Control+z");
   await expect.poll(() => pmDoc(page)).toEqual(edited);
   await page.keyboard.type("uu");
-  await expect.poll(() => pmText(page)).toEqual(original);
+  await expect.poll(() => modelText(page)).toEqual(original);
   // ProseMirror took the restored text into its model: a further edit applies to it.
   await page.keyboard.type("x");
-  await expect.poll(async () => (await pmText(page))[0]).toBe("the uick brown fox");
+  await expect.poll(async () => (await modelText(page))[0]).toBe("the uick brown fox");
 });
 
 test("an input rule's rewrite syncs into the mirror and undoes with the change that provoked it", async ({

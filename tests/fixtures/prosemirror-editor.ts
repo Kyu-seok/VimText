@@ -61,6 +61,23 @@ export function describeDoc(doc: Node): string[] {
   return out;
 }
 
+/**
+ * ProseMirror's own text, one line per textblock (a list item's paragraph is
+ * a line), a non-text inline as U+FFFC: the `modelText()` every rich-editor
+ * fixture exposes (#53).
+ */
+export function modelLines(doc: Node): string[] {
+  const out: string[] = [];
+  doc.descendants((node) => {
+    if (!node.isTextblock) return true;
+    let line = "";
+    node.forEach((child) => (line += child.isText ? child.text! : "￼"));
+    out.push(line);
+    return false;
+  });
+  return out;
+}
+
 function describeBlock(node: Node): string {
   const kids: string[] = [];
   if (node.isTextblock) {

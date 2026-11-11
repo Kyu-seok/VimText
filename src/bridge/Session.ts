@@ -728,10 +728,16 @@ export class Session {
     view.dispatch({ changes: changeOf(after).map(changeOf(now)), userEvent: "input.type.compose" });
   }
 
-  /** Lands the engine's cursor and records what the Field and the mirror now agree on, at undo depth `depth`. */
+  /**
+   * Lands the engine's cursor and records what the Field and the mirror now
+   * agree on, at undo depth `depth`. With a merged render due, the cursor is
+   * left to it: the mirror's cursor is where the keys pressed during the write
+   * put it, in text the Field does not hold yet, and an editor that takes the
+   * selection into its model (Lexical) would apply the merged write there.
+   */
   private finishRender(depth: number): void {
     const sel = this.renderedSelection();
-    this.field.setSelection(sel.anchor, sel.head);
+    if (!this.renderDue) this.field.setSelection(sel.anchor, sel.head);
     this.lastRendered = this.field.getSelection();
     this.lastText = this.field.getValue();
     this.readAtoms();
