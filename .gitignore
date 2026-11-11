@@ -11,4 +11,5 @@ tests/fixtures/prosemirror.css
 tests/fixtures/quill.js
 tests/fixtures/quill.css
 tests/fixtures/lexical.js
+tests/fixtures/slate.js
 .claude/worktrees/

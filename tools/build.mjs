@@ -31,8 +31,8 @@ const ctx = await esbuild.context({
 
 // The e2e fixtures bundled from source into gitignored files next to their
 // pages: React 19 ships no UMD build (tests/fixtures/react.tsx), and the pinned
-// ProseMirror, Quill and Lexical builds are npm modules, the first two with
-// their stylesheets (tests/fixtures/prosemirror.ts, quill.ts, lexical.ts).
+// ProseMirror, Quill, Lexical and Slate builds are npm modules, the first two with
+// their stylesheets (tests/fixtures/prosemirror.ts, quill.ts, lexical.ts, slate.ts).
 async function buildFixtures() {
   await esbuild.build({
     ...common,
@@ -41,6 +41,7 @@ async function buildFixtures() {
       prosemirror: "tests/fixtures/prosemirror.ts",
       quill: "tests/fixtures/quill.ts",
       lexical: "tests/fixtures/lexical.ts",
+      slate: "tests/fixtures/slate.ts",
     },
     outdir: "tests/fixtures",
   });

@@ -128,7 +128,8 @@ describe("a contenteditable host in a custom element, through the content entry"
     expect(statusText()).toContain("NORMAL");
     expect(sessions.focusedMode).toBe("normal");
     keydownOn(host.querySelector("p")!, "x");
-    expect(blockTexts(host)).toEqual(["ne", "two"]);
+    // The write lands asynchronously (ADR 0008).
+    await expect.poll(() => blockTexts(host)).toEqual(["ne", "two"]);
   });
 
   it("removing the custom element disposes the Session", async () => {

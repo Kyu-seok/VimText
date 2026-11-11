@@ -9,7 +9,8 @@
     "tests/fixtures/react.tsx",
     "tests/fixtures/prosemirror.ts",
     "tests/fixtures/quill.ts",
-    "tests/fixtures/lexical.ts"
+    "tests/fixtures/lexical.ts",
+    "tests/fixtures/slate.ts"
   ],
   "project": ["src/**/*.ts", "popup/**/*.ts", "options/**/*.ts", "tools/**/*.mjs", "tests/**/*.{ts,tsx}"]
 }

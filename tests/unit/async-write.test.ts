@@ -201,10 +201,22 @@ describe("A Session that ends mid-write", () => {
   it("throws nothing and writes nothing more: the step that ran stays, the rest is dropped", async () => {
     const { host, session, field } = open("<p>one</p><p>two</p>");
     const log = inputLog(host);
+    // Destroyed as the first step lands: that step may first wait out the gap
+    // after the cursor the Session set (`WRITE_GAP_MS`).
+    const ended = new Promise<void>((resolve) =>
+      host.addEventListener(
+        "input",
+        () => {
+          session.destroy();
+          field.destroy();
+          resolve();
+        },
+        { once: true },
+      ),
+    );
     keys("yyp"); // one write in two steps: insertParagraph, then insertText "one"
+    await ended;
     expect(inputs(log)).toEqual(["input:insertParagraph"]);
-    session.destroy();
-    field.destroy();
     await new Promise((r) => setTimeout(r, 50));
     expect(inputs(log)).toEqual(["input:insertParagraph"]);
     expect(blockTexts(host)).toEqual(["one", "", "two"]);

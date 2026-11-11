@@ -56,6 +56,10 @@
     "quill": "2.0.3",
     "react": "19.3.0",
     "react-dom": "19.3.0",
+    "slate": "0.147.4",
+    "slate-dom": "0.147.3",
+    "slate-history": "0.144.0",
+    "slate-react": "0.147.5",
     "typescript": "7.0.2",
     "vitest": "3.2.7"
   }
