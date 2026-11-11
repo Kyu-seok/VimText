@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { project } from "../../src/field/projection";
 import { resolveField } from "../../src/field/resolve";
 import { activeHost, backspaceNatively, editableHost, selectedText } from "./contenteditable";
-import { keyDriver } from "./keys";
+import { settledKeyDriver } from "./keys";
 import { statusText } from "./dom";
 import { Session } from "../../src/bridge/Session";
 import { TextareaField } from "../../src/field/TextareaField";
@@ -25,7 +25,7 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-const { keydown, keys } = keyDriver(() => current!.session);
+const { keydown, keys } = settledKeyDriver(() => current!.session);
 
 function open(html = ATOMS) {
   current = activeHost(html);
@@ -46,11 +46,11 @@ function coversExactly(el: Element): boolean {
 }
 
 describe("Atoms in the projection", () => {
-  it("an island and an image are one U+FFFC each, never their inner text", () => {
+  it("an island and an image are one U+FFFC each, never their inner text", async () => {
     expect(project(editableHost(ATOMS)).text).toBe(`hi ${OBJ} and ${OBJ} ok\nnext`);
   });
 
-  it("an Atom's character maps to the DOM positions around its element", () => {
+  it("an Atom's character maps to the DOM positions around its element", async () => {
     const host = editableHost(ATOMS);
     const p = project(host);
     const chip = host.querySelector("span")!;
@@ -63,70 +63,70 @@ describe("Atoms in the projection", () => {
 });
 
 describe("motions over Atoms", () => {
-  it("l and h step over each Atom as one character, and the cursor on it selects the whole Atom", () => {
+  it("l and h step over each Atom as one character, and the cursor on it selects the whole Atom", async () => {
     const { host } = open();
     const chip = host.querySelector("span")!;
     const img = host.querySelector("img")!;
-    keys("lll");
+    await keys("lll");
     expect(coversExactly(chip)).toBe(true);
-    keys("l");
+    await keys("l");
     expect(selectedText()).toBe(" ");
-    keys("lllll");
+    await keys("lllll");
     expect(coversExactly(img)).toBe(true);
-    keys("h");
+    await keys("h");
     expect(selectedText()).toBe(" ");
   });
 
-  it("w lands on each Atom as a word of its own", () => {
+  it("w lands on each Atom as a word of its own", async () => {
     const { host } = open();
-    keys("w");
+    await keys("w");
     expect(coversExactly(host.querySelector("span")!)).toBe(true);
-    keys("ww");
+    await keys("ww");
     expect(coversExactly(host.querySelector("img")!)).toBe(true);
-    keys("w");
+    await keys("w");
     expect(selectedText()).toBe("o");
   });
 });
 
 describe("editing Atoms", () => {
-  it("x on an Atom removes its whole element; u brings the element back", () => {
+  it("x on an Atom removes its whole element; u brings the element back", async () => {
     const { host, field } = open();
-    keys("wx");
+    await keys("wx");
     expect(host.querySelector("span")).toBeNull();
     expect(field.getValue()).toBe(`hi  and ${OBJ} ok\nnext`);
-    keys("u");
+    await keys("u");
     const chip = host.querySelector("span");
     expect(chip?.getAttribute("contenteditable")).toBe("false");
     expect(chip?.textContent).toBe("@alice");
     expect(field.getValue()).toBe(`hi ${OBJ} and ${OBJ} ok\nnext`);
   });
 
-  it("dw on the image removes it; u brings it back with its alt", () => {
+  it("dw on the image removes it; u brings it back with its alt", async () => {
     const { host, field } = open();
-    keys("wwwdw");
+    await keys("wwwdw");
     expect(host.querySelector("img")).toBeNull();
     expect(field.getValue()).toBe(`hi ${OBJ} and ok\nnext`);
-    keys("u");
+    await keys("u");
     expect(host.querySelector("img")?.getAttribute("alt")).toBe("cat");
     expect(field.getValue()).toBe(`hi ${OBJ} and ${OBJ} ok\nnext`);
   });
 });
 
 describe("undoing Atom deletions", () => {
-  it("an Atom that ends its block comes back inside that block", () => {
+  it("an Atom that ends its block comes back inside that block", async () => {
     const { host, field } = open('<p>a <span contenteditable="false">@bob</span></p><p>next</p>');
-    keys("$x");
+    await keys("$x");
     expect(field.getValue()).toBe("a \nnext");
-    keys("u");
+    await keys("u");
     expect(field.getValue()).toBe(`a ${OBJ}\nnext`);
     expect(host.children[0]!.querySelector("span")?.textContent).toBe("@bob");
   });
 
-  it("dd of a line with two Atoms, then u, brings both back in order", () => {
+  it("dd of a line with two Atoms, then u, brings both back in order", async () => {
     const { host, field } = open();
-    keys("dd");
+    await keys("dd");
     expect(field.getValue()).toBe("next");
-    keys("u");
+    await keys("u");
     expect(field.getValue()).toBe(`hi ${OBJ} and ${OBJ} ok\nnext`);
     expect(host.querySelector("span")?.textContent).toBe("@alice");
     expect(host.querySelector("img")?.getAttribute("alt")).toBe("cat");
@@ -137,29 +137,29 @@ describe("undo puts back the Atom removed at that place", () => {
   const TWO = '<p>a<img alt="first">b<img alt="second">c</p>';
   const alts = (host: HTMLElement) => [...host.querySelectorAll("img")].map((i) => i.alt);
 
-  it("an Atom Backspaced in Insert mode comes back on u in its own place, and an earlier x's Atom on the next u", () => {
+  it("an Atom Backspaced in Insert mode comes back on u in its own place, and an earlier x's Atom on the next u", async () => {
     const { host, field } = open(TWO);
-    keys("lx");
+    await keys("lx");
     expect(alts(host)).toEqual(["second"]);
-    keys("$i");
+    await keys("$i");
     backspaceNatively();
-    keydown("Escape");
+    await keydown("Escape");
     expect(field.getValue()).toBe("abc");
-    keys("u");
+    await keys("u");
     expect(alts(host)).toEqual(["second"]);
     expect(field.getValue()).toBe(`ab${OBJ}c`);
     expect(statusText()).not.toContain("refused");
-    keys("u");
+    await keys("u");
     expect(alts(host)).toEqual(["first", "second"]);
     expect(field.getValue()).toBe(`a${OBJ}b${OBJ}c`);
     expect(statusText()).not.toContain("refused");
   });
 
-  it("a U+FFFC written back with no element kept for it is not reported as a refused edit", () => {
+  it("a U+FFFC written back with no element kept for it is not reported as a refused edit", async () => {
     const { field } = open(`<p>a${OBJ}b</p>`);
-    keys(`l"_x`); // the black hole: a literal U+FFFC in "- would show in a later test's :reg
+    await keys(`l"_x`); // the black hole: a literal U+FFFC in "- would show in a later test's :reg
     expect(field.getValue()).toBe("ab");
-    keys("u");
+    await keys("u");
     expect(statusText()).not.toContain("refused");
     expect(field.getValue()).toBe("ab");
   });
@@ -167,36 +167,36 @@ describe("undo puts back the Atom removed at that place", () => {
 
 describe("Atoms in registers", () => {
   /** Runs an ex command through the command line, as the user does. */
-  function exCommand(line: string): void {
-    keys(":");
+  async function exCommand(line: string): Promise<void> {
+    await keys(":");
     const input = document.querySelector("vimtext-status")!.shadowRoot!.querySelector("input")!;
     input.value = line;
     input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", keyCode: 13, bubbles: true }));
   }
 
-  it('yy stores each Atom as its visible text: "0p puts it, :reg shows it, never U+FFFC', () => {
+  it('yy stores each Atom as its visible text: "0p puts it, :reg shows it, never U+FFFC', async () => {
     const { field } = open();
-    keys("yyj");
-    keys('"0p');
+    await keys("yyj");
+    await keys('"0p');
     expect(field.getValue()).toBe(`hi ${OBJ} and ${OBJ} ok\nnext\nhi @alice and cat ok`);
-    exCommand("reg");
+    await exCommand("reg");
     expect(statusText()).toContain("hi @alice and cat ok");
     expect(statusText()).not.toContain(OBJ);
   });
 
-  it("x on an Atom stores its visible text", () => {
+  it("x on an Atom stores its visible text", async () => {
     const { field } = open();
-    keys("wx$p");
+    await keys("wx$p");
     expect(field.getValue()).toBe(`hi  and ${OBJ} ok@alice\nnext`);
   });
 
-  it("a Visual p over an Atom leaves its visible text in the unnamed register", () => {
+  it("a Visual p over an Atom leaves its visible text in the unnamed register", async () => {
     const { field } = open();
-    keys("yiwwvp$p");
+    await keys("yiwwvp$p");
     expect(field.getValue()).toBe(`hi hi and ${OBJ} ok@alice\nnext`);
   });
 
-  it('"+y puts the visible text on the clipboard', () => {
+  it('"+y puts the visible text on the clipboard', async () => {
     let clipboard = "";
     vi.stubGlobal("navigator", {
       ...navigator,
@@ -210,7 +210,7 @@ describe("Atoms in registers", () => {
     });
     try {
       open();
-      keys('"+yy');
+      await keys('"+yy');
       expect(clipboard).toBe("hi @alice and cat ok\n");
     } finally {
       vi.unstubAllGlobals();
@@ -219,7 +219,7 @@ describe("Atoms in registers", () => {
 });
 
 describe("Atoms in registers with several Fields Activated (registers are page-global)", () => {
-  it("the second host's yank stores its own Atoms' text; a textarea's literal U+FFFC stays one", () => {
+  it("the second host's yank stores its own Atoms' text; a textarea's literal U+FFFC stays one", async () => {
     const first = open();
     const second = activeHost('<p>to <span contenteditable="false">@bob</span></p>');
     const ta = document.createElement("textarea");
@@ -227,18 +227,18 @@ describe("Atoms in registers with several Fields Activated (registers are page-g
     document.body.appendChild(ta);
     const taField = new TextareaField(ta);
     const taSession = new Session(taField, { vimrc: "" });
-    const onSecond = keyDriver(() => second.session);
-    const onTextarea = keyDriver(() => taSession);
+    const onSecond = settledKeyDriver(() => second.session);
+    const onTextarea = settledKeyDriver(() => taSession);
     try {
       second.host.focus();
-      onSecond.keys("yyp");
+      await onSecond.keys("yyp");
       expect(second.field.getValue()).toBe(`to ${OBJ}\nto @bob`);
       ta.focus();
       ta.setSelectionRange(0, 0);
-      onTextarea.keys("yyp");
+      await onTextarea.keys("yyp");
       expect(ta.value).toBe(`lit ${OBJ} x\nlit ${OBJ} x`);
       first.host.focus();
-      keys("yyjp");
+      await keys("yyjp");
       expect(first.field.getValue()).toBe(`hi ${OBJ} and ${OBJ} ok\nnext\nhi @alice and cat ok`);
     } finally {
       taSession.destroy();
@@ -249,16 +249,16 @@ describe("Atoms in registers with several Fields Activated (registers are page-g
 });
 
 describe("the command line on a contenteditable host", () => {
-  it("keeps focus after : (the render's selection does not pull focus back to the host)", () => {
+  it("keeps focus after : (the render's selection does not pull focus back to the host)", async () => {
     open();
-    keys(":");
+    await keys(":");
     // The command line's input sits in the Status Line's shadow root, so the document sees its host focused.
     expect(document.activeElement?.localName).toBe("vimtext-status");
   });
 });
 
 describe("focus inside an Atom", () => {
-  it("resolves to the host Field", () => {
+  it("resolves to the host Field", async () => {
     const host = editableHost(ATOMS);
     const chip = host.querySelector("span")!;
     expect(resolveField(chip)?.element).toBe(host);

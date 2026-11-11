@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { Session } from "../../src/bridge/Session";
 import { activeHost, blockTexts, selectedText } from "./contenteditable";
 import { FakeField } from "./FakeField";
-import { keyDriver } from "./keys";
+import { settledKeyDriver } from "./keys";
 import { statusText } from "./dom";
 
 /**
@@ -43,7 +43,7 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-const { keydown, keys } = keyDriver(() => current!.session);
+const { keydown, keys } = settledKeyDriver(() => current!.session);
 
 // prettier-ignore
 const LOCKED = '<p>ab<span class="locked">LOCK</span>cd</p><p>next line</p>';
@@ -56,99 +56,99 @@ function open(html = LOCKED) {
 }
 
 describe("A refused edit on a contenteditable host", () => {
-  it("x in the locked span leaves the text unchanged, the cursor on its character, and the message on the Status Line", () => {
+  it("x in the locked span leaves the text unchanged, the cursor on its character, and the message on the Status Line", async () => {
     const { host } = open();
-    keys("ll");
+    await keys("ll");
     expect(selectedText()).toBe("L");
-    keys("x");
+    await keys("x");
     expect(blockTexts(host)).toEqual(["abLOCKcd", "next line"]);
     expect(selectedText()).toBe("L");
     expect(statusText()).toContain(REFUSED);
   });
 
-  it("the next key works normally", () => {
+  it("the next key works normally", async () => {
     const { host } = open();
-    keys("llx");
-    keys("l");
+    await keys("llx");
+    await keys("l");
     expect(selectedText()).toBe("O");
-    keys("$x");
+    await keys("$x");
     expect(blockTexts(host)).toEqual(["abLOCKc", "next line"]);
-    keys("j0x");
+    await keys("j0x");
     expect(blockTexts(host)).toEqual(["abLOCKc", "ext line"]);
   });
 
-  it("u does not undo a change that never happened: it undoes the accepted edit before it", () => {
+  it("u does not undo a change that never happened: it undoes the accepted edit before it", async () => {
     const { host } = open();
-    keys("x");
+    await keys("x");
     expect(blockTexts(host)).toEqual(["bLOCKcd", "next line"]);
-    keys("lx");
+    await keys("lx");
     expect(blockTexts(host)).toEqual(["bLOCKcd", "next line"]);
-    keys("u");
+    await keys("u");
     expect(blockTexts(host)).toEqual(["abLOCKcd", "next line"]);
-    keys("u");
+    await keys("u");
     expect(blockTexts(host)).toEqual(["abLOCKcd", "next line"]);
   });
 
-  it("an accepted edit next to the refused one still works, and u undoes only it", () => {
+  it("an accepted edit next to the refused one still works, and u undoes only it", async () => {
     // `x` on `b` then `x` on `L` at once: the engine's history may join the two
     // adjacent changes into one undo step (docs/engine-seams.md "History grouping").
     const { host } = open();
-    keys("l");
-    keys("x");
+    await keys("l");
+    await keys("x");
     expect(blockTexts(host)).toEqual(["aLOCKcd", "next line"]);
-    keys("x");
+    await keys("x");
     expect(blockTexts(host)).toEqual(["aLOCKcd", "next line"]);
     expect(statusText()).toContain(REFUSED);
-    keys("$x");
+    await keys("$x");
     expect(blockTexts(host)).toEqual(["aLOCKc", "next line"]);
-    keys("u");
+    await keys("u");
     expect(blockTexts(host)).toEqual(["aLOCKcd", "next line"]);
-    keys("u");
+    await keys("u");
     expect(blockTexts(host)).toEqual(["abLOCKcd", "next line"]);
   });
 
-  it("dd over the locked line is refused whole; dd on the next line is accepted", () => {
+  it("dd over the locked line is refused whole; dd on the next line is accepted", async () => {
     const { host } = open();
-    keys("dd");
+    await keys("dd");
     expect(blockTexts(host)).toEqual(["abLOCKcd", "next line"]);
     expect(statusText()).toContain(REFUSED);
-    keys("jdd");
+    await keys("jdd");
     expect(host.innerText.trim()).toBe("abLOCKcd");
   });
 
-  it("in Visual, d over the span is refused and Normal resumes", () => {
+  it("in Visual, d over the span is refused and Normal resumes", async () => {
     const { host, session } = open();
-    keys("lvlld");
+    await keys("lvlld");
     expect(blockTexts(host)).toEqual(["abLOCKcd", "next line"]);
     expect(session.mode).toBe("normal");
     expect(statusText()).toContain(REFUSED);
   });
 
-  it("in Insert, a Ctrl-r paste into the span is refused and Insert goes on", () => {
+  it("in Insert, a Ctrl-r paste into the span is refused and Insert goes on", async () => {
     const { host, session } = open();
-    keys("ylllli");
-    keydown("r", { ctrlKey: true });
-    keydown('"');
+    await keys("ylllli");
+    await keydown("r", { ctrlKey: true });
+    await keydown('"');
     expect(blockTexts(host)).toEqual(["abLOCKcd", "next line"]);
     expect(session.mode).toBe("insert");
     expect(statusText()).toContain(REFUSED);
   });
 
-  it("in Replace, a character typed over the span is refused and Replace goes on outside it", () => {
+  it("in Replace, a character typed over the span is refused and Replace goes on outside it", async () => {
     const { host, session } = open();
-    keys("llR");
-    keys("Z");
+    await keys("llR");
+    await keys("Z");
     expect(blockTexts(host)).toEqual(["abLOCKcd", "next line"]);
     expect(session.mode).toBe("replace");
     expect(statusText()).toContain(REFUSED);
-    keydown("Escape");
-    keys("$RY");
+    await keydown("Escape");
+    await keys("$RY");
     expect(blockTexts(host)).toEqual(["abLOCKcY", "next line"]);
   });
 });
 
 describe("A refused write on a Field that keeps its value", () => {
-  it("the page puts its value back: the text stays, the message shows, u has nothing to undo", () => {
+  it("the page puts its value back: the text stays, the message shows, u has nothing to undo", async () => {
     const field = new FakeField("hello world");
     field.focus();
     const session = new Session(field, { vimrc: "" });
@@ -159,24 +159,24 @@ describe("A refused write on a Field that keeps its value", () => {
         field.destroy();
       },
     };
-    keys("x");
+    await keys("x");
     expect(field.value).toBe("ello world");
     field.rewrite = () => ({ text: "ello world", caret: 0 });
-    keys("x");
+    await keys("x");
     expect(field.value).toBe("ello world");
     expect(statusText()).toContain(REFUSED);
     field.rewrite = null;
-    keys("u");
+    await keys("u");
     expect(field.value).toBe("hello world");
   });
 });
 
 describe('What Chromium refuses (docs/engine-seams.md "Refused edits")', () => {
-  it("a page that cancels beforeinput does not stop the write: the editing command fires none", () => {
+  it("a page that cancels beforeinput does not stop the write: the editing command fires none", async () => {
     const opened = activeHost("<p>hello world</p>");
     current = opened;
     opened.host.addEventListener("beforeinput", (e) => e.preventDefault());
-    keys("x");
+    await keys("x");
     expect(blockTexts(opened.host)).toEqual(["ello world"]);
     expect(statusText()).not.toContain(REFUSED);
   });

@@ -2,6 +2,27 @@ import type { DomPoint } from "./projection";
 import { selectDom } from "./domSelection";
 
 /**
+ * Resolves in a later task (a message on a fresh channel: no timer clamping),
+ * the spacing between the steps of a contenteditable write (ADR 0008).
+ */
+export function nextTask(): Promise<void> {
+  return new Promise((resolve) => {
+    const channel = new MessageChannel();
+    channel.port1.onmessage = () => {
+      channel.port1.close();
+      resolve();
+    };
+    channel.port2.postMessage(null);
+  });
+}
+
+/**
+ * Waits between two steps of a write; resolves false when the write must stop
+ * there (its Field was destroyed, its host left the document).
+ */
+export type Pause = () => Promise<boolean>;
+
+/**
  * Replaces the DOM between `from` and `to` with `text` the way typing would
  * (ADR 0007): the range is selected and the browser's own editing commands
  * run on it, so the page's editor applies the edit and its model stays the
@@ -9,20 +30,34 @@ import { selectDom } from "./domSelection";
  * text `insertText`, a pure deletion `delete`; the first command replaces the
  * selection. No DOM node is touched here.
  *
- * Each step is followed by a `selectionchange` (see `settleEditor`).
+ * Each step is followed by a `selectionchange` (see `settleEditor`). The first
+ * step runs before this returns its promise; each later one waits on `pause`
+ * (ADR 0008: the steps are spaced so the editor catches up), and none runs
+ * once `pause` says stop.
  *
- * Returns false when the browser refused a command (no editable selection,
- * an editor that cancelled it).
+ * Resolves false when the browser refused a command (no editable selection,
+ * an editor that cancelled it) or the write stopped.
  */
-export function replaceDomRange(host: Element, from: DomPoint, to: DomPoint, text: string): boolean {
+export async function replaceDomRange(
+  host: Element,
+  from: DomPoint,
+  to: DomPoint,
+  text: string,
+  pause: Pause,
+): Promise<boolean> {
   selectDom(host, from, to);
   settleEditor(host);
   if (!text) return run(host, "delete");
-  let ok = true;
+  const steps: [string, string?][] = [];
   text.split("\n").forEach((part, i) => {
-    if (i > 0) ok = run(host, "insertParagraph") && ok;
-    if (part) ok = run(host, "insertText", part) && ok;
+    if (i > 0) steps.push(["insertParagraph"]);
+    if (part) steps.push(["insertText", part]);
   });
+  let ok = true;
+  for (const [i, [command, value]] of steps.entries()) {
+    if (i > 0 && !(await pause())) return false;
+    ok = run(host, command, value) && ok;
+  }
   return ok;
 }
 

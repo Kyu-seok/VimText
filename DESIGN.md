@@ -185,7 +185,15 @@ primary range is highlighted.
   The formatting at a write's edge is the editor's: text written at the end of a mark run takes
   the mark, as typing there would (`J` after an italic word makes the joining space italic).
 - _Insert_: the editor owns typing as on every Field; the mirror re-projects the whole host
-  on every `input`. No size budget until a measured finding asks for one.
+  on every `input`. No size budget until a measured finding asks for one. The one exception
+  is a key typed while a write is still settling (the `o` or `cw` that entered Insert has
+  not landed, so the caret is not yet where the text goes): a character, Backspace and a
+  multi-line host's Enter are taken from the page and typed into the mirror, and land with
+  the merged write (#52); any other key stays the page's.
+- _Keys during a write_ (#52): a page that refuses a write also refuses what keys pressed
+  while it settled made on top of it (the Status Line says so); a page that rewrites it
+  keeps both, its rewrite mapped under the keys' change and joined to that change's undo
+  step.
 - _Key Policy_: a multi-line contenteditable follows the textarea rows: `Enter` in Normal is
   the Vim motion; a chat composer submits with Insert-mode `Enter` or Cmd/Ctrl+Enter.
 - _Registers_: plain text only. Cmd+V stays a Pass-through, so the editor's rich paste works.

@@ -3,7 +3,7 @@ import { resolveField } from "../../src/field/resolve";
 import { Session } from "../../src/bridge/Session";
 import type { Field } from "../../src/field/Field";
 import { blockTexts, caretAt, editableHost } from "./contenteditable";
-import { keyDriver } from "./keys";
+import { settledKeyDriver } from "./keys";
 import { Sessions } from "../../src/content/Sessions";
 import { hostCount, keydown as keydownOn, settle, statusText } from "./dom";
 import { controlledPort, settingsFor } from "./settings-port";
@@ -28,12 +28,12 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-const { keydown, keys } = keyDriver(() => session!);
+const { keydown, keys } = settledKeyDriver(() => session!);
 
 const SINGLE_LINE = { attrs: { "aria-multiline": "false" } };
 
 describe("which contenteditable is a Single-line Field", () => {
-  it('a host with aria-multiline="false" is a Single-line Field', () => {
+  it('a host with aria-multiline="false" is a Single-line Field', async () => {
     const field = resolveField(editableHost("<p>title</p>", SINGLE_LINE))!.create();
     expect(field.singleLine).toBe(true);
     field.destroy();
@@ -63,38 +63,38 @@ function open(opts: Parameters<typeof editableHost>[1] = {}): HTMLElement {
 }
 
 describe('Single-line rules on an aria-multiline="false" host', () => {
-  it("Enter in plain Normal passes through to the page (it submits)", () => {
+  it("Enter in plain Normal passes through to the page (it submits)", async () => {
     open(SINGLE_LINE);
-    expect(keydown("Enter").defaultPrevented).toBe(false);
+    expect((await keydown("Enter")).defaultPrevented).toBe(false);
   });
 
-  it("o and O beep: Normal stays, the text is unchanged, a pending count is cleared", () => {
+  it("o and O beep: Normal stays, the text is unchanged, a pending count is cleared", async () => {
     const host = open(SINGLE_LINE);
-    expect(keydown("o").defaultPrevented).toBe(true);
+    expect((await keydown("o")).defaultPrevented).toBe(true);
     expect(session!.mode).toBe("normal");
-    keys("3O");
+    await keys("3O");
     expect(session!.mode).toBe("normal");
     expect(blockTexts(host)).toEqual(["hello world"]);
-    keys("x");
+    await keys("x");
     expect(blockTexts(host)).toEqual(["ello world"]); // not "lo world": the 3 went with the beep
   });
 
-  it("yyp concatenates as on an input; one u restores", () => {
+  it("yyp concatenates as on an input; one u restores", async () => {
     const host = open(SINGLE_LINE);
-    keys("yyp");
+    await keys("yyp");
     expect(blockTexts(host)).toEqual(["hello worldhello world"]);
-    keys("u");
+    await keys("u");
     expect(blockTexts(host)).toEqual(["hello world"]);
   });
 });
 
 describe("the same host without the attribute stays multi-line", () => {
-  it("Enter is the Vim motion, o opens a line, yyp pastes a line below", () => {
+  it("Enter is the Vim motion, o opens a line, yyp pastes a line below", async () => {
     const host = open();
-    expect(keydown("Enter").defaultPrevented).toBe(true);
-    keys("yyp");
+    expect((await keydown("Enter")).defaultPrevented).toBe(true);
+    await keys("yyp");
     expect(blockTexts(host)).toEqual(["hello world", "hello world"]);
-    keys("o");
+    await keys("o");
     expect(session!.mode).toBe("insert");
     expect(blockTexts(host)).toEqual(["hello world", "hello world", ""]);
   });
