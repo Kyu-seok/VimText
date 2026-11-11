@@ -50,6 +50,11 @@ describe("Atoms in the projection", () => {
     expect(project(editableHost(ATOMS)).text).toBe(`hi ${OBJ} and ${OBJ} ok\nnext`);
   });
 
+  it("a non-editable replaced element is an Atom, not decoration", async () => {
+    const host = editableHost('<p>a<img contenteditable="false" alt="x">b</p>');
+    expect(project(host).text).toBe(`a${OBJ}b`);
+  });
+
   it("an Atom's character maps to the DOM positions around its element", async () => {
     const host = editableHost(ATOMS);
     const p = project(host);
