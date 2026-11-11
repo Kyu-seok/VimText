@@ -1,5 +1,5 @@
-import { isTextControl, type TextControl } from "../field/Field";
-import { TextareaField } from "../field/TextareaField";
+import type { Field } from "../field/Field";
+import { resolveField, type ResolvedField } from "../field/resolve";
 import { Session, isActivationKey } from "../bridge/Session";
 import { policyFor, type Settings, type SitePolicy } from "../settings/settings";
 import type { Plugin } from "../plugins/Plugin";
@@ -19,7 +19,7 @@ export interface SettingsPort {
 }
 
 interface FieldSession {
-  field: TextareaField;
+  field: Field;
   session: Session;
 }
 
@@ -47,11 +47,22 @@ function concernsFields(record: MutationRecord): boolean {
   return false;
 }
 
+/**
+ * True while the element a Session is keyed by still resolves to a Field on
+ * itself, of the kind its Field was made as: a host that gains or loses
+ * `aria-multiline="false"` stops qualifying, and the next Activation makes a
+ * Field of the new kind.
+ */
+function stillQualifies(el: HTMLElement, field: Field): boolean {
+  const resolved = resolveField(el);
+  return resolved?.element === el && resolved.singleLine === field.singleLine;
+}
+
 const lifecycleOptions: MutationObserverInit = {
   childList: true,
   subtree: true,
   attributes: true,
-  attributeFilter: ["type", "readonly", "disabled"],
+  attributeFilter: ["type", "readonly", "disabled", "contenteditable", "aria-multiline"],
 };
 
 /**
@@ -66,10 +77,11 @@ const lifecycleOptions: MutationObserverInit = {
  * reconciled against the policy.
  */
 export class Sessions {
-  private readonly sessions = new Map<TextControl, FieldSession>();
+  /** Keyed by the Field's element, as `resolveField` names it. */
+  private readonly sessions = new Map<HTMLElement, FieldSession>();
   private settings: Settings | null = null;
   /** The Field an Activation key was pressed on while the policy was unknown; the last one only. */
-  private remembered: TextControl | null = null;
+  private remembered: HTMLElement | null = null;
   private lifecycleObserver: MutationObserver | null = null;
   private readonly stateSync: SessionStateSync | null;
   private readonly stopWatching: () => void;
@@ -103,8 +115,8 @@ export class Sessions {
 
   /** Mode of the Session on the focused Field, or null when it has none. */
   get focusedMode(): Session["mode"] | null {
-    const active = deepActiveElement(this.document);
-    const entry = isTextControl(active) ? this.sessions.get(active) : undefined;
+    const resolved = resolveField(deepActiveElement(this.document));
+    const entry = resolved ? this.sessions.get(resolved.element) : undefined;
     return entry?.session.mode ?? null;
   }
 
@@ -118,10 +130,11 @@ export class Sessions {
     return this.settings ? policyFor(this.settings, this.site) : null;
   }
 
-  private activate(el: TextControl): void {
+  private activate(resolved: ResolvedField): void {
+    const el = resolved.element;
     if (this.sessions.has(el)) return;
     if (this.remembered === el) this.remembered = null;
-    const field = new TextareaField(el);
+    const field = resolved.create();
     const session = new Session(field, {
       vimrc: this.settings?.vimrc ?? "",
       plugins: this.enabledPlugins(),
@@ -140,7 +153,7 @@ export class Sessions {
       .map((name) => this.plugins[name]!);
   }
 
-  private dispose(el: TextControl): void {
+  private dispose(el: HTMLElement): void {
     const entry = this.sessions.get(el);
     if (!entry) return;
     entry.session.destroy();
@@ -170,9 +183,9 @@ export class Sessions {
    */
   private reconcile(policy: "insert" | "normal"): void {
     if (!this.document.hasFocus()) return;
-    const el = deepActiveElement(this.document);
-    if (!isTextControl(el) || this.sessions.has(el)) return;
-    if (policy === "normal" || el === this.remembered) this.activate(el);
+    const resolved = resolveField(deepActiveElement(this.document));
+    if (!resolved || this.sessions.has(resolved.element)) return;
+    if (policy === "normal" || resolved.element === this.remembered) this.activate(resolved);
   }
 
   private onKeydown = (e: KeyboardEvent): void => {
@@ -181,9 +194,9 @@ export class Sessions {
     // sees the result. Keys inside the command line are handled by its own
     // input's listener, after this one: those are caught by `onDialog`.
     if (this.sessions.size) this.stateSync?.queueSnapshot();
-    const target = deepTarget(e);
-    if (!isTextControl(target)) return;
-    const entry = this.sessions.get(target);
+    const resolved = resolveField(deepTarget(e));
+    if (!resolved) return;
+    const entry = this.sessions.get(resolved.element);
     if (entry) {
       entry.session.handleKeydown(e);
       return;
@@ -193,33 +206,34 @@ export class Sessions {
     if (policy === null) {
       // Unknown policy: the page sees the key as it would on an "off" site,
       // and the arrival decides whether it was an Activation.
-      this.remembered = target;
+      this.remembered = resolved.element;
       return;
     }
     if (policy === "off") return;
     e.preventDefault();
     e.stopPropagation();
-    this.activate(target);
+    this.activate(resolved);
   };
 
   private onFocusin = (e: FocusEvent): void => {
-    const target = deepTarget(e);
-    if (!isTextControl(target)) return;
-    const entry = this.sessions.get(target);
+    const resolved = resolveField(deepTarget(e));
+    if (!resolved) return;
+    const entry = this.sessions.get(resolved.element);
     if (entry) entry.session.onFocus();
-    else if (this.policy() === "normal") this.activate(target);
+    else if (this.policy() === "normal") this.activate(resolved);
   };
 
   private onFocusout = (e: FocusEvent): void => {
-    const target = deepTarget(e);
-    if (!isTextControl(target)) return;
-    this.sessions.get(target)?.session.onBlur();
-    if (this.remembered === target) this.remembered = null;
+    const resolved = resolveField(deepTarget(e));
+    if (!resolved) return;
+    this.sessions.get(resolved.element)?.session.onBlur();
+    if (this.remembered === resolved.element) this.remembered = null;
   };
 
   // Disposal is prompt (ADR 0003): a Session ends when its Field leaves the
   // page (framework re-mounts included) or stops qualifying (readonly,
-  // disabled, type changed to password), not on the next focus change
+  // disabled, type changed to password, a host no longer contenteditable),
+  // not on the next focus change
   // elsewhere. The observer runs only while a Session exists, so an inert
   // page costs nothing.
 
@@ -234,8 +248,8 @@ export class Sessions {
     if (!this.lifecycleObserver) {
       this.lifecycleObserver = new MutationObserver((records) => {
         if (!records.some(concernsFields)) return;
-        for (const el of [...this.sessions.keys()])
-          if (!el.isConnected || !isTextControl(el)) this.dispose(el);
+        for (const [el, { field }] of [...this.sessions])
+          if (!el.isConnected || !stillQualifies(el, field)) this.dispose(el);
       });
       this.lifecycleObserver.observe(this.document, lifecycleOptions);
     }

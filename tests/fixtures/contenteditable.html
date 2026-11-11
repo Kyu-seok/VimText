@@ -1,0 +1,51 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>VimText fixture: contenteditable</title>
+    <style>
+      body {
+        font-family: system-ui;
+        margin: 40px;
+      }
+      [contenteditable] {
+        width: 480px;
+        min-height: 160px;
+        padding: 4px;
+        border: 1px solid #888;
+        font:
+          14px/1.4 Menlo,
+          monospace;
+      }
+      [contenteditable] p {
+        margin: 0;
+      }
+      #log {
+        font: 12px monospace;
+        color: #555;
+        white-space: pre;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>VimText fixture: contenteditable</h1>
+    <!-- A bare contenteditable of plain blocks: paragraphs, a div, a <br> inside a block, an empty block with its placeholder <br>. Kept free of whitespace between tags (whitespace is a projection rule of its own), hence the prettier-ignore. -->
+    <!-- prettier-ignore -->
+    <div id="ce" contenteditable="true"><p>the quick <b>brown</b> fox</p><p>jumps over the lazy dog</p><div>third line<br>fourth line</div><p><br></p><p>last line</p></div>
+    <div id="log"></div>
+    <script>
+      const log = (line) => (document.getElementById("log").textContent += line + "\n");
+      // What the page's editor would see of each edit.
+      const ce = document.getElementById("ce");
+      // `?contenteditable=plaintext-only` reruns the same cases on a plaintext-only host (#45).
+      const mode = new URLSearchParams(location.search).get("contenteditable");
+      if (mode) ce.setAttribute("contenteditable", mode);
+      ce.addEventListener("beforeinput", (e) => log(`beforeinput:${e.inputType}`));
+      ce.addEventListener("input", (e) => log(`input:${e.inputType}`));
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") log("page-esc");
+        if (e.key === "Enter") log(`page-enter${e.metaKey ? ":meta" : ""}${e.ctrlKey ? ":ctrl" : ""}`);
+      });
+    </script>
+  </body>
+</html>

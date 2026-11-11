@@ -1,7 +1,8 @@
 import { EditorSelection, type Text } from "@codemirror/state";
 import type { Field } from "../field/Field";
 import { diffText } from "../field/diff";
-import { Mirror, Vim, type KeyLike } from "../engine/mirror";
+import { ATOM_CHAR } from "../field/atoms";
+import { clipToLine, Mirror, Vim, type KeyLike } from "../engine/mirror";
 import { engineApi } from "../engine/pluginApi";
 import { vimrcLines } from "../engine/vimrc";
 import type { Mode } from "../engine/mode";
@@ -83,11 +84,15 @@ function fedKey(key: string): KeyLike {
   };
 }
 
-/** Normal-mode cursors sit on a character, never past the end of a non-empty line. */
-function clipToLine(doc: Text, pos: number): number {
-  pos = Math.max(0, Math.min(doc.length, pos));
-  const line = doc.lineAt(pos);
-  return pos === line.to && line.length > 0 ? pos - 1 : pos;
+/**
+ * Whether a write of `text` that left the Field at `before` fell short only by
+ * U+FFFC the Field had no element for (an undo of a literal U+FFFC, or of an
+ * Atom it no longer keeps): the Field wrote what it could, which is not the
+ * page refusing the edit, so it is folded like a Controlled Field's rewrite.
+ */
+function onlyAtomsUnwritten(before: string, text: string): boolean {
+  const count = (s: string) => s.split(ATOM_CHAR).length - 1;
+  return count(text) > count(before) && text.split(ATOM_CHAR).join("") === before.split(ATOM_CHAR).join("");
 }
 
 let exCommandsDefined = false;
@@ -132,6 +137,8 @@ export class Session {
   private lastRendered: { anchor: number; head: number } | null = null;
   /** The Field text the bridge last wrote or agreed with; anything else means the page changed the Field. */
   private lastText: string | null = null;
+  /** The mirror's undo depth when `lastText` was last agreed: a refused edit undoes back to it. */
+  private agreedDepth = 0;
   private readonly onDialog: (() => void) | undefined;
   /** The enabled Plugins, bound on every Activation and told when the Field loses focus. */
   private readonly plugins: readonly Plugin[];
@@ -464,6 +471,12 @@ export class Session {
     // Field's selection is the user's doing.
     if (this.renderQueued) this.render();
     this.withSyncing(() => this.syncFromFieldInner());
+    this.readAtoms();
+  }
+
+  /** The mirror's text is the Field's now: give it the Field's Atoms for the register writes. */
+  private readAtoms(): void {
+    if (this.field.atoms) this.withSyncing(() => this.mirror.setAtoms(this.field.atoms!()));
   }
 
   /** Runs our own mirror dispatches, whose updates must not queue a render: the caller renders. */
@@ -508,6 +521,7 @@ export class Session {
         selection: EditorSelection.cursor(insert ? head : clipToLine(newDoc, head)),
         userEvent,
       });
+      this.agreedDepth = this.mirror.undoDepth();
       return;
     }
 
@@ -584,17 +598,44 @@ export class Session {
     this.queuedDocChange = false;
     this.enforceSingleLine();
     const text = this.mirror.view.state.doc.toString();
-    if (text !== this.field.getValue()) {
+    const before = this.field.getValue();
+    if (text !== before) {
       this.field.setValue(text);
+      const after = this.field.getValue();
+      if (after === before && !onlyAtomsUnwritten(before, text)) this.dropRefusedChange();
       // A Controlled Field rewrote the text inside the write; the Field is the truth.
-      if (this.field.getValue() !== text) this.withSyncing(() => this.syncFromFieldInner(true));
+      else if (after !== text) this.withSyncing(() => this.syncFromFieldInner(true));
     }
     const sel = this.renderedSelection();
     this.field.setSelection(sel.anchor, sel.head);
     this.lastRendered = this.field.getSelection();
     this.lastText = this.field.getValue();
+    this.readAtoms();
+    this.agreedDepth = this.mirror.undoDepth();
     this.status.setMode(this.mode);
     this.status.reposition();
+  }
+
+  /**
+   * The page refused the write: the Field's text is what it was before it
+   * (spec #40 "Writes"). The Field wins and the engine's change is taken back
+   * out of the undo history, so `u` never undoes a change that never happened;
+   * the part of a joined step the Field did keep is written back as a step of
+   * its own, the cursor left where the command put it. In Insert and Replace
+   * the change is folded instead, as a Controlled Field's rewrite is: an undo
+   * there would be recorded as typed text for `.`, and the Insert session is
+   * one undo step anyway. The Status Line says so: a refused `x` is never a
+   * silent no-op.
+   */
+  private dropRefusedChange(): void {
+    this.withSyncing(() => {
+      if (this.mirror.vim.insertMode) {
+        this.syncFromFieldInner(true);
+        return;
+      }
+      this.mirror.takeBackSince(this.agreedDepth, this.field.getValue());
+    });
+    this.mirror.notify("VimText: the page refused the edit");
   }
 
   onFocus(): void {

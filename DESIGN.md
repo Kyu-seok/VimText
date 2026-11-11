@@ -2,7 +2,8 @@
 
 Vim modal editing for the text fields of ordinary web pages, in place, with no
 native host. Vocabulary is defined in [GLOSSARY.md](GLOSSARY.md); the engine
-decision is recorded in [docs/adr/0001](docs/adr/0001-reuse-codemirror-vim-engine.md).
+decision is recorded in [docs/adr/0001](docs/adr/0001-reuse-codemirror-vim-engine.md), the
+contenteditable model in [docs/adr/0007](docs/adr/0007-contenteditable-is-plain-text-written-through-editing-commands.md).
 
 ## Positioning
 
@@ -13,13 +14,14 @@ decision is recorded in [docs/adr/0001](docs/adr/0001-reuse-codemirror-vim-engin
 
 ## Scope
 
-| Surface                                                 | Status                                                         |
-| ------------------------------------------------------- | -------------------------------------------------------------- |
-| `<textarea>`                                            | first-class, M1                                                |
-| `<input>` text/search/url/email/tel (Single-line Field) | first-class, M2                                                |
-| contenteditable (Gmail, Slack, Notion, …)               | separate Field implementation, M4, designed in its own session |
-| password/number/date/color/file inputs                  | never                                                          |
-| canvas editors (Google Docs)                            | impossible, out of scope                                       |
+| Surface                                                 | Status                                                 |
+| ------------------------------------------------------- | ------------------------------------------------------ |
+| `<textarea>`                                            | first-class, M1                                        |
+| `<input>` text/search/url/email/tel (Single-line Field) | first-class, M2                                        |
+| contenteditable (Gmail, Slack, Notion, …)               | first-class, M4 (one Field per editing host, ADR 0007) |
+| contenteditable inside a closed shadow root             | never (unreachable)                                    |
+| password/number/date/color/file inputs                  | never                                                  |
+| canvas editors (Google Docs)                            | impossible, out of scope                               |
 
 ## Architecture
 
@@ -116,8 +118,9 @@ pending keys, `recording @q`, the command line for `:` `/` `?`, engine messages
 (e.g. `E486`). Never shown on a Field that was not activated; dim `-- INSERT --` after
 activation. No page-level bar. It sits below the Field when the strip fits in the
 viewport there and above it otherwise, so a Field flush with the bottom of a short
-iframe keeps a visible strip; when it fits neither side (a Field taller than the
-viewport) it stays below. A Field in an iframe gets its Status Line in that frame's
+iframe keeps a visible strip. A Field taller than the viewport (a Gmail body, a long
+answer) gets the strip pinned to the bottom edge of the viewport, spanning the Field's
+horizontal extent, for as long as the Field is on screen (M4, every Field type). A Field in an iframe gets its Status Line in that frame's
 own document, never in the top page (no cross-frame rendering).
 
 **Frames.** The content script runs in every frame; each frame owns its Fields, Sessions
@@ -127,8 +130,50 @@ top origin from `location.ancestorOrigins` (last entry; also works for nested an
 sandboxed frames) and falls back to its own origin on a browser without that property (Firefox).
 
 **Cursor.** Normal mode block cursor = native selection of the char under the cursor;
-Visual = native selection. No overlay. Visual block edits apply correctly but only the
+Visual = native selection. No overlay. On a contenteditable Field the char may be an Atom
+(the selection covers the Atom); on an empty block there is no char, so the cursor is a
+collapsed caret. Visual block edits apply correctly but only the
 primary range is highlighted.
+
+**contenteditable Fields** (M4, ADR 0007, decided in the grill of 2026-11-10).
+
+- _Which element_: the editing host, the outermost element whose `isContentEditable` is true
+  and whose parent's is not (`contenteditable="true"` and `"plaintext-only"`). Non-editable
+  islands inside it are part of the Field. A page that makes every block its own host
+  (Notion) has one Field, Session and undo history per block.
+- _Single-line_: only when the host declares `aria-multiline="false"`; it then takes every
+  Single-line Field rule (newline strip, rule 6, rule 7). No guessing from height or role.
+- _Projection_: the Field's text is the host's plain text, read by VimText's own DOM walker
+  so every offset maps back to a (node, offset) position. Line breaks follow `innerText`,
+  which is the oracle where a case is ambiguous: a block-level computed `display` boundary,
+  a `<br>` (not the trailing placeholder `<br>` of an empty block), a `\n` in
+  `white-space: pre*` text; table cells in a row are joined by a tab; collapsed whitespace
+  projects as rendered. Formatting is not in the projection. Two departures from `innerText`,
+  where it is not what renders: each block is one line (`innerText` puts a blank line on each
+  side of a `<p>`, and in Chrome of a heading), and a break that ends its block (`<div>a<br></div>`,
+  a trailing `\n` in `pre`) makes no line of its own (docs/engine-seams.md "innerText as the oracle").
+- _Atoms_: a mention chip, an inline image, a `contenteditable="false"` island projects as
+  one `U+FFFC`. Motions count it as one non-blank char; `x`/`dw` delete it whole. A yank
+  stores the Atom's visible text (`@alice`, an image's `alt`, otherwise nothing), never `U+FFFC`.
+- _Writes_ (non-Insert Modes): never a DOM mutation. The bridge selects the DOM range of
+  the diff and runs `document.execCommand('insertText' | 'delete')`; an inserted `\n` is
+  `insertParagraph` (what Enter does in the editor), a deleted one merges blocks through
+  `delete`. The editor's own handling is a Controlled Field rewrite (ADR 0004). An edit the
+  editor refuses (`execCommand` false, or the DOM unchanged) is dropped: the Field wins, the
+  mirror resyncs, and the Status Line says the page refused the edit. Both cases show as the
+  projection unchanged after the write, and that alone decides it: `execCommand` returns true
+  for an edit the editor's `input` handler then puts back, so its return value is not read.
+  The same test holds on every Field kind: a textarea or input whose page puts its whole value
+  back after a write gets the message, and the change leaves the undo history, where a page that
+  writes anything else is a Controlled Field rewrite. A `U+FFFC` an undo writes back for an Atom
+  VimText no longer holds the element of is written as nothing, which is not a refusal.
+  The formatting at a write's edge is the editor's: text written at the end of a mark run takes
+  the mark, as typing there would (`J` after an italic word makes the joining space italic).
+- _Insert_: the editor owns typing as on every Field; the mirror re-projects the whole host
+  on every `input`. No size budget until a measured finding asks for one.
+- _Key Policy_: a multi-line contenteditable follows the textarea rows: `Enter` in Normal is
+  the Vim motion; a chat composer submits with Insert-mode `Enter` or Cmd/Ctrl+Enter.
+- _Registers_: plain text only. Cmd+V stays a Pass-through, so the editor's rich paste works.
 
 **Registers & clipboard.** `"+` is the system clipboard (`clipboardRead`/`clipboardWrite`;
 the engine writes when a yank, delete or change stores text into the register and reads at
@@ -317,6 +362,17 @@ it is outside the gate, so PNG churn never fails `npm run check`.
   `"+p`/`"*p` show a Status Line message and leave the text untouched; `"+y` still fills the
   register but the clipboard does not change. On a plain `http://` page (not a secure context)
   there is no clipboard API at all: every `"+`/`"*` command beeps with a Status Line message.
+- contenteditable (M4): yank and put carry plain text, never formatting (Cmd+V keeps the
+  editor's rich paste). Display-line motions and scrolls approximate on mixed fonts and sizes:
+  the mirror takes the host's base font. VimText's edits land in the editor's own undo history
+  as user edits, so Cmd+Z in Insert can undo them; the self-heal resyncs on the next key.
+  Notion's blocks are one Field each, so `j`/`k` stop at a block's edge. A contenteditable
+  in a closed shadow root is unreachable.
+- contenteditable (M4): `u` restores the text, not always its markup or marks. An undone line
+  merge can leave the text in another block element, a character put back at the start of a
+  bold run is plain, and a `plaintext-only` host keeps the `<br>` a merge left. An Atom comes
+  back from `u` only while VimText still holds its element (the last 200 removed in that Field);
+  an older one, or one the page took out without an `input` event, comes back as nothing.
 
 ## Milestones
 
@@ -340,8 +396,14 @@ it is outside the gate, so PNG churn never fails `npm run check`.
   a re-cut tag. Announcements (Show HN, r/vim, r/chrome_extensions, Stack Overflow answers with
   affiliation disclosed, a GitHub Discussion) go out after approval, not at upload. Not in
   this part: Firefox/AMO, a CHANGELOG file (GitHub Release notes are the changelog), #12, #23.
-- **M4** contenteditable Field (own planning session first). Reddit's rich-text comment
-  composer and Stack Overflow's answer editor (the Stacks Editor, ProseMirror) are among its
-  cases.
+- **M4** contenteditable Field, decided in the grill of 2026-11-10 (ADR 0007), in two parts,
+  each landing on `main`. Part 1: the projection and the write path, the Atom, line, Single-line
+  and refusal rules, the Status Line pinned for a Field taller than the viewport, with a bare
+  contenteditable, a `plaintext-only` one, a shadow-rooted one and a pinned ProseMirror build as
+  fixtures. Part 2: pinned Lexical, Quill and Slate fixtures, then a dogfooding pass in the
+  docs/release.md style on Stack Overflow's answer editor, Reddit's rich-text composer, Gmail
+  compose, Slack's message box, a GitHub comment and a Notion page, under M3 part 3's blocking
+  rule (corrupts text, traps the page, throws; anything else is filed); the store listing,
+  README and announcement limitation lines are rewritten in it. 0.4.0 is tagged after part 2.
 
 Each milestone is a usable release.

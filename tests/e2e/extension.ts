@@ -91,13 +91,49 @@ export async function openActivated(page: Page): Promise<void> {
   await activateAtStart(page, "#ta");
 }
 
-/** Focuses a Field, parks the caret at its start and Activates VimText with Esc. */
+/**
+ * Focuses a Field, parks the caret at its start and Activates VimText with Esc.
+ * A textarea or input takes `setSelectionRange`; a contenteditable host a
+ * collapsed native selection at its start.
+ */
 export async function activateAtStart(page: Page, selector = "#in"): Promise<void> {
   const field = page.locator(selector);
   await field.focus();
-  await field.evaluate((el: HTMLInputElement | HTMLTextAreaElement) => el.setSelectionRange(0, 0));
+  await field.evaluate((el: HTMLElement) => {
+    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) el.setSelectionRange(0, 0);
+    else el.ownerDocument.getSelection()!.collapse(el, 0);
+  });
   await page.keyboard.press("Escape");
-  base.expect(await statusText(page)).toContain("NORMAL");
+  // An Esc before the settings load arrive Activates when they do (Sessions).
+  await base.expect.poll(() => statusText(page)).toContain("NORMAL");
+}
+
+/** The text of each direct child block of a contenteditable host, a no-break space read as the space it renders as. */
+export function blockTexts(page: Page | Frame, selector: string): Promise<string[]> {
+  return page
+    .locator(selector)
+    .evaluate((el) => [...el.children].map((c) => (c.textContent ?? "").replace(/\u00a0/g, " ")));
+}
+
+/**
+ * The text the native selection covers in that page or frame: a Normal-mode
+ * cursor's character. With `shadowHost`, the selection inside that element's
+ * open shadow root, read through Chromium's `ShadowRoot.getSelection`: the
+ * document's selection is retargeted to the host there.
+ */
+export function selectedText(page: Page | Frame, shadowHost?: string): Promise<string> {
+  return page.evaluate((hostSelector) => {
+    if (!hostSelector) return document.getSelection()?.toString() ?? "";
+    const root = document.querySelector(hostSelector)!.shadowRoot as ShadowRoot & {
+      getSelection(): Selection;
+    };
+    return root.getSelection().toString();
+  }, shadowHost);
+}
+
+/** How many Status Line hosts VimText has on the page; one per live Session. */
+export function hostCount(page: Page | Frame): Promise<number> {
+  return page.evaluate(() => document.querySelectorAll("vimtext-status").length);
 }
 
 /** What the content script of a tab's top frame reports (the popup's `vimtext:status` query). */
