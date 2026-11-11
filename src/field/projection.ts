@@ -101,17 +101,21 @@ function collapseOf(node: Text): Collapse {
 
 /** One run of a text node as it renders, at DOM offset `at`. */
 interface Run {
-  /** A line break (a `\n` where breaks are preserved), collapsible whitespace, or characters that render one for one. */
-  kind: "break" | "space" | "chars";
+  /**
+   * A line break (a `\n` where breaks are preserved), collapsible whitespace,
+   * characters that render one for one, or zero-width no-break spaces, which
+   * render as nothing (Slate's placeholder in an empty leaf).
+   */
+  kind: "break" | "space" | "chars" | "nothing";
   at: number;
   text: string;
 }
 
-/** Document whitespace; U+00A0 is not, it never collapses. */
+/** Document whitespace; U+00A0 is not, it never collapses. U+FEFF runs on their own. */
 const RUN_PATTERNS: Record<Collapse, RegExp> = {
-  collapse: /[ \t\n\r\f]+|[^ \t\n\r\f]+/g,
-  "preserve-breaks": /\n|[ \t\r\f]+|[^\n \t\r\f]+/g,
-  preserve: /\n|[^\n]+/g,
+  collapse: /\ufeff+|[ \t\n\r\f]+|[^ \t\n\r\f\ufeff]+/g,
+  "preserve-breaks": /\ufeff+|\n|[ \t\r\f]+|[^\n \t\r\f\ufeff]+/g,
+  preserve: /\ufeff+|\n|[^\n\ufeff]+/g,
 };
 
 function runsOf(node: Text): Run[] {
@@ -119,11 +123,13 @@ function runsOf(node: Text): Run[] {
   return [...node.data.matchAll(RUN_PATTERNS[mode])].map((m) => {
     const text = m[0];
     const kind =
-      text === "\n" && mode !== "collapse"
-        ? "break"
-        : mode !== "preserve" && /^[ \t\n\r\f]/.test(text)
-          ? "space"
-          : "chars";
+      text[0] === "\ufeff"
+        ? "nothing"
+        : text === "\n" && mode !== "collapse"
+          ? "break"
+          : mode !== "preserve" && /^[ \t\n\r\f]/.test(text)
+            ? "space"
+            : "chars";
     return { kind, at: m.index, text };
   });
 }
@@ -220,6 +226,7 @@ class Walker {
     for (const run of runsOf(node)) {
       const at = { node, offset: run.at };
       if (run.kind === "break") this.lineBreak({ kind: "text", from: at, to: { node, offset: run.at + 1 } });
+      else if (run.kind === "nothing") continue;
       else if (run.kind === "space") this.space(node, run);
       else this.chars(node, run);
     }
