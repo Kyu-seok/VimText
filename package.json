@@ -49,6 +49,7 @@
     "prosemirror-schema-list": "1.5.1",
     "prosemirror-state": "1.4.4",
     "prosemirror-view": "1.42.8",
+    "quill": "2.0.3",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "typescript": "7.0.2",
