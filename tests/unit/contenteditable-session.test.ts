@@ -107,7 +107,7 @@ describe("motions across lines", () => {
 });
 
 describe("Normal-mode edits go through editing commands", () => {
-  it("x dw cw dd J edit the blocks, each write an input event of an editing type", async () => {
+  it("x dw cw dd J edit the blocks, each write a beforeinput and an input event of an editing type", async () => {
     const { host } = open();
     const log = inputLog(host);
     await keys("x");
@@ -124,7 +124,7 @@ describe("Normal-mode edits go through editing commands", () => {
     expect(blockTexts(host)).toEqual(["slow brown fox third line here"]);
     expect(log.length).toBeGreaterThan(0);
     expect(
-      log.every((e) => /^input:(insertText|deleteContentBackward|insertParagraph)$/.test(e)),
+      log.every((e) => /^(before|input):(insertText|deleteContentBackward|insertParagraph)$/.test(e)),
       log.join(),
     ).toBe(true);
   });

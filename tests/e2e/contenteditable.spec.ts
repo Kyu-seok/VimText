@@ -98,7 +98,7 @@ test("x dw cw dd J edit through editing commands: the page sees only editing inp
     .poll(() => blockTexts(page, "#ce"))
     .toEqual(["slow brown fox jumps over the lazy dog", "third linefourth line", "last line"]);
   const log = (await pageLog(page)).filter((l) => !l.startsWith("page-"));
-  // Chrome fires no beforeinput for execCommand; the typed "slow" is the editor's own (insertText too).
+  // Each write step is a synthetic beforeinput, then (nothing cancels it here) the command's input (ADR 0008); the typed "slow" is the editor's own (insertText too).
   expect(log.filter((l) => l.startsWith("input:")).length).toBeGreaterThan(0);
   for (const line of log) {
     expect(line).toMatch(

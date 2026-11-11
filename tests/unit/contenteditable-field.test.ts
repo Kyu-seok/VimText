@@ -12,10 +12,12 @@ import {
 
 /**
  * A contenteditable Field at the `Field` seam (ADR 0007): its text is the
- * host's projection, its selection the native one, and every write is the
- * browser's own editing command, so the page sees each as an `input` with an
- * editing `inputType` (Chrome fires no `beforeinput` for `execCommand`; see
- * docs/engine-seams.md "Editing commands").
+ * host's projection, its selection the native one, and every write step is
+ * offered to the page as a synthetic `beforeinput` (ADR 0008) and, where no
+ * listener cancels it, run as the browser's own editing command, so the page
+ * sees each as a `beforeinput` and an `input` with the same editing
+ * `inputType` (Chrome fires no `beforeinput` of its own for `execCommand`;
+ * see docs/engine-seams.md "Editing commands").
  */
 
 let field: ContentEditableField | null = null;
@@ -69,7 +71,7 @@ describe("ContentEditableField", () => {
     const log = inputLog(host);
     await field.setValue("abcef");
     expect(host.innerHTML).toBe("<p>ab<b>ce</b>f</p>");
-    expect(log).toEqual(["input:deleteContentBackward"]);
+    expect(log).toEqual(["before:deleteContentBackward", "input:deleteContentBackward"]);
   });
 
   it("keeps a space the browser's delete drops at the edge of a block", async () => {
@@ -96,7 +98,7 @@ describe("ContentEditableField", () => {
     await field.setValue("abcYZ");
     expect(field.getValue()).toBe("abcYZ");
     expect(host.querySelector("b")!.textContent).toBe("cYZ");
-    expect(log).toEqual(["input:insertText", "input:insertText"]);
+    expect(log).toEqual(["before:insertText", "input:insertText", "before:insertText", "input:insertText"]);
   });
 
   it("an inserted newline is a new block, made by insertParagraph", async () => {
@@ -108,7 +110,7 @@ describe("ContentEditableField", () => {
     await field.setValue("one\nnew\nmore\n\ntwo");
     expect(blockTexts(host)).toEqual(["one", "new", "more", "", "two"]);
     expect(log).toContain("input:insertParagraph");
-    expect(log.every((e) => /^input:(insertText|insertParagraph)$/.test(e))).toBe(true);
+    expect(log.every((e) => /^(before|input):(insertText|insertParagraph)$/.test(e))).toBe(true);
   });
 
   it("a deleted newline merges two blocks", async () => {

@@ -27,9 +27,11 @@
   </head>
   <body>
     <h1>VimText fixture: refused edit</h1>
-    <!-- An editor that refuses any edit to its locked span: its input handler puts back the last accepted markup, as an editor re-rendering from its own model does. Cancelling beforeinput would not do it: Chrome's editing commands fire none (docs/engine-seams.md "Refused edits"). No whitespace between tags, hence the prettier-ignore. -->
+    <!-- An editor that refuses any edit to its locked span: its input handler puts back the last accepted markup, as an editor re-rendering from its own model does. No whitespace between tags, hence the prettier-ignore. -->
     <!-- prettier-ignore -->
     <div id="ce" contenteditable="true"><p>ab<span class="locked">LOCK</span>cd</p><p>next line</p></div>
+    <!-- An editor that takes over every beforeinput and does nothing (ADR 0008): it cancels the event and records what it saw in window.offered, the target range as the text it covers and whether its start lies in this host. -->
+    <div id="cancel" contenteditable="true"><p>hello world</p></div>
     <script>
       const ce = document.getElementById("ce");
       const lockedTexts = () => [...ce.querySelectorAll(".locked")].map((s) => s.textContent);
@@ -39,6 +41,25 @@
         const now = lockedTexts();
         if (now.length === locked.length && now.every((t, i) => t === locked[i])) accepted = ce.innerHTML;
         else ce.innerHTML = accepted;
+      });
+      window.offered = [];
+      const cancel = document.getElementById("cancel");
+      cancel.addEventListener("beforeinput", (e) => {
+        e.preventDefault();
+        const ranges = e.getTargetRanges();
+        const range = ranges.length === 1 && ranges[0] instanceof StaticRange ? ranges[0] : null;
+        const text = range ? new Range() : null;
+        if (range) {
+          text.setStart(range.startContainer, range.startOffset);
+          text.setEnd(range.endContainer, range.endOffset);
+        }
+        window.offered.push({
+          inputType: e.inputType,
+          data: e.data,
+          trusted: e.isTrusted,
+          target: text ? text.toString() : null,
+          inHost: range ? cancel.contains(range.startContainer) : false,
+        });
       });
     </script>
   </body>

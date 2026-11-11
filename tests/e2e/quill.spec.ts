@@ -108,12 +108,17 @@ test("dd removes a block from Quill's model; a real keystroke after it lands at 
 test("J and a Visual delete across lines merge Quill's blocks; a real keystroke after each keeps them", async ({
   page,
 }) => {
-  // The heading joins the paragraph above it, as Backspace at its start would.
+  // The heading's text joins the paragraph above it. `J` writes one
+  // `insertText(' ')` over the line break, which Quill's Input module takes
+  // from the synthetic `beforeinput` (ADR 0008) and applies as a Delta: the
+  // first line's `\n` goes, so the joined line keeps the heading's line
+  // format, as typing a space over a selection across the two lines does.
+  // (Under `execCommand` alone it kept the paragraph's.)
   await page.keyboard.type("J");
   await expect
     .poll(() => quillDoc(page))
     .toEqual([
-      "the <b>quick brown</b> fox a heading",
+      "h1:the <b>quick brown</b> fox a heading",
       "bullet:first item",
       "bullet:second item",
       `a cat ${EMBED} here`,
