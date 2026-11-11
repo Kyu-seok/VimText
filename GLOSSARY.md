@@ -25,7 +25,7 @@ A Field whose page rewrites its value in response to edits, as React controlled 
 _Avoid_: framework field, React input, managed input
 
 **Activate**:
-The moment VimText takes control of a focused Field: on its first Esc or Ctrl+[ when the Start Mode is Insert, or as soon as it is focused when the Start Mode is Normal. Before activation VimText is inert on that Field and shows nothing; after activation the Field stays under VimText's control until it leaves the page.
+The moment VimText takes control of a focused Field: on its first Esc or Ctrl+[ when the Start Mode is Insert, or as soon as it is focused when the Start Mode is Normal. Before activation VimText is inert on that Field and shows nothing; after activation the Field stays under VimText's control until it leaves the page or stops qualifying (see **Session**).
 _Avoid_: enable, wake, turn on
 
 **Mode**:

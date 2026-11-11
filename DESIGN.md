@@ -120,7 +120,9 @@ activation. No page-level bar. It sits below the Field when the strip fits in th
 viewport there and above it otherwise, so a Field flush with the bottom of a short
 iframe keeps a visible strip. A Field taller than the viewport (a Gmail body, a long
 answer) gets the strip pinned to the bottom edge of the viewport, spanning the Field's
-horizontal extent, for as long as the Field is on screen (M4, every Field type). A Field in an iframe gets its Status Line in that frame's
+horizontal extent, for as long as the Field is on screen (M4, every Field type). Once the Field's
+bottom edge is in view the strip rides up with it, just below the Field, rather than
+floating over the page beneath. A Field in an iframe gets its Status Line in that frame's
 own document, never in the top page (no cross-frame rendering).
 
 **Frames.** The content script runs in every frame; each frame owns its Fields, Sessions
@@ -142,7 +144,8 @@ primary range is highlighted.
   islands inside it are part of the Field. A page that makes every block its own host
   (Notion) has one Field, Session and undo history per block.
 - _Single-line_: only when the host declares `aria-multiline="false"`; it then takes every
-  Single-line Field rule (newline strip, rule 6, rule 7). No guessing from height or role.
+  Single-line Field rule (newline strip, rule 6, rule 7). No guessing from height or role. Adding or removing the
+  attribute ends a Session on that host; the next Activation makes the Field of the new kind.
 - _Projection_: the Field's text is the host's plain text, read by VimText's own DOM walker
   so every offset maps back to a (node, offset) position. Line breaks follow `innerText`,
   which is the oracle where a case is ambiguous: a block-level computed `display` boundary,
@@ -150,11 +153,15 @@ primary range is highlighted.
   `white-space: pre*` text; table cells in a row are joined by a tab; collapsed whitespace
   projects as rendered. Formatting is not in the projection. Two departures from `innerText`,
   where it is not what renders: each block is one line (`innerText` puts a blank line on each
-  side of a `<p>`, and in Chrome of a heading), and a break that ends its block (`<div>a<br></div>`,
+  side of a `<p>`), and a break that ends its block (`<div>a<br></div>`,
   a trailing `\n` in `pre`) makes no line of its own (docs/engine-seams.md "innerText as the oracle").
 - _Atoms_: a mention chip, an inline image, a `contenteditable="false"` island projects as
   one `U+FFFC`. Motions count it as one non-blank char; `x`/`dw` delete it whole. A yank
   stores the Atom's visible text (`@alice`, an image's `alt`, otherwise nothing), never `U+FFFC`.
+  Any element inside the host whose `isContentEditable` is false is an Atom, and so is every
+  replaced element or form control (`img`, `video`, `canvas`, `iframe`, `svg`, `input`,
+  `button`, `select`, `textarea`, …; the list is `src/field/atoms.ts`): none is text the
+  editor writes through.
 - _Writes_ (non-Insert Modes): never a DOM mutation. The bridge selects the DOM range of
   the diff and runs `document.execCommand('insertText' | 'delete')`; an inserted `\n` is
   `insertParagraph` (what Enter does in the editor), a deleted one merges blocks through
