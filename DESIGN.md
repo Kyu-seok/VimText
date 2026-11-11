@@ -163,11 +163,19 @@ primary range is highlighted.
   `button`, `select`, `textarea`, …; the list is `src/field/atoms.ts`): none is text the
   editor writes through.
 - _Writes_ (non-Insert Modes): never a DOM mutation. The bridge selects the DOM range of
-  the diff and runs `document.execCommand('insertText' | 'delete')`; an inserted `\n` is
-  `insertParagraph` (what Enter does in the editor), a deleted one merges blocks through
-  `delete`. The editor's own handling is a Controlled Field rewrite (ADR 0004). An edit the
-  editor refuses (`execCommand` false, or the DOM unchanged) is dropped: the Field wins, the
-  mirror resyncs, and the Status Line says the page refused the edit. Both cases show as the
+  the diff and, per step, offers the editor a cancelable synthetic `beforeinput`
+  (`insertText`, `deleteContentBackward`, `insertParagraph`, with the range as its target);
+  only if no listener cancels it does it run `document.execCommand('insertText' | 'delete')`
+  (ADR 0008). An inserted `\n` is `insertParagraph` (what Enter does in the editor), a deleted
+  one merges blocks through the delete. The write is asynchronous: its steps are spaced so the
+  editor catches up, a render due meanwhile is merged into the next write, and the refusal and
+  Controlled Field rules below read the Field once the write has settled. A write reaches the
+  editor's model on the editors a pinned fixture covers (Lexical, Slate, Quill, ProseMirror);
+  elsewhere the projection is the only signal, so a Diverged Edit there goes unseen. The
+  editor's own handling is a Controlled Field rewrite (ADR 0004). A Refused Edit (the editor
+  cancels the event and does nothing, `execCommand` returns false, or the DOM is unchanged) is
+  dropped: the Field wins, the mirror resyncs, and the Status Line says the page refused the
+  edit. Both cases show as the
   projection unchanged after the write, and that alone decides it: `execCommand` returns true
   for an edit the editor's `input` handler then puts back, so its return value is not read.
   The same test holds on every Field kind: a textarea or input whose page puts its whole value
@@ -372,7 +380,8 @@ it is outside the gate, so PNG churn never fails `npm run check`.
 - contenteditable (M4): yank and put carry plain text, never formatting (Cmd+V keeps the
   editor's rich paste). Display-line motions and scrolls approximate on mixed fonts and sizes:
   the mirror takes the host's base font. VimText's edits land in the editor's own undo history
-  as user edits, so Cmd+Z in Insert can undo them; the self-heal resyncs on the next key.
+  as user edits, so Cmd+Z in Insert can undo them (Quill merges edits within one second into one
+  step; Lexical and Slate may take one per step of a write); the self-heal resyncs on the next key.
   Notion's blocks are one Field each, so `j`/`k` stop at a block's edge. A contenteditable
   in a closed shadow root is unreachable.
 - contenteditable (M4): `u` restores the text, not always its markup or marks. An undone line
@@ -407,7 +416,7 @@ it is outside the gate, so PNG churn never fails `npm run check`.
   each landing on `main`. Part 1: the projection and the write path, the Atom, line, Single-line
   and refusal rules, the Status Line pinned for a Field taller than the viewport, with a bare
   contenteditable, a `plaintext-only` one, a shadow-rooted one and a pinned ProseMirror build as
-  fixtures. Part 2: pinned Lexical, Quill and Slate fixtures, then a dogfooding pass in the
+  fixtures. Part 2: the `beforeinput`-first asynchronous write (ADR 0008) with pinned Lexical, Quill and Slate fixtures that check the editor's model, then a dogfooding pass in the
   docs/release.md style on Stack Overflow's answer editor, Reddit's rich-text composer, Gmail
   compose, Slack's message box, a GitHub comment and a Notion page, under M3 part 3's blocking
   rule (corrupts text, traps the page, throws; anything else is filed); the store listing,

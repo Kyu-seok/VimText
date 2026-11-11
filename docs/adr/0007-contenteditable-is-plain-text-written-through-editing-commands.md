@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: accepted, amended by ADR 0008
 ---
 
 # contenteditable: a plain-text projection, written back through native editing commands
@@ -18,3 +18,4 @@ Decided in the M4 grill of 2026-11-10. A contenteditable Field is, to the bridge
 - Formatting is preserved around an edit because the editor applies it; yank and put carry plain text only.
 - VimText's edits land in the editor's own undo history as ordinary user edits.
 - An editor that reads edits from the DOM and `input` (ProseMirror's DOM observer, Quill) takes VimText's writes as typing. One that takes its edits only from `beforeinput` and treats any other DOM change as foreign (Lexical, Slate) sees no event before the DOM changes under it: it may reconcile the change back into its model, revert it (a refused edit, #48), or diverge. M4 part 2's pinned Lexical and Slate fixtures decide which, and that finding, not a per-editor adapter, is where this ADR is revisited.
+- Amended by ADR 0008 (2026-11-12): Lexical reverts the structure of a write and keeps its text, so structural writes corrupt text; Slate diverges. Each write step now offers a synthetic `beforeinput` first and runs `execCommand` only when no listener cancels it, asynchronously, judged once settled.

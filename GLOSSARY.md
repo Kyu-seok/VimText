@@ -24,6 +24,14 @@ _Avoid_: single-line input, input field, one-line box
 A Field whose page rewrites its value in response to edits, as React controlled components, input masks and uppercase filters do. The page's rewrite is the truth; VimText follows it.
 _Avoid_: framework field, React input, managed input
 
+**Refused Edit**:
+An edit VimText writes to a Field that leaves the Field's text as it was, because the page refused it or put it back at once. The Field wins and the Status Line says so.
+_Avoid_: rejected edit, reverted edit, blocked write
+
+**Diverged Edit**:
+An edit the page shows in a Field but its editor never takes in, so the editor later puts its own text back without telling anyone. VimText cannot see one; it is a defect to prevent, not a state to handle.
+_Avoid_: reverted edit, lost edit, desync
+
 **Activate**:
 The moment VimText takes control of a focused Field: on its first Esc or Ctrl+[ when the Start Mode is Insert, or as soon as it is focused when the Start Mode is Normal. Before activation VimText is inert on that Field and shows nothing; after activation the Field stays under VimText's control until it leaves the page or stops qualifying (see **Session**).
 _Avoid_: enable, wake, turn on
