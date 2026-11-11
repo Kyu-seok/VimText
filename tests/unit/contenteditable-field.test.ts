@@ -113,6 +113,26 @@ describe("ContentEditableField", () => {
     expect(log.every((e) => /^(before|input):(insertText|insertParagraph)$/.test(e))).toBe(true);
   });
 
+  // #61: Chromium's insertParagraph at the end of an <h1> makes a <div>, which
+  // Quill replaces with a <p> of its own, the caret then wherever its
+  // re-render left it. The text after the paragraph break goes at the start of
+  // the new line, where the projection puts it, not where that caret is.
+  it("text after a paragraph break lands on the new line when the editor re-rendered it and moved the caret", async () => {
+    const { host, field } = fieldOn("<p>one</p><h1>head</h1><p>two</p>");
+    const heading = host.querySelector("h1")!.firstChild!;
+    new MutationObserver(() => {
+      for (const div of host.querySelectorAll(":scope > div")) {
+        const p = document.createElement("p");
+        p.append(document.createElement("br"));
+        div.replaceWith(p);
+        getSelection()!.setBaseAndExtent(heading, 4, heading, 4);
+      }
+    }).observe(host, { childList: true });
+    await field.setValue("one\nhead\nnew\ntwo");
+    expect(blockTexts(host)).toEqual(["one", "head", "new", "two"]);
+    expect(host.children[2]!.localName).toBe("p");
+  });
+
   it("a deleted newline merges two blocks", async () => {
     const { host, field } = fieldOn("<p>one</p><p>two</p><p>three</p>");
     await field.setValue("one\nthree");

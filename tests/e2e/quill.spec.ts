@@ -191,40 +191,55 @@ test("o on a list item opens a list item; o on a header opens a plain line, as E
     .toEqual(["h1:a heading", "body", "bullet:first item"]);
 });
 
-test("a linewise p below a header loses the pasted line (#61)", async ({ page }) => {
+test("a linewise p below a header, or P on the line below it, keeps the pasted line (#61)", async ({
+  page,
+}) => {
+  // Chromium's insertParagraph at the end of an <h1> makes a <div>, which
+  // Quill replaces with a <p> of its own; the pasted text goes on that new
+  // line, where the projection puts it, wherever Quill's re-render left the
+  // caret. `P` on the line below writes the same `\n` + text at the heading's
+  // end (docs/engine-seams.md, "Linewise writes").
+  const pasted = [ORIGINAL[0]!, ORIGINAL[1]!, ORIGINAL[0]!, ...ORIGINAL.slice(2)];
   await page.keyboard.type("yyjp");
-  // Pins #61, not what Vim does: Chromium's insertParagraph at the end of an
-  // <h1> makes a <div>, the insertText fills it, and Quill replaces the <div>
-  // with an empty <p>. The new line should read `the quick brown fox`. Since
-  // the write's steps are a task apart (#52, ADR 0008), whether Quill replaces
-  // the <div> before or after the insertText lands depends on timing, so the
-  // new line is either; every other line is as it should be.
-  await expect.poll(async () => (await modelText(page)).length).toBe(ORIGINAL.length + 1);
-  const lines = await modelText(page);
-  expect(["", "the quick brown fox"]).toContain(lines[2]);
-  expect(lines.filter((_, i) => i !== 2)).toEqual(ORIGINAL);
+  await expect.poll(() => modelText(page)).toEqual(pasted);
+  await typeAfter(page, ">");
+  await expect.poll(async () => (await modelText(page))[2]).toBe(">the quick brown fox");
+  await page.keyboard.type("uu");
+  await expect.poll(() => modelText(page)).toEqual(ORIGINAL);
+  await page.keyboard.type("ggjjP");
+  await expect.poll(() => modelText(page)).toEqual(pasted);
+  await expect.poll(async () => (await quillDoc(page))[1]).toBe("h1:a heading");
 });
 
-test("Quill's list marker counts as an Atom, so I and x on a list item go wrong (#60)", async ({ page }) => {
-  // Pins #60, not what Vim does. Each list item starts with Quill's
-  // <span class="ql-ui" contenteditable="false">, which the projection reads as
-  // an Atom. `I` puts the caret before the span, and Quill moves the typed text
-  // to the item's end: it should read `Zsecond item`.
+test("a list item's marker is no text of its line: 0x, I, dd and J act on a list item as on a plain line (#60)", async ({
+  page,
+}) => {
+  // Each list item starts with Quill's empty <span class="ql-ui"
+  // contenteditable="false">, which draws the bullet. It is decoration, not an
+  // Atom (DESIGN.md, _Atoms_), so the line starts at the item's text.
   await page.keyboard.type("jjjI");
   await page.keyboard.type("Z");
   await page.keyboard.press("Escape");
-  await expect.poll(async () => (await modelText(page))[3]).toBe("second itemZ");
-  // `0x` on the span changes nothing (Quill keeps it): a Refused Edit. The
-  // cursor stays on the span, its selection set once the write has settled
-  // (#52, ADR 0008), so the next `x` is refused too: the line should read
-  // `rst item`. (Before #52 the cursor slid onto `i`, and `x` deleted it.)
+  await expect.poll(async () => (await modelText(page))[3]).toBe("Zsecond item");
   await page.keyboard.type("k0x");
-  // The refusal is judged once the write has settled; a key pressed before
-  // then goes with the refused edit.
-  await expect.poll(() => statusText(page)).toContain("refused");
+  await expect.poll(async () => (await modelText(page))[2]).toBe("irst item");
   await page.keyboard.type("x");
-  await expect.poll(() => statusText(page)).toContain("refused");
-  await expect.poll(async () => (await modelText(page))[2]).toBe("first item");
+  await expect.poll(async () => (await modelText(page))[2]).toBe("rst item");
+  await typeAfter(page, "f");
+  await expect.poll(async () => (await modelText(page))[2]).toBe("frst item");
+  expect(await statusText(page)).not.toContain("refused");
+  // J joins the two items into one.
+  await page.keyboard.type("J");
+  await expect
+    .poll(async () => (await quillDoc(page)).slice(2, 4))
+    .toEqual(["bullet:frst item Zsecond item", `a cat ${EMBED} here`]);
+  // dd removes the item whole, marker and all.
+  await page.keyboard.type("dd");
+  await expect
+    .poll(() => quillDoc(page))
+    .toEqual(["the <b>quick brown</b> fox", "h1:a heading", `a cat ${EMBED} here`, "last line"]);
+  await typeAfter(page, "Q");
+  await expect.poll(async () => (await modelText(page))[2]).toBe(`Qa cat ${EMBED} here`);
 });
 
 test("x on the embed deletes it and u restores it; the next keystroke lands at the cursor", async ({
