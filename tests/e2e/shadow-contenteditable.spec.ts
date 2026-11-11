@@ -28,45 +28,45 @@ test("Esc Activates on the host in the shadow root; motions move the Normal curs
 }) => {
   await activateAtStart(page, "#ce");
   await expect(page.locator("#log")).toBeEmpty();
-  expect(await selectedText(page, "#editor")).toBe("t");
+  await expect.poll(() => selectedText(page, "#editor")).toBe("t");
   await page.keyboard.type("ww");
-  expect(await selectedText(page, "#editor")).toBe("b"); // into the bold run
+  await expect.poll(() => selectedText(page, "#editor")).toBe("b"); // into the bold run
   await page.keyboard.type("j$");
-  expect(await selectedText(page, "#editor")).toBe("g");
+  await expect.poll(() => selectedText(page, "#editor")).toBe("g");
   await page.keyboard.type("G0");
-  expect(await selectedText(page, "#editor")).toBe("l");
+  await expect.poll(() => selectedText(page, "#editor")).toBe("l");
   await page.keyboard.type("gg");
-  expect(await selectedText(page, "#editor")).toBe("t");
+  await expect.poll(() => selectedText(page, "#editor")).toBe("t");
 });
 
 test("Visual selects inside the shadow tree", async ({ page }) => {
   await activateAtStart(page, "#ce");
   await page.keyboard.type("vee");
-  expect(await statusText(page)).toContain("VISUAL");
-  expect(await selectedText(page, "#editor")).toBe("the quick");
+  await expect.poll(() => statusText(page)).toContain("VISUAL");
+  await expect.poll(() => selectedText(page, "#editor")).toBe("the quick");
 });
 
 test("x dw cw dd o land as editing commands; u walks them back", async ({ page }) => {
   await activateAtStart(page, "#ce");
   const original = await page.locator("#ce").innerText();
   await page.keyboard.type("x");
-  expect((await blockTexts(page, "#ce"))[0]).toBe("he quick brown fox");
+  await expect.poll(async () => (await blockTexts(page, "#ce"))[0]).toBe("he quick brown fox");
   await page.keyboard.type("dw");
-  expect((await blockTexts(page, "#ce"))[0]).toBe("quick brown fox");
+  await expect.poll(async () => (await blockTexts(page, "#ce"))[0]).toBe("quick brown fox");
   await page.keyboard.type("cwslow");
   await page.keyboard.press("Escape");
-  expect((await blockTexts(page, "#ce"))[0]).toBe("slow brown fox");
+  await expect.poll(async () => (await blockTexts(page, "#ce"))[0]).toBe("slow brown fox");
   await expect(page.locator("#ce b")).toHaveText("brown");
   await page.keyboard.type("jdd");
-  expect(await blockTexts(page, "#ce")).toEqual(["slow brown fox", "last line"]);
+  await expect.poll(() => blockTexts(page, "#ce")).toEqual(["slow brown fox", "last line"]);
   await page.keyboard.type("onew");
   await page.keyboard.press("Escape");
-  expect(await blockTexts(page, "#ce")).toEqual(["slow brown fox", "last line", "new"]);
+  await expect.poll(() => blockTexts(page, "#ce")).toEqual(["slow brown fox", "last line", "new"]);
   const log = ((await page.locator("#log").textContent()) ?? "").split("\n").filter(Boolean);
   for (const line of log) expect(line).toMatch(/^input:(insertText|deleteContentBackward|insertParagraph)$/);
   await page.keyboard.type("uuuuu");
-  expect(await page.locator("#ce").innerText()).toBe(original);
-  expect(await blockTexts(page, "#ce")).toEqual(ORIGINAL);
+  await expect.poll(() => page.locator("#ce").innerText()).toBe(original);
+  await expect.poll(() => blockTexts(page, "#ce")).toEqual(ORIGINAL);
 });
 
 test("typing in Insert re-projects the host", async ({ page }) => {
@@ -74,7 +74,7 @@ test("typing in Insert re-projects the host", async ({ page }) => {
   await page.keyboard.type("A!!");
   await page.keyboard.press("Escape");
   await page.keyboard.type("x");
-  expect((await blockTexts(page, "#ce"))[0]).toBe("the quick brown fox!");
+  await expect.poll(async () => (await blockTexts(page, "#ce"))[0]).toBe("the quick brown fox!");
 });
 
 test("removing the custom element disposes the Session", async ({ page }) => {

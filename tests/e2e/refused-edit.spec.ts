@@ -21,22 +21,22 @@ test("x on the locked span is refused: the text stays, the cursor stays, the Sta
 }) => {
   await page.keyboard.type("ll");
   await page.keyboard.type("x");
-  expect(await blockTexts(page, "#ce")).toEqual(ORIGINAL);
-  expect(await selectedText(page)).toBe("L");
-  expect(await statusText(page)).toContain(REFUSED);
+  await expect.poll(() => blockTexts(page, "#ce")).toEqual(ORIGINAL);
+  await expect.poll(() => selectedText(page)).toBe("L");
+  await expect.poll(() => statusText(page)).toContain(REFUSED);
 });
 
 test("the next key works, an accepted edit beside the refused one lands, and u undoes only that", async ({
   page,
 }) => {
   await page.keyboard.type("x");
-  expect(await blockTexts(page, "#ce")).toEqual(["bLOCKcd", "next line"]);
+  await expect.poll(() => blockTexts(page, "#ce")).toEqual(["bLOCKcd", "next line"]);
   await page.keyboard.type("lx");
-  expect(await blockTexts(page, "#ce")).toEqual(["bLOCKcd", "next line"]);
+  await expect.poll(() => blockTexts(page, "#ce")).toEqual(["bLOCKcd", "next line"]);
   await page.keyboard.type("l");
-  expect(await selectedText(page)).toBe("O");
+  await expect.poll(() => selectedText(page)).toBe("O");
   await page.keyboard.type("u");
-  expect(await blockTexts(page, "#ce")).toEqual(ORIGINAL);
+  await expect.poll(() => blockTexts(page, "#ce")).toEqual(ORIGINAL);
   await page.keyboard.type("$x");
-  expect(await blockTexts(page, "#ce")).toEqual(["abLOCKc", "next line"]);
+  await expect.poll(() => blockTexts(page, "#ce")).toEqual(["abLOCKc", "next line"]);
 });

@@ -1,4 +1,4 @@
-import { EditorSelection, type Text } from "@codemirror/state";
+import { ChangeSet, EditorSelection, type Text } from "@codemirror/state";
 import type { Field } from "../field/Field";
 import { diffText } from "../field/diff";
 import { ATOM_CHAR } from "../field/atoms";
@@ -139,6 +139,13 @@ export class Session {
   private lastText: string | null = null;
   /** The mirror's undo depth when `lastText` was last agreed: a refused edit undoes back to it. */
   private agreedDepth = 0;
+  /**
+   * A contenteditable write in flight (ADR 0008), until it has settled and
+   * been judged. The Field is VimText's own until then: it is not read back.
+   */
+  private pendingWrite: Promise<void> | null = null;
+  /** A render came due while a write was pending: it runs, merged, once that write settles. */
+  private renderDue = false;
   private readonly onDialog: (() => void) | undefined;
   /** The enabled Plugins, bound on every Activation and told when the Field loses focus. */
   private readonly plugins: readonly Plugin[];
@@ -223,7 +230,10 @@ export class Session {
       // A whitelisted key may leave the engine waiting for more (<C-r> wants a
       // register); the keys that complete it are the engine's too.
       const pendingInsert = vim.inputState.keyBuffer.length > 0;
-      if (!pendingInsert && !isInsertModeVimKey(e)) return; // native typing
+      if (!pendingInsert && !isInsertModeVimKey(e)) {
+        if (this.pendingWrite) this.typeWhileWriting(e);
+        return; // native typing
+      }
       this.syncFromField();
       this.dispatchToEngine(e);
       return;
@@ -442,6 +452,35 @@ export class Session {
     this.render();
   }
 
+  /**
+   * A key typed in Insert while a write is pending (ADR 0008): the Field's
+   * caret is not yet where the engine's cursor is (the `o` that entered Insert
+   * has not landed), so typed natively it would go in the wrong place. A
+   * character, Backspace and a multi-line Field's Enter are typed into the
+   * mirror instead, as the Field's own typing would sync into it, and land
+   * with the merged render. Any other key stays the page's.
+   */
+  private typeWhileWriting(e: KeyboardEvent): void {
+    const plain = !e.ctrlKey && !e.metaKey && !e.altKey;
+    let insert: string;
+    if (plain && e.key.length === 1) insert = e.key;
+    else if (plain && e.key === "Enter" && !this.field.singleLine) insert = "\n";
+    else if (plain && e.key === "Backspace") insert = "";
+    else return;
+    e.preventDefault();
+    e.stopPropagation();
+    const view = this.mirror.view;
+    const main = view.state.selection.main;
+    const from = main.empty && !insert ? Math.max(0, main.from - 1) : main.from;
+    const opensStep = this.firstInsertSync && !this.joinNextInsert;
+    this.firstInsertSync = false;
+    view.dispatch({
+      changes: { from, to: main.to, insert },
+      selection: EditorSelection.cursor(from + insert.length),
+      userEvent: opensStep ? "input.type.compose.start" : "input.type.compose",
+    });
+  }
+
   private onFieldInput = (): void => {
     if (this.destroyed) return;
     this.syncFromField();
@@ -470,13 +509,21 @@ export class Session {
     // A render queued by a mirror update must land before we judge whether the
     // Field's selection is the user's doing.
     if (this.renderQueued) this.render();
+    // Mid-write the Field holds part of VimText's own write, not the page's
+    // change: the keys go to the engine as they are, and the Field is read
+    // once the write settles (`writeSettled`).
+    if (this.pendingWrite) return;
     this.withSyncing(() => this.syncFromFieldInner());
     this.readAtoms();
   }
 
   /** The mirror's text is the Field's now: give it the Field's Atoms for the register writes. */
   private readAtoms(): void {
-    if (this.field.atoms) this.withSyncing(() => this.mirror.setAtoms(this.field.atoms!()));
+    if (!this.field.atoms) return;
+    // Keys pressed during a write made the mirror's text newer than the
+    // Field's: the Field's offsets do not fit it. The merged render reads them.
+    if (this.field.getValue() !== this.mirror.view.state.doc.toString()) return;
+    this.withSyncing(() => this.mirror.setAtoms(this.field.atoms!()));
   }
 
   /** Runs our own mirror dispatches, whose updates must not queue a render: the caller renders. */
@@ -585,10 +632,18 @@ export class Session {
     this.withSyncing(() => view.dispatch({ changes, userEvent: "input.type.compose" }));
   }
 
-  /** Writes the engine's text and cursor into the Field. */
+  /**
+   * Writes the engine's text and cursor into the Field. While a write is
+   * pending, the render waits: every render due meanwhile merges into one
+   * write of the mirror's text once it has settled (ADR 0008).
+   */
   render(): void {
     this.renderQueued = false;
     if (this.destroyed) return;
+    if (this.pendingWrite) {
+      this.renderDue = true;
+      return;
+    }
     if (this.lastText !== null && this.field.getValue() !== this.lastText) {
       // The page changed the Field since we last agreed with it (rule 1): the
       // Field wins, and the engine's change we were about to write is dropped,
@@ -600,20 +655,101 @@ export class Session {
     const text = this.mirror.view.state.doc.toString();
     const before = this.field.getValue();
     if (text !== before) {
-      this.field.setValue(text);
-      const after = this.field.getValue();
-      if (after === before && !onlyAtomsUnwritten(before, text)) this.dropRefusedChange();
-      // A Controlled Field rewrote the text inside the write; the Field is the truth.
-      else if (after !== text) this.withSyncing(() => this.syncFromFieldInner(true));
+      const depth = this.mirror.undoDepth();
+      const write = this.field.setValue(text);
+      if (write) {
+        const settled = () => this.writeSettled(before, text, depth);
+        this.pendingWrite = write.then(settled, (err: unknown) => {
+          console.error("VimText write error", err);
+          settled();
+        });
+        return;
+      }
+      this.judgeWrite(before, text);
     }
+    this.finishRender(this.mirror.undoDepth());
+  }
+
+  /**
+   * The asynchronous write of `text` over `before` has settled: it is judged
+   * now, against the Field as it stands, and the render that came due
+   * meanwhile writes what the keys pressed since made of the mirror. A Session
+   * destroyed meanwhile judges nothing. `depth` is the mirror's undo depth
+   * the written text stood for.
+   */
+  private writeSettled(before: string, text: string, depth: number): void {
+    this.pendingWrite = null;
+    if (this.destroyed) return;
+    const after = this.field.getValue();
+    this.judgeWrite(before, text);
+    // Accepted as written: `text` is the agreed text, at the depth it was
+    // written from; the keys pressed since are the merged render's change.
+    this.finishRender(after === text ? depth : this.mirror.undoDepth());
+    if (this.renderDue) {
+      this.renderDue = false;
+      this.render();
+    }
+  }
+
+  /**
+   * Reads the Field after a write of `text` over `before`. A Field left at
+   * `before` refused the write; one at anything else but `text` is a
+   * Controlled Field's rewrite. Either way the Field wins. A refusal takes
+   * back the changes of the keys pressed during an asynchronous write too
+   * (they were made on an edit the page did not keep), and the Status Line
+   * says so; a rewrite is applied under them instead (`rebaseOnField`).
+   */
+  private judgeWrite(before: string, text: string): void {
+    const after = this.field.getValue();
+    if (after === before && !onlyAtomsUnwritten(before, text)) this.dropRefusedChange();
+    // A Controlled Field rewrote the text inside the write; the Field is the truth.
+    else if (after !== text) {
+      if (this.mirror.view.state.doc.toString() === text)
+        this.withSyncing(() => this.syncFromFieldInner(true));
+      else this.withSyncing(() => this.rebaseOnField(text, after));
+    }
+  }
+
+  /**
+   * The page made `text`, the write that settled, into `after`, while keys
+   * pressed meanwhile made the mirror into something else again. The page's
+   * change is mapped through the keys' and applied on top, so both stand (the
+   * page's where they overlap, rule 1). It joins the mirror's latest undo
+   * step, the keys' change, not the write that provoked it: that step is no
+   * longer the latest. The merged render then writes the keys' change.
+   */
+  private rebaseOnField(text: string, after: string): void {
+    const view = this.mirror.view;
+    const now = view.state.doc.toString();
+    const changeOf = (to: string) => {
+      const d = diffText(text, to);
+      return ChangeSet.of({ from: d.start, to: d.endOld, insert: to.slice(d.start, d.endNew) }, text.length);
+    };
+    view.dispatch({ changes: changeOf(after).map(changeOf(now)), userEvent: "input.type.compose" });
+  }
+
+  /** Lands the engine's cursor and records what the Field and the mirror now agree on, at undo depth `depth`. */
+  private finishRender(depth: number): void {
     const sel = this.renderedSelection();
     this.field.setSelection(sel.anchor, sel.head);
     this.lastRendered = this.field.getSelection();
     this.lastText = this.field.getValue();
     this.readAtoms();
-    this.agreedDepth = this.mirror.undoDepth();
+    this.agreedDepth = depth;
     this.status.setMode(this.mode);
     this.status.reposition();
+  }
+
+  /**
+   * Resolves once no write to the Field is pending and no render waits on
+   * one: what the keys pressed so far made of the text is in the Field.
+   */
+  async settled(): Promise<void> {
+    await Promise.resolve(); // a render queued for a microtask has started its write
+    while (this.pendingWrite) {
+      await this.pendingWrite;
+      await Promise.resolve();
+    }
   }
 
   /**

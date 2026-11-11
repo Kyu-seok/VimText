@@ -1,8 +1,8 @@
 import type { Field, FieldSelection, WrappingStyle } from "./Field";
-import { diffText, type TextDiff } from "./diff";
+import { diffHunks, diffText, type TextDiff } from "./diff";
 import { project, type Projection } from "./projection";
 import { readDomSelection, selectDom } from "./domSelection";
-import { insertAtomHtml, replaceDomRange } from "./editingCommands";
+import { insertAtomHtml, nextTask, replaceDomRange, settleEditor } from "./editingCommands";
 import { ATOM_CHAR, atomText } from "./atoms";
 
 /**
@@ -88,9 +88,16 @@ function breakAtLineEnd(
  * always the truth; its selection is the native one mapped through the
  * projection. `setValue` writes only the span that differs, through the
  * browser's editing commands (`replaceDomRange`), never by mutating the DOM.
+ *
+ * A write is asynchronous (ADR 0008): its first step runs inside `setValue`,
+ * each later one a task after the one before, and the promise resolves a task
+ * after the last, once the editor has caught up. The host's `input` events
+ * until then are the write's own. `destroy` stops a write between two steps,
+ * and so does the host leaving the document.
  */
 export class ContentEditableField implements Field {
   private writing = false;
+  private destroyed = false;
   private inputHandlers = new Set<() => void>();
   /** The last selection set or read inside the host, answered while the native one is elsewhere. */
   private lastSelection: FieldSelection = { anchor: 0, head: 0 };
@@ -130,25 +137,51 @@ export class ContentEditableField implements Field {
     return project(this.element).text;
   }
 
-  setValue(text: string): void {
+  /** Resolves once the write has settled. One write at a time: the Session waits for one before the next. */
+  setValue(text: string): Promise<void> {
+    const old = project(this.element).text;
+    if (old === text) return Promise.resolve();
+    // Each changed span on its own, first to last (`diffHunks`): the text
+    // after the k-th is the new text up to its end and the old text after it.
+    const stages = diffHunks(old, text).map((h) => text.slice(0, h.toNew) + old.slice(h.toOld));
+    this.writing = true;
+    const write = async (): Promise<void> => {
+      try {
+        for (const [i, stage] of stages.entries()) {
+          if (i > 0 && !(await this.pause())) return;
+          await this.writeSpan(stage);
+        }
+        // The editor's answer to the last step (a re-render, a rewrite) is part of the write.
+        await nextTask();
+      } finally {
+        this.writing = false;
+        if (!this.destroyed) this.noteAtoms(project(this.element));
+      }
+    };
+    return write();
+  }
+
+  /** Writes the one span by which the host's text differs from `text`; its first step runs before it yields. */
+  private async writeSpan(text: string): Promise<void> {
     const projection = project(this.element);
     const old = projection.text;
     if (old === text) return;
     const span = breakAtLineEnd(old, keepAdjacentSpaces(old, diffText(old, text), text));
-    this.writing = true;
-    try {
-      const restored = this.takeRemovedAtoms(span.from, span.insert);
-      this.keepRemovedAtoms(projection, span.from, span.to);
-      if (!span.insert.includes(ATOM_CHAR)) {
-        replaceDomRange(this.element, projection.toDom(span.from), projection.toDom(span.to), span.insert);
-      } else {
-        this.writeWithAtoms(span.from, span.to, span.insert, restored);
-      }
-    } finally {
-      this.writing = false;
-      this.noteAtoms(project(this.element));
+    const restored = this.takeRemovedAtoms(span.from, span.insert);
+    this.keepRemovedAtoms(projection, span.from, span.to);
+    if (!span.insert.includes(ATOM_CHAR)) {
+      const [from, to] = [projection.toDom(span.from), projection.toDom(span.to)];
+      await replaceDomRange(this.element, from, to, span.insert, this.pause);
+    } else {
+      await this.writeWithAtoms(span.from, span.to, span.insert, restored);
     }
   }
+
+  /** The wait between two steps of a write: false once the write must stop (ADR 0008). */
+  private pause = async (): Promise<boolean> => {
+    await nextTask();
+    return !this.destroyed && this.element.isConnected;
+  };
 
   /** The Atoms in the text: each one's offset and the visible text a yank stores for it. */
   atoms(): { offset: number; text: string }[] {
@@ -193,22 +226,39 @@ export class ContentEditableField implements Field {
     return taken;
   }
 
-  /** Writes `insert` over `from`..`to`, each U+FFFC as the next of `atoms` (`undefined`: nothing). */
-  private writeWithAtoms(from: number, to: number, insert: string, atoms: (string | undefined)[]): void {
+  /**
+   * Writes `insert` over `from`..`to`, each U+FFFC as the next of `atoms`
+   * (`undefined`: nothing). Each part is a step of its own, after a pause,
+   * and re-projects the host the editor may have changed meanwhile.
+   */
+  private async writeWithAtoms(
+    from: number,
+    to: number,
+    insert: string,
+    atoms: (string | undefined)[],
+  ): Promise<void> {
     const [first, ...rest] = insert.split(ATOM_CHAR);
+    let started = false;
     if (first || from !== to) {
+      started = true;
       const p = project(this.element);
-      replaceDomRange(this.element, p.toDom(from), p.toDom(to), first!);
+      await replaceDomRange(this.element, p.toDom(from), p.toDom(to), first!, this.pause);
     }
     let at = from + first!.length;
-    rest.forEach((part, i) => {
+    for (const [i, part] of rest.entries()) {
       const html = atoms[i];
-      if (html && this.insertAtom(at, html)) at++;
-      if (!part) return;
+      if (html) {
+        if (started && !(await this.pause())) return;
+        started = true;
+        if (await this.insertAtom(at, html)) at++;
+      }
+      if (!part) continue;
+      if (started && !(await this.pause())) return;
+      started = true;
       const caret = project(this.element).toDom(at);
-      replaceDomRange(this.element, caret, caret, part);
+      await replaceDomRange(this.element, caret, caret, part, this.pause);
       at += part.length;
-    });
+    }
   }
 
   /**
@@ -217,14 +267,18 @@ export class ContentEditableField implements Field {
    * element inserted at the end of a block out of that block, and leaves the
    * caret inside it, where no later editing command applies.
    */
-  private insertAtom(at: number, html: string): boolean {
+  private async insertAtom(at: number, html: string): Promise<boolean> {
     const here = project(this.element).toDom(at);
-    replaceDomRange(this.element, here, here, MARKER);
+    await replaceDomRange(this.element, here, here, MARKER, this.pause);
+    if (!(await this.pause())) return false;
     const before = project(this.element).toDom(at);
     selectDom(this.element, before, before);
     insertAtomHtml(html);
+    if (!(await this.pause())) return false;
     const p = project(this.element);
-    if (p.text[at + 1] === MARKER) replaceDomRange(this.element, p.toDom(at + 1), p.toDom(at + 2), "");
+    if (p.text[at + 1] === MARKER) {
+      await replaceDomRange(this.element, p.toDom(at + 1), p.toDom(at + 2), "", this.pause);
+    }
     return project(this.element).text[at] === ATOM_CHAR;
   }
 
@@ -250,6 +304,11 @@ export class ContentEditableField implements Field {
     // line, which closes on blur. The render on focus sets it.
     if (!this.hasFocus()) return;
     selectDom(this.element, projection.toDom(a), projection.toDom(h));
+    // The editor takes the cursor into its model now, as after a write step: it
+    // lands a task or more after the write (ADR 0008). Without this the
+    // ProseMirror e2e intermittently ended with a collapsed selection and an
+    // input rule that never ran (#52; cause not pinned down).
+    settleEditor(this.element);
   }
 
   hasFocus(): boolean {
@@ -298,6 +357,7 @@ export class ContentEditableField implements Field {
   }
 
   destroy(): void {
+    this.destroyed = true;
     this.element.removeEventListener("input", this.handleInput);
     this.inputHandlers.clear();
   }

@@ -34,14 +34,14 @@ function fieldOn(html: string) {
 }
 
 describe("ContentEditableField", () => {
-  it("is a multi-line Field on its host, its text the projection", () => {
+  it("is a multi-line Field on its host, its text the projection", async () => {
     const { host, field } = fieldOn("<p>one</p><p><br></p><p>three</p>");
     expect(field.element).toBe(host);
     expect(field.singleLine).toBe(false);
     expect(field.getValue()).toBe("one\n\nthree");
   });
 
-  it("selects a character as the native selection and reads it back", () => {
+  it("selects a character as the native selection and reads it back", async () => {
     const { field } = fieldOn("<p>ab<b>cd</b></p><p>ef</p>");
     field.setSelection(2, 3);
     expect(selectedText()).toBe("c");
@@ -51,79 +51,79 @@ describe("ContentEditableField", () => {
     expect(field.getSelection()).toEqual({ anchor: 6, head: 5 });
   });
 
-  it("an empty line's cursor is a collapsed caret in its block", () => {
+  it("an empty line's cursor is a collapsed caret in its block", async () => {
     const { host, field } = fieldOn("<p>a</p><p><br></p><p>b</p>");
     field.setSelection(2, 2);
     expect(isCaretIn(host.children[1]!)).toBe(true);
     expect(field.getSelection()).toEqual({ anchor: 2, head: 2 });
   });
 
-  it("reads a caret the user put in a text node", () => {
+  it("reads a caret the user put in a text node", async () => {
     const { host, field } = fieldOn("<p>ab</p><p>cd</p>");
     caretAt(host.children[1]!.firstChild!, 1);
     expect(field.getSelection()).toEqual({ anchor: 4, head: 4 });
   });
 
-  it("deletes through the editing command, leaving the formatting around it", () => {
+  it("deletes through the editing command, leaving the formatting around it", async () => {
     const { host, field } = fieldOn("<p>ab<b>cde</b>f</p>");
     const log = inputLog(host);
-    field.setValue("abcef");
+    await field.setValue("abcef");
     expect(host.innerHTML).toBe("<p>ab<b>ce</b>f</p>");
     expect(log).toEqual(["input:deleteContentBackward"]);
   });
 
-  it("keeps a space the browser's delete drops at the edge of a block", () => {
+  it("keeps a space the browser's delete drops at the edge of a block", async () => {
     // Chrome removes the whitespace-only text node `delete` leaves at the start of the block.
     const { host, field } = fieldOn("<p>quick <b>brown</b> fox</p>");
-    field.setValue(" brown fox");
+    await field.setValue(" brown fox");
     expect(field.getValue()).toBe(" brown fox");
     expect(host.querySelector("b")!.textContent).toBe("brown");
-    field.setValue("slow brown fox");
+    await field.setValue("slow brown fox");
     expect(field.getValue()).toBe("slow brown fox");
     expect(host.querySelector("b")!.textContent).toBe("brown"); // the new word is plain text, not bold
   });
 
-  it("a no-break space projects as the space it renders as", () => {
+  it("a no-break space projects as the space it renders as", async () => {
     const { field } = fieldOn("<p>a&nbsp;b&nbsp;</p>");
     expect(field.getValue()).toBe("a b ");
   });
 
-  it("inserts and replaces through insertText", () => {
+  it("inserts and replaces through insertText", async () => {
     const { host, field } = fieldOn("<p>ab<b>cd</b></p>");
     const log = inputLog(host);
-    field.setValue("abcXd");
+    await field.setValue("abcXd");
     expect(host.innerHTML).toBe("<p>ab<b>cXd</b></p>");
-    field.setValue("abcYZ");
+    await field.setValue("abcYZ");
     expect(field.getValue()).toBe("abcYZ");
     expect(host.querySelector("b")!.textContent).toBe("cYZ");
     expect(log).toEqual(["input:insertText", "input:insertText"]);
   });
 
-  it("an inserted newline is a new block, made by insertParagraph", () => {
+  it("an inserted newline is a new block, made by insertParagraph", async () => {
     const { host, field } = fieldOn("<p>one</p><p>two</p>");
     const log = inputLog(host);
-    field.setValue("one\n\ntwo");
+    await field.setValue("one\n\ntwo");
     expect(blockTexts(host)).toEqual(["one", "", "two"]);
     expect(field.getValue()).toBe("one\n\ntwo");
-    field.setValue("one\nnew\nmore\n\ntwo");
+    await field.setValue("one\nnew\nmore\n\ntwo");
     expect(blockTexts(host)).toEqual(["one", "new", "more", "", "two"]);
     expect(log).toContain("input:insertParagraph");
     expect(log.every((e) => /^input:(insertText|insertParagraph)$/.test(e))).toBe(true);
   });
 
-  it("a deleted newline merges two blocks", () => {
+  it("a deleted newline merges two blocks", async () => {
     const { host, field } = fieldOn("<p>one</p><p>two</p><p>three</p>");
-    field.setValue("one\nthree");
+    await field.setValue("one\nthree");
     expect(blockTexts(host)).toEqual(["one", "three"]);
-    field.setValue("one three");
+    await field.setValue("one three");
     expect(blockTexts(host)).toEqual(["one three"]);
   });
 
-  it("tells its handlers about the user's typing, never about its own writes", () => {
+  it("tells its handlers about the user's typing, never about its own writes", async () => {
     const { host, field } = fieldOn("<p>ab</p>");
     let calls = 0;
     field.onInput(() => calls++);
-    field.setValue("a");
+    await field.setValue("a");
     expect(calls).toBe(0);
     caretAt(host.firstChild!.firstChild!, 1);
     typeNatively("z");
@@ -131,7 +131,7 @@ describe("ContentEditableField", () => {
     expect(field.getValue()).toBe("az");
   });
 
-  it("reports focus on its host", () => {
+  it("reports focus on its host", async () => {
     const { field } = fieldOn("<p>ab</p>");
     expect(field.hasFocus()).toBe(true);
     field.blur();
