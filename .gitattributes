@@ -1,0 +1,3 @@
+# Parallel ticket branches each append entries to the same list here; union
+# keeps both sides instead of conflicting (docs/engine-seams.md, its header).
+docs/engine-seams.md merge=union

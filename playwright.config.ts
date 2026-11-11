@@ -11,7 +11,11 @@ export default defineConfig<ContentEditableOption>({
   timeout: 30_000,
   // One retry tells a flake from a regression: a flake passes the retry and is
   // reported as flaky with a trace under test-results/; a regression fails twice.
+  // A flake still fails the run: it is a bug in the test or the extension
+  // (#46 found Activation racing the settings load behind three flakes the
+  // retry had absorbed), so the gate stays red until it is diagnosed.
   retries: 1,
+  failOnFlakyTests: true,
   workers: 1,
   reporter: "list",
   use: { baseURL: `http://localhost:${port}`, trace: "on-first-retry" },
