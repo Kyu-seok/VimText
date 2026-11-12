@@ -1,13 +1,11 @@
-# VimText 0.3.0 — release notes and announcements
+# VimText 0.4.0 — release notes and announcements
 
-Every text that goes out with 0.3.0, drafted before the store upload and posted
-by a human after the store's approval (DESIGN.md, M3 part 3). Each draft is in
-its own fenced block so it can be copied whole.
+Every text that goes out with 0.4.0, drafted before the store upload and posted
+by a human after the store's approval (DESIGN.md, M3 part 3 and M4). Each draft
+is in its own fenced block so it can be copied whole. The 0.3.0 drafts are in
+the history of this file and in the `v0.3.0` tag message.
 
-Every draft carries the store page's URL, which goes live when the review
-passes; nothing in a draft is a placeholder. The release notes (section 1)
-say instead that the README links the store page, since the tag message
-was written before the store assigned the URL.
+Every draft carries the store page's URL; nothing in a draft is a placeholder.
 
 The release notes are the annotated tag's message, verbatim
 (`docs/release.md`): first line the title, plain text, no Markdown. The other
@@ -20,95 +18,70 @@ limitations named rather than hidden, names no competing extension, and uses
 the terms of `GLOSSARY.md`. None of it contradicts `DESIGN.md`, `PRIVACY.md` or
 `docs/store/listing.md`.
 
-## 1. Release notes (the `v0.3.0` tag message and the GitHub Release body)
+## 1. Release notes (the `v0.4.0` tag message and the GitHub Release body)
 
 ```text
-VimText 0.3.0: on the Chrome Web Store, with clipboard registers, Session State across tabs, and the surround and targets Plugins
+VimText 0.4.0: contenteditable editors
 
 VimText gives Vim's modal editing to the text fields of ordinary web pages
-(textarea and single-line text inputs), editing the page's own field in
-place: no native host, no replacement editor. Chrome only.
+(textarea, single-line text inputs and now contenteditable editors),
+editing the page's own field in place: no native host, no replacement
+editor. Chrome only.
 
-Install: from the Chrome Web Store once its review passes; the README links the store page.
+Install: https://chromewebstore.google.com/detail/vimtext/egfolppakllammjdjnpbajpioigchbkp
 Source, issues, design and the accepted limitations: https://github.com/Kyu-seok/VimText
 
-0.3.0 is the first version on the Chrome Web Store. It closes M3. What is
-new since 0.2.0:
+0.4.0 closes M4. What is new since 0.3.0:
 
-Clipboard registers
-- "+ is the system clipboard: "+p reads it; "+y, "+d and "+c write it. "*
-  is an alias of "+. The unnamed register never touches the clipboard.
-- The clipboard is read only for a "+ or "* paste and written only when a
-  yank, delete or change stores text into "+ or "*. A denied read shows a
-  message on the Status Line and leaves the text alone. A plain http://
-  page has no clipboard API, so every "+ and "* command beeps there, with
-  a message.
+contenteditable editors
+- The rich-text boxes of sites such as Gmail, Slack and Notion are fields.
+  Press Esc in one and it is under Vim, as a textarea is. Each editor is one
+  field; its text is the editor's text without the formatting.
+- VimText's edits go through the editor: each one is offered to the editor
+  first, as the editor's own typing would be, so the editor's model takes
+  it. ProseMirror, Lexical, Slate and Quill are covered by tests against
+  pinned builds of each, which check the editor's model, not only the page.
+- A mention chip, an inline image or another non-editable island counts as
+  one character: motions step over it, x and dw delete it whole, and a yank
+  stores its visible text (@alice, an image's alt text).
+- In a multi-line editor Enter in Normal is Vim's motion, so a chat box
+  sends with Enter in Insert or Cmd/Ctrl+Enter. An editor that declares
+  itself single-line (aria-multiline="false") follows the single-line
+  input rules.
+- On a field taller than the window the Status Line stays in view.
+- Keys typed while an edit is still landing (the text after o or cw) are
+  kept and land with it.
 
-Session State across tabs
-- Registers (the macros they hold included), search and command history
-  and the last f/t search are shared by every field in every tab for as
-  long as the browser runs. They live in Chrome's session storage and are
-  gone when the browser closes.
-- Two tabs changing a register at the same moment: the last write wins;
-  nothing is merged.
-- Marks, undo history and the jump list stay with the field they belong to.
+Every field
+- When a page refuses an edit (puts its text back), the page's text stays,
+  VimText follows it, and the Status Line says the page refused the edit.
+  This holds on textarea and input too.
 
-vimrc
-- The options page lists each failing line of a saved vimrc, with the
-  engine's message, under the text box. A clean vimrc lists nothing.
-- The saved vimrc is the whole truth about your mappings. Every Activation
-  clears the user mappings and runs it again, so a mapping you delete is
-  gone at the next Activation in every tab instead of lingering until a
-  restart.
+Known limits on contenteditable editors
+- VimText edits the text and leaves the formatting to the editor. Yank and
+  put carry plain text, never formatting; Cmd+V keeps the editor's own rich
+  paste. Text written at the end of a formatted run takes that formatting,
+  as typing there would.
+- u restores the text, not always its formatting: a character put back at
+  the start of a bold run comes back plain, and an undone line join can
+  leave a line in another kind of block.
+- A mention chip or inline image comes back from u only while VimText
+  still holds it (the last 200 removed in that field). On Lexical, u after
+  deleting one restores the text around it, without the chip or image.
+- VimText's edits are in the editor's own undo history too, so Cmd+Z in
+  Insert can undo them; VimText catches up on the next key.
+- Notion makes each block its own editor, so each block is a field and j
+  and k stop at its edge.
+- Display-line motions and scrolls approximate on mixed fonts and sizes.
+- On an editor without a pinned test, VimText sees only the page's text,
+  so an edit the editor's model did not take can go unnoticed.
+- An editor inside a closed shadow root is out of reach.
+The full list is under "Accepted limitations" in DESIGN.md.
 
-Plugins (off by default; switched on in the options page, effective at the
-next Activation in every tab)
-- surround (modelled on vim-surround): ys{motion}{char}, yss{char},
-  cs{old}{new}, ds{old} and Visual S{char}; the four bracket pairs with
-  the aliases b r B a (the opening character adds inner spaces, the closing
-  one does not) and the three quotes; any other character wraps literally.
-  . repeats ys, cs and ds with the same characters. Macros record and
-  replay them.
-- targets (modelled on targets.vim): i( a( i" a" and friends Seek the next
-  pair or quote when the cursor is not inside one; the n and l prefixes
-  (cin(, dil", vin(); the argument objects ia and aa.
-- A vimrc mapping on a key a Plugin also binds wins, as your vimrc beats a
-  plugin's default maps in Vim.
-- Not in this version: surround's tag and function targets (ysiw<div>,
-  cst, dst), yS ySS cS gS and Insert-mode Ctrl-s; targets' separator
-  objects, I/A, any-block ib and any-quote iq. Known differences from the
-  upstream plugins: a key VimText is holding while it waits for the rest of
-  a Plugin sequence (the d of ds) does not show on the Status Line until
-  the sequence resolves; Visual S is not .-repeatable; targets ranks its
-  Seek candidates as if every line were on screen, so a next object below
-  always beats a last object above; a pair whose brackets end and start
-  lines of their own is charwise (ci{ leaves {}). The full list is under
-  "Accepted limitations" in DESIGN.md.
-
-Release
-- The zip attached to this Release is what the store received, built from
-  this tagged commit by the release workflow.
-- The privacy policy ships with this version: PRIVACY.md in the repository,
-  linked from the store page. In short: no analytics, no network requests,
-  no remote code. Settings (Site Policies, the vimrc, the Plugin toggles)
-  are carried by Chrome Sync when you have it on and otherwise stay on
-  this device. The clipboard is touched only by "+ and "* commands.
-  Registers and history are Session State in session storage, gone when
-  the browser closes. The content script runs on every http and https page
-  and frame, because nothing else could hear the Esc that Activates a
-  field, but it reads only the field you Activated. A change to the policy
-  ships with a new version and is noted in that version's release notes.
-- The README describes a public install: Install leads with the store
-  link, load-unpacked lives under Develop.
-
-Still true in 0.3.0
+Still true in 0.4.0
 - Chrome only. Firefox is untested and not submitted.
-- textarea and the text, search, url, email and tel inputs, in the top
-  page and in embedded frames, on plain pages and on pages whose framework
-  rewrites the value (React controlled inputs, masks). contenteditable
-  editors (Gmail, Slack, Notion, Reddit's rich-text composer) are the next
-  milestone; canvas editors such as Google Docs are out of scope; password
-  fields never.
+- Canvas editors such as Google Docs are out of scope; password fields
+  never.
 - A field starts in Insert mode and is the page's own until you press Esc
   or Ctrl+[ on it. In Insert mode IME, autocomplete and the site's own
   handlers work as before; only Esc, Ctrl+[, Ctrl-o, Ctrl-r, Ctrl-u and
@@ -119,6 +92,7 @@ Still true in 0.3.0
 - A mapping whose prefix is itself a bound key (nnoremap <Space>x dd while
   <Space> is l) never fires: the engine takes the full match at once rather
   than waiting like Vim's timeoutlen. Map from an unbound prefix such as \.
+- The privacy policy is unchanged.
 
 Bugs and questions: https://github.com/Kyu-seok/VimText/issues
 ```
@@ -134,7 +108,7 @@ Show HN: VimText – Vim modal editing inside the browser's own text fields (Chr
 Text:
 
 ```text
-VimText is a Chrome extension that gives Vim's modal editing to the text fields of ordinary web pages. It edits the page's own textarea or input in place: no native host to install, no editor widget replacing the field.
+VimText is a Chrome extension that gives Vim's modal editing to the text fields of ordinary web pages. It edits the page's own textarea, input or rich-text editor in place: no native host to install, no editor widget replacing the field.
 
 Store: https://chromewebstore.google.com/detail/vimtext/egfolppakllammjdjnpbajpioigchbkp
 Source (MIT): https://github.com/Kyu-seok/VimText
@@ -143,13 +117,13 @@ How it behaves: every field starts in Insert mode and is the page's own, so IME,
 
 The engine is the Vim implementation behind CodeMirror (@replit/codemirror-vim), run on a hidden mirror of the field. That is why motions, operators, text objects, counts, registers, marks, macros, Visual block, ".", search and ex commands (:s, :g, :sort, :map, :set) work; VimText is the bridge between that engine and the page: key routing, syncing the field and the mirror, and keeping the page's and Vim's undo from diverging. The baseline for "correct" is Vim's own :help. Two opt-in Plugins, off by default: surround (ys/cs/ds/Visual S) and targets (seeking text objects, the n/l prefixes, argument objects).
 
-0.3.0 adds clipboard registers ("+ and its alias "*, touched only by "+/"* commands), registers and history shared across tabs for the life of the browser session, and a vimrc box whose failing lines are listed in the options page.
+0.4.0 adds contenteditable editors, the rich-text boxes of sites such as Gmail, Slack and Notion. Edits go through the editor (offered to it first as its own typing would be), so the editor's model takes them; ProseMirror, Lexical, Slate and Quill are covered by tests against pinned builds of each. Earlier versions brought clipboard registers ("+ and its alias "*), registers and history shared across tabs, and a vimrc box whose failing lines are listed in the options page.
 
-What it does not do: only Chrome (Firefox untested, not submitted). Only textarea and single-line text inputs; contenteditable editors (Gmail, Slack, Notion, Reddit's rich-text composer) are the next milestone, Google Docs is out of scope, password fields never. No hlsearch highlighting. Scroll commands approximate. One engine quirk: a mapping whose prefix is itself a bound key never fires (the engine takes the full match at once, no timeoutlen). Every known deviation is listed under "Accepted limitations" in DESIGN.md in the repo.
+What it does not do: only Chrome (Firefox untested, not submitted). Google Docs (a canvas) is out of scope, password fields never. In a rich-text editor VimText edits the text and leaves the formatting to the editor: yank and put are plain text, u restores the text but not always its formatting, a mention chip comes back from u only while VimText still holds it, and Notion's blocks are one field each, so j/k stop at a block's edge. No hlsearch highlighting. Scroll commands approximate. One engine quirk: a mapping whose prefix is itself a bound key never fires (the engine takes the full match at once, no timeoutlen). Every known deviation is listed under "Accepted limitations" in DESIGN.md in the repo.
 
 Privacy: no analytics, no network requests, no remote code. Settings travel with Chrome Sync if you have it on and otherwise stay on the device. The content script runs on every http/https page (nothing else could hear the Esc that Activates a field) but reads only the field you Activated. The policy is PRIVACY.md in the repo.
 
-I wrote this because I kept reaching for dd in comment boxes. Happy to answer questions about the bridge, the undo story on React-controlled inputs, or why the Plugins are engine commands rather than a fork.
+I wrote this because I kept reaching for dd in comment boxes. Happy to answer questions about the bridge, writing into rich-text editors without fighting their models, the undo story on React-controlled inputs, or why the Plugins are engine commands rather than a fork.
 ```
 
 ## 3. r/vim
@@ -163,7 +137,7 @@ VimText: Vim modal editing in the browser's own text fields, as a Chrome extensi
 Body:
 
 ```text
-I wrote a Chrome extension that puts Vim's modal editing on the text fields of ordinary web pages: comment boxes, issue forms, search inputs. It edits the page's own textarea or input in place. No native host, no Neovim to install, no editor replacing the field.
+I wrote a Chrome extension that puts Vim's modal editing on the text fields of ordinary web pages: comment boxes, issue forms, search inputs, rich-text editors. It edits the page's own field in place. No native host, no Neovim to install, no editor replacing the field.
 
 Store: https://chromewebstore.google.com/detail/vimtext/egfolppakllammjdjnpbajpioigchbkp
 Source (MIT): https://github.com/Kyu-seok/VimText
@@ -182,7 +156,8 @@ The rule for "is it correct" is Vim's `:help`. Plugin behaviour is never part of
 **What it does not do**
 
 - Chrome only. Firefox is untested and not submitted.
-- textarea and single-line text inputs (text, search, url, email, tel) only, in the top page and in frames, including React-controlled inputs and masks. contenteditable editors (Gmail, Slack, Notion, Reddit's rich-text composer) are the next milestone; Google Docs is out of scope; password fields never.
+- Fields are textarea, single-line text inputs (text, search, url, email, tel) and contenteditable editors (the rich-text boxes of Gmail, Slack, Notion and the like; ProseMirror, Lexical, Slate and Quill are covered by tests against pinned builds), in the top page and in frames. Google Docs is out of scope; password fields never.
+- In a rich-text editor VimText edits the text and leaves the formatting to the editor. Yank and put are plain text (`Cmd+V` keeps the editor's rich paste). `u` restores the text, not always its formatting: a character put back at the start of a bold run comes back plain. A mention chip or inline image is one character and comes back from `u` only while VimText still holds it. Notion's blocks are one field each, so `j`/`k` stop at a block's edge. `Cmd+Z` in Insert can undo VimText's edits, since they are in the editor's own history too.
 - No `hlsearch` highlighting (`n`/`N` work). Scroll commands approximate. Visual block highlights only the primary range.
 - Engine quirk: a mapping whose prefix is itself a bound key (`nnoremap <Space>x dd` while `<Space>` is `l`) never fires, because the engine takes the full match at once instead of waiting like `timeoutlen`. Map from an unbound prefix such as `\`.
 - surround v1 has no tag or function targets (`ysiw<div>`, `cst`, `dst`); targets v1 has no separator objects, `I`/`A`, any-block `ib` or any-quote `iq`. Visual `S` is not `.`-repeatable. The key VimText holds while it waits for the rest of a Plugin sequence (the `d` of `ds`) is not shown on the Status Line until the sequence resolves.
@@ -203,7 +178,7 @@ VimText (MV3, open source): Vim modal editing on the page's own text fields, ine
 Body:
 
 ```text
-I published VimText, a Chrome extension that gives Vim's modal editing to the text fields of ordinary web pages. It edits the page's own textarea or input in place, with no native messaging host and no replacement editor widget.
+I published VimText, a Chrome extension that gives Vim's modal editing to the text fields of ordinary web pages. It edits the page's own textarea, input or rich-text editor in place, with no native messaging host and no replacement editor widget.
 
 Store: https://chromewebstore.google.com/detail/vimtext/egfolppakllammjdjnpbajpioigchbkp
 Source (MIT): https://github.com/Kyu-seok/VimText
@@ -211,7 +186,7 @@ Source (MIT): https://github.com/Kyu-seok/VimText
 **What it does**
 
 - Every field starts in Insert mode and behaves natively; VimText shows nothing. Press `Esc` or `Ctrl+[` in a focused field to Activate Vim on it. A Site Policy (from the popup or the options page) can make a site start in Normal mode or turn VimText off there.
-- In every other mode the engine owns the text and writes it back to the field with the native value setter plus a synthetic `input` event, so React-controlled inputs and masks keep the edits. When the page rewrites the value, the page wins and VimText follows.
+- In every other mode the engine owns the text and writes it back to the field with the native value setter plus a synthetic `input` event, so React-controlled inputs and masks keep the edits. In a contenteditable editor each edit is offered first as a synthetic `beforeinput`, then run as `execCommand` if no listener took it, so the editor's own model takes it; ProseMirror, Lexical, Slate and Quill are covered by tests against pinned builds. When the page rewrites the text, the page wins and VimText follows; when it refuses an edit, the Status Line says so.
 - A fixed set of keys always reaches the page: `Tab`, `Cmd`/`Ctrl` shortcuts the engine does not bind, a second `Esc` in Normal (so a site's modal still closes), `Enter` on a single-line input in plain Normal (so the form still submits).
 - A Status Line in a shadow root at the edge of the field shows the mode, pending keys and the command line. No page-level bar.
 - Options page: a vimrc box (ex commands, failing lines listed under it), two opt-in Plugins (surround, targets), the Site Policy table.
@@ -226,7 +201,8 @@ Source (MIT): https://github.com/Kyu-seok/VimText
 **What it does not do**
 
 - Chrome only. Firefox is untested and not submitted.
-- textarea and single-line text inputs (text, search, url, email, tel) only. contenteditable editors (Gmail, Slack, Notion, Reddit's rich-text composer) are the next milestone; Google Docs is out of scope; password fields never.
+- Google Docs (a canvas) is out of scope; password fields never.
+- In a contenteditable editor VimText edits the text and leaves the formatting to the editor: yank and put are plain text, `u` restores the text but not always its formatting, and Notion's blocks are one field each. On an editor without a pinned test VimText sees only the page's text, so an edit the editor's model did not take can go unnoticed.
 - No `hlsearch` highlighting. Scroll commands approximate. Fields that reformat in a `setTimeout` are reconciled on the next keystroke. Frames the page creates as `about:blank`, `srcdoc` or `blob:` are not covered.
 - The engine takes the longest full match at once, so a user mapping whose prefix is itself a bound key never fires (no `timeoutlen`).
 
@@ -254,11 +230,11 @@ navigation extensions.)
 ```text
 Disclosure: I wrote the extension this answer recommends.
 
-The navigation extensions you tried are for moving around the page; they do not give you a Normal mode inside a text field. What you describe (press Esc in the text area you are typing in, then `dd`) is what [VimText](https://chromewebstore.google.com/detail/vimtext/egfolppakllammjdjnpbajpioigchbkp) does. It is a Chrome extension (Chrome only; Firefox is untested) that edits the page's own textarea or input in place: no native host and no editor widget replacing the field. Source is on GitHub: https://github.com/Kyu-seok/VimText
+The navigation extensions you tried are for moving around the page; they do not give you a Normal mode inside a text field. What you describe (press Esc in the text area you are typing in, then `dd`) is what [VimText](https://chromewebstore.google.com/detail/vimtext/egfolppakllammjdjnpbajpioigchbkp) does. It is a Chrome extension (Chrome only; Firefox is untested) that edits the page's own textarea, input or rich-text editor in place: no native host and no editor widget replacing the field. Source is on GitHub: https://github.com/Kyu-seok/VimText
 
 How it works: every field starts in Insert mode and behaves natively. Press `Esc` or `Ctrl+[` and that field is under Vim until it leaves the page, with a small Status Line at its edge for the mode, pending keys and the `:` `/` `?` command line. The engine is the Vim implementation behind CodeMirror, so motions, operators, text objects, counts, registers, marks, macros, Visual block, `.`, `u`/`Ctrl-r` and ex commands (`:s`, `:g`, `:sort`, `:map`, `:set`) work, and a vimrc box in the options page takes your mappings. A Site Policy can make a site start in Normal mode or turn the extension off there. `Tab`, `Cmd`/`Ctrl` shortcuts, a second `Esc` and `Enter` in a single-line input still reach the page.
 
-Limits worth knowing before you install: it covers `<textarea>` and single-line text inputs only, not contenteditable editors (Gmail, Slack, Notion), and not Google Docs. There is no `hlsearch` highlighting, scroll commands are approximate, and a mapping whose prefix is itself a bound key never fires (the engine takes the full match at once, there is no `timeoutlen`). The full list is under "Accepted limitations" in the repo's DESIGN.md.
+Limits worth knowing before you install: it covers `<textarea>`, single-line text inputs and contenteditable editors (the rich-text boxes of Gmail, Slack, Notion and the like), not Google Docs. In a rich-text editor it edits the text and leaves the formatting to the editor, so yank and put are plain text and `u` restores the text but not always its formatting. There is no `hlsearch` highlighting, scroll commands are approximate, and a mapping whose prefix is itself a bound key never fires (the engine takes the full match at once, there is no `timeoutlen`). The full list is under "Accepted limitations" in the repo's DESIGN.md.
 
 Privacy: no analytics, no network requests, no remote code; the content script runs on every page but reads only the field you Activated with Esc. The policy is PRIVACY.md in the repo.
 ```
@@ -276,7 +252,7 @@ A current option for Chrome: [VimText](https://chromewebstore.google.com/detail/
 
 Each field starts in Insert mode and is the page's own, so IME, autocomplete and the site's handlers keep working. Press `Esc` (or `Ctrl+[`) in a focused field and it is under Vim until it leaves the page; a Status Line at the edge of the field shows the mode, pending keys and the `:` `/` `?` command line. The engine is the one behind CodeMirror's Vim mode, so motions, operators, text objects, counts, registers, marks, macros, Visual block, `.`, search and ex commands work, `"+` and `"*` are the system clipboard, and a vimrc box in the options page takes mappings and `set` options. A Site Policy can make a site start in Normal mode (closer to what you ask for) or turn the extension off there. Two opt-in Plugins, off by default, model surround and targets.
 
-What it does not do: only `<textarea>` and single-line text inputs (text, search, url, email, tel), in the top page and in frames. contenteditable editors such as Gmail, Slack and Notion are not covered yet, Google Docs is out of scope, password fields never. No `hlsearch` highlighting; scroll commands are approximate; a user mapping whose prefix is itself a bound key never fires (the engine takes the full match at once, no `timeoutlen`). The repo's DESIGN.md lists every known deviation from Vim under "Accepted limitations".
+What it covers: `<textarea>`, single-line text inputs (text, search, url, email, tel) and contenteditable editors such as those of Gmail, Slack and Notion, in the top page and in frames. What it does not do: Google Docs is out of scope, password fields never. In a rich-text editor it edits the text and leaves the formatting to the editor: yank and put are plain text and `u` restores the text but not always its formatting. No `hlsearch` highlighting; scroll commands are approximate; a user mapping whose prefix is itself a bound key never fires (the engine takes the full match at once, no `timeoutlen`). The repo's DESIGN.md lists every known deviation from Vim under "Accepted limitations".
 
 Privacy: no analytics, no network requests, no remote code. Settings travel with Chrome Sync when it is on and otherwise stay on the device; the content script runs on every http/https page but reads only the field you Activated. The policy is PRIVACY.md in the repo.
 ```
@@ -292,9 +268,9 @@ Disclosure: I wrote the extension this answer recommends.
 
 If what you miss is Vim's editing rather than your own Vim binary and plugins, there is now a way that needs no server and no native host: [VimText](https://chromewebstore.google.com/detail/vimtext/egfolppakllammjdjnpbajpioigchbkp), a Chrome extension (source: https://github.com/Kyu-seok/VimText, MIT). To be clear about what it is not: it does not open the textarea in your installed vim or gvim, and your `~/.vimrc` and plugins are not involved. It runs a Vim engine (the one behind CodeMirror's Vim mode) inside the browser and edits the page's own textarea in place.
 
-What you get: press `Esc` or `Ctrl+[` in a focused textarea or single-line input and that field is under Vim until it leaves the page, with a Status Line at its edge for the mode, pending keys and the `:` `/` `?` command line. Motions, operators, text objects, counts, registers, marks, macros, Visual block, `.`, search and ex commands (`:s`, `:g`, `:sort`, `:map`, `:set`) work; `"+` and `"*` are the system clipboard; a vimrc box in the options page takes mappings and `set` options; surround and targets are available as opt-in Plugins. Until you press Esc the field is the page's own, so nothing changes on sites where you do not want it, and a Site Policy can turn it off or make a site start in Normal mode.
+What you get: press `Esc` or `Ctrl+[` in a focused textarea, single-line input or rich-text editor and that field is under Vim until it leaves the page, with a Status Line at its edge for the mode, pending keys and the `:` `/` `?` command line. Motions, operators, text objects, counts, registers, marks, macros, Visual block, `.`, search and ex commands (`:s`, `:g`, `:sort`, `:map`, `:set`) work; `"+` and `"*` are the system clipboard; a vimrc box in the options page takes mappings and `set` options; surround and targets are available as opt-in Plugins. Until you press Esc the field is the page's own, so nothing changes on sites where you do not want it, and a Site Policy can turn it off or make a site start in Normal mode.
 
-Limits: Chrome only (Firefox untested, not submitted). `<textarea>` and single-line text inputs only; contenteditable editors (Gmail, Slack, Notion) are not covered yet and Google Docs is out of scope. No `hlsearch` highlighting, approximate scroll commands, and a mapping whose prefix is itself a bound key never fires (the engine takes the full match at once, no `timeoutlen`). DESIGN.md in the repo lists every known deviation under "Accepted limitations".
+Limits: Chrome only (Firefox untested, not submitted). Google Docs is out of scope. In a contenteditable editor (Gmail, Slack, Notion and the like) it edits the text and leaves the formatting to the editor: yank and put are plain text and `u` restores the text but not always its formatting. No `hlsearch` highlighting, approximate scroll commands, and a mapping whose prefix is itself a bound key never fires (the engine takes the full match at once, no `timeoutlen`). DESIGN.md in the repo lists every known deviation under "Accepted limitations".
 
 Privacy: no analytics, no network requests, no remote code; the content script runs on every http/https page but reads only the field you Activated. The policy is PRIVACY.md in the repo.
 ```
@@ -304,25 +280,26 @@ Privacy: no analytics, no network requests, no remote code; the content script r
 Title:
 
 ```text
-VimText 0.3.0 is on the Chrome Web Store
+VimText 0.4.0: contenteditable editors
 ```
 
 Body:
 
 ```text
-VimText 0.3.0 is the first version you can install from the Chrome Web Store: https://chromewebstore.google.com/detail/vimtext/egfolppakllammjdjnpbajpioigchbkp
+VimText 0.4.0 is on the Chrome Web Store: https://chromewebstore.google.com/detail/vimtext/egfolppakllammjdjnpbajpioigchbkp
 
-The release and the zip the store received are at https://github.com/Kyu-seok/VimText/releases/tag/v0.3.0; the release notes there are the full list of what changed since 0.2.0. In short, M3 is closed:
+The release and the zip the store received are at https://github.com/Kyu-seok/VimText/releases/tag/v0.4.0; the release notes there are the full list of what changed since 0.3.0. In short, M4 is closed:
 
-- **Clipboard registers.** `"+` is the system clipboard, `"*` its alias; read only on a `"+`/`"*` paste, written only when a yank, delete or change stores text into them. A denied read is a Status Line message, not an error.
-- **Session State across tabs.** Registers (macros included), search and command history and the last `f`/`t` search are shared by every Field in every tab for the life of the browser session, in session storage. Last writer wins.
-- **vimrc.** Failing lines are listed under the box in the options page; the saved vimrc is the whole truth about your mappings, re-run on every Activation, so a deleted mapping is gone everywhere at the next Activation.
-- **Plugins**, off by default: surround (`ys` `yss` `cs` `ds`, Visual `S`, `.` repeats) and targets (Seek, the `n`/`l` prefixes, `ia`/`aa`). A vimrc mapping on a key a Plugin also binds wins.
-- **Release.** A `package` script and a tag-driven GitHub Release build the zip; the privacy policy ([PRIVACY.md](https://github.com/Kyu-seok/VimText/blob/main/PRIVACY.md)) and the store listing texts live in this repo; the README describes a public install.
+- **contenteditable editors are Fields.** The rich-text boxes of sites such as Gmail, Slack and Notion: press `Esc` in one and it is under Vim. Each editor is one Field; its text is the editor's text without the formatting.
+- **Edits go through the editor.** Each edit is offered to the editor first as a `beforeinput`, as its own typing would be, so the editor's model takes it. ProseMirror, Lexical, Slate and Quill are covered by tests against pinned builds of each.
+- **Atoms.** A mention chip or inline image counts as one character: motions step over it, `x` and `dw` delete it whole, a yank stores its visible text.
+- **Refused edits.** When a page puts its text back after an edit, on any Field, the page's text stays and the Status Line says the page refused the edit.
 
-Chrome only (Firefox is untested and not submitted). textarea and single-line text inputs only; contenteditable editors (Gmail, Slack, Notion, Reddit's rich-text composer) are M4; Google Docs is out of scope; password fields never. Every known deviation from Vim, including the ones the Plugins have from their upstreams, is under [Accepted limitations in DESIGN.md](https://github.com/Kyu-seok/VimText/blob/main/DESIGN.md#accepted-limitations). If something differs from `:help` and is not on that list, please open an issue: https://github.com/Kyu-seok/VimText/issues
+Known limits on contenteditable editors: VimText edits the text and leaves the formatting to the editor. Yank and put carry plain text (`Cmd+V` keeps the editor's rich paste). `u` restores the text, not always its formatting, and a mention chip or inline image comes back from `u` only while VimText still holds it; on Lexical it does not come back. VimText's edits are in the editor's own undo history too, so `Cmd+Z` in Insert can undo them. Notion's blocks are one Field each, so `j`/`k` stop at a block's edge. Display-line motions approximate on mixed fonts. On an editor without a pinned test, VimText sees only the page's text, so an edit the editor's model did not take can go unnoticed. An editor inside a closed shadow root is out of reach.
 
-Privacy, in one paragraph: no analytics, no network requests, no remote code. Settings (Site Policies, the vimrc, the Plugin toggles) travel with Chrome Sync when you have it on and otherwise stay on the device. The content script runs on every http/https page and frame, because nothing else could hear the Esc that Activates a Field, but reads only the Field you Activated. A change to the policy ships with a new version and is noted in that version's release notes.
+Chrome only (Firefox is untested and not submitted). Google Docs is out of scope; password fields never. Every known deviation from Vim is under [Accepted limitations in DESIGN.md](https://github.com/Kyu-seok/VimText/blob/main/DESIGN.md#accepted-limitations). If something differs from `:help` and is not on that list, please open an issue: https://github.com/Kyu-seok/VimText/issues
 
-Before the upload I wrote comments on GitHub, Hacker News, Stack Overflow and Reddit's Markdown editor with it in Normal, Insert and Visual, with `u` and `"+p`. Reports from other sites are welcome here or in Issues.
+The privacy policy is unchanged: no analytics, no network requests, no remote code ([PRIVACY.md](https://github.com/Kyu-seok/VimText/blob/main/PRIVACY.md)).
+
+Reports from rich-text editors I have not covered are especially welcome, here or in Issues.
 ```
