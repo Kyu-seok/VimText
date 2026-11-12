@@ -9,7 +9,7 @@
 // next render ("!! changed"); an edit the editor's model never took comes back
 // there. Steps feeding a `u` skip it, so the keystroke never becomes the undo.
 import { chromium } from "@playwright/test";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -53,7 +53,8 @@ const STEPS = [
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const context = await chromium.launchPersistentContext(mkdtempSync(join(tmpdir(), "vimtext-dogfood-")), {
+const profile = mkdtempSync(join(tmpdir(), "vimtext-dogfood-"));
+const context = await chromium.launchPersistentContext(profile, {
   channel: "chromium",
   headless: true,
   args: [`--disable-extensions-except=${dist}`, `--load-extension=${dist}`],
@@ -150,4 +151,5 @@ for (const demo of DEMOS.filter((d) => !only || d.name === only)) {
   await page.close();
 }
 await context.close();
+rmSync(profile, { recursive: true, force: true });
 process.exit(failures ? 1 : 0);
