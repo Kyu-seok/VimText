@@ -29,10 +29,11 @@ so Chrome and the store page show the same words):
 **Description:**
 
 > VimText gives Vim's modal editing to the text fields of ordinary web pages:
-> comment boxes, issue forms, wikis, search fields. Focus a textarea, press Esc,
-> and the field is in Normal mode: motions, operators, text objects, counts,
-> registers, marks, macros, Visual charwise, linewise and block, the dot
-> command, search, and ex commands such as :s, :g, :sort, :map and :set.
+> comment boxes, issue forms, wikis, search fields, rich-text editors. Focus a
+> field, press Esc, and the field is in Normal mode: motions, operators, text
+> objects, counts, registers, marks, macros, Visual charwise, linewise and
+> block, the dot command, search, and ex commands such as :s, :g, :sort, :map
+> and :set.
 >
 > What is different about VimText:
 >
@@ -67,7 +68,19 @@ so Chrome and the store page show the same words):
 >
 > Works on textarea and on text, search, url, email and tel inputs, in the top
 > page and in embedded frames, on plain pages and on React-controlled inputs.
-> contenteditable editors are a later milestone.
+>
+> Works on contenteditable editors too: the rich-text boxes of sites such as
+> Gmail, Slack and Notion. VimText's edits go through the editor, so the
+> editor's own model takes them. ProseMirror, Lexical, Slate and Quill are
+> covered by tests against pinned builds of each. In these editors VimText edits
+> the text and leaves the formatting to the editor: yank and put carry plain
+> text (Cmd+V keeps the editor's rich paste), u restores the text but not always
+> its formatting, and a mention chip or inline image counts as one character
+> that u brings back only while VimText still holds it. VimText's edits are in
+> the editor's own undo history too, so Cmd+Z in Insert mode can undo them.
+> Notion makes each block its own field, so j and k stop at a block's edge.
+> Display-line motions approximate on mixed fonts. Google Docs draws on a canvas
+> and is out of scope.
 >
 > No analytics, no network requests, no remote code. Settings travel with
 > Chrome Sync when you have it on. Open source, MIT:
