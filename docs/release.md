@@ -103,6 +103,14 @@ since an edit the editor's model never took comes back on its next render):
 Record one comment per site on #56: site, editor library, each step's outcome, and the issue
 filed for any finding.
 
+**No one at a signed-in browser** (the owner remote, #56): `npm run build`, then
+`npm run dogfood:demos [prosemirror|lexical|slate|quill]` runs these steps on the libraries'
+public demos (prosemirror.net, playground.lexical.dev, slatejs.org, quilljs.com) through the
+built extension in Playwright's Chromium (`tools/dogfood-demos.mjs`). It stands in for the
+libraries, not the sites: the sign-ins, the send keys and Stack Overflow (behind a Cloudflare
+challenge) stay with a person, and the comment on the gate ticket says which were reached.
+To tell a regression from an old gap, build `main` in a temporary worktree and run it there too.
+
 ## The package script
 
 `npm run package` (`tools/package.mjs`) is what the workflow runs and what a local check of

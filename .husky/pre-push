@@ -1,1 +1,10 @@
 npm run check
+
+# The rich-editor specs again, repeated on four workers, when the push touches
+# the write path or the fixtures. The gate runs one worker, and a timing bug
+# against an editor's late rendering hides there: #64 (Slate lost a keystroke)
+# passed four implementers' gates and the review, and surfaced only by chance.
+base=$(git merge-base HEAD origin/main 2>/dev/null || echo "")
+if [ -z "$base" ] || ! git diff --quiet "$base" HEAD -- src/field src/bridge tests/fixtures; then
+  npm run test:e2e:editors
+fi

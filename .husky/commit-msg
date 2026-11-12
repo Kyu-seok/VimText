@@ -1,0 +1,1 @@
+node tools/check-owner-decision.mjs "$1"
