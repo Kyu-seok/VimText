@@ -1,8 +1,8 @@
 # VimText
 
 Vim modal editing for the text fields of ordinary web pages. A Chrome extension
-that edits the page's own `<textarea>` or `<input>` in place: no native host to
-install, no replacement editor widget.
+that edits the page's own `<textarea>`, `<input>` or rich-text editor in place:
+no native host to install, no replacement editor widget.
 
 ## Install
 
@@ -47,8 +47,35 @@ Or load it unpacked from a clone: see [Develop](#develop).
 - **Fields.** `<textarea>`, and the text, search, url, email and tel `<input>`
   types (Single-line Fields), in the top page and in embedded frames, on plain
   pages and on pages whose framework rewrites the value (React controlled
-  inputs, masks). Password, number, date and file inputs never. contenteditable
-  editors (Gmail, Slack, Notion, ...) are a later milestone.
+  inputs, masks). contenteditable editors, the rich-text boxes of sites such
+  as Gmail, Slack and Notion: one Field per editor, whose text is the editor's
+  text without its formatting. VimText's edits go through the editor, so the
+  editor's own model takes them; ProseMirror, Lexical, Slate and Quill are
+  covered by tests against pinned builds of each. In a multi-line one `Enter`
+  in Normal is Vim's motion, so a chat box sends with `Enter` in Insert or
+  `Cmd`/`Ctrl+Enter`. When an editor refuses an edit, the editor's text stays
+  and the Status Line says so. Password, number, date and file inputs never;
+  canvas editors (Google Docs) are out of scope.
+- **On contenteditable editors** VimText edits the text and leaves the
+  formatting to the editor, which shows in a few places:
+  - Yank and put carry plain text, never formatting. `Cmd+V` keeps the
+    editor's own rich paste.
+  - `u` restores the text, not always its formatting: a character put back at
+    the start of a bold run comes back plain, and an undone line join can
+    leave a line in another kind of block. Text written at the end of a
+    formatted run takes that formatting, as typing there would.
+  - A mention chip or an inline image (an Atom) counts as one character. `u`
+    brings it back only while VimText still holds it (the last 200 removed in
+    that Field). On Lexical, `u` after deleting one restores the text around
+    it, without the chip or image.
+  - VimText's edits are in the editor's own undo history too, so `Cmd+Z` in
+    Insert can undo them; VimText catches up on the next key.
+  - Notion makes each block its own editor, so each block is a Field and
+    `j`/`k` stop at its edge.
+  - Display-line motions and scrolls approximate on mixed fonts and sizes.
+  - On an editor without a pinned test, VimText sees only the page's text, so
+    an edit the editor's model did not take can go unnoticed.
+  - An editor inside a closed shadow root is out of reach.
 - **Options page.** A vimrc box of ex commands (`nnoremap Y y$`,
   `set ignorecase`, ...) run on every Activation, with each failing line listed
   under the box; the Plugin toggles; the Site Policy table. The popup holds the
@@ -64,7 +91,7 @@ so motions, operators, text objects, counts, registers, marks, macros, Visual
 charwise, linewise and block, `.`, search and ex commands (`:s`, `:g`, `:sort`,
 `:map`, `:set`, ...) work on day one. VimText itself is the bridge between that
 engine and the page. Where the engine or the bridge deviates from Vim, the
-[accepted limitations in DESIGN.md](DESIGN.md#accepted-limitations-m1m3) say so.
+[accepted limitations in DESIGN.md](DESIGN.md#accepted-limitations) say so.
 
 ## Plugins
 
@@ -90,7 +117,7 @@ While a Plugin is on, the Baseline keys it claims (`i(`, `i"`, Visual `S`)
 behave as the plugin makes them behave in Vim, and a vimrc mapping on a key a
 Plugin also binds wins. The points where each Plugin differs from its upstream
 are listed under the
-[accepted limitations in DESIGN.md](DESIGN.md#accepted-limitations-m1m3).
+[accepted limitations in DESIGN.md](DESIGN.md#accepted-limitations).
 
 ## Develop
 
@@ -138,11 +165,12 @@ full policy is [PRIVACY.md](PRIVACY.md).
 
 ## Status
 
-0.3.0 closes M3: clipboard registers, Session State across tabs, the surround
-and targets Plugins, and the Web Store release. Earlier milestones brought the
-textarea with the full engine and the command line (M1) and Single-line Fields,
-Controlled Fields and frames (M2). See the
+0.4.0 closes M4: contenteditable editors are Fields. Earlier milestones brought
+the textarea with the full engine and the command line (M1), Single-line
+Fields, Controlled Fields and frames (M2), and clipboard registers, Session
+State across tabs, the surround and targets Plugins and the Web Store release
+(M3). See the
 [milestones](DESIGN.md#milestones) and the
-[accepted limitations](DESIGN.md#accepted-limitations-m1m3) in DESIGN.md.
+[accepted limitations](DESIGN.md#accepted-limitations) in DESIGN.md.
 
 MIT licensed.

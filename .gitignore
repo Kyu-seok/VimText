@@ -8,4 +8,8 @@ tests/unit/__screenshots__/
 tests/fixtures/react.js
 tests/fixtures/prosemirror.js
 tests/fixtures/prosemirror.css
+tests/fixtures/quill.js
+tests/fixtures/quill.css
+tests/fixtures/lexical.js
+tests/fixtures/slate.js
 .claude/worktrees/

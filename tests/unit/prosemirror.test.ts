@@ -43,7 +43,7 @@ function open(html: string) {
   return current;
 }
 
-/** Each key in its own turn: the editor's MutationObserver reads the previous key's write first. */
+/** Each key once the previous one's write has settled and the editor's MutationObserver has read it. */
 async function keys(seq: string, init: Partial<KeyboardEventInit> = {}): Promise<void> {
   for (const key of seq) await keydown(key, init);
 }
@@ -51,6 +51,7 @@ async function keys(seq: string, init: Partial<KeyboardEventInit> = {}): Promise
 async function keydown(key: string, init: Partial<KeyboardEventInit> = {}): Promise<KeyboardEvent> {
   const e = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, composed: true, ...init });
   current!.session.handleKeydown(e);
+  await current!.session.settled();
   await settle();
   return e;
 }
@@ -214,9 +215,9 @@ describe("undo", () => {
       caretAt(view.dom.querySelector("p")!.firstChild!, 0);
       dispatchKey(view.dom, "Escape");
       dispatchKey(view.dom, "x");
-      await settle();
+      // The write lands asynchronously (ADR 0008).
+      await expect.poll(() => describeDoc(view.state.doc)[0]).toBe("he <b>quick</b> fox");
       const after = describeDoc(view.state.doc);
-      expect(after[0]).toBe("he <b>quick</b> fox");
       for (const mod of [{ metaKey: true }, { ctrlKey: true }]) {
         expect(dispatchKey(view.dom, "z", mod).defaultPrevented).toBe(true);
         await settle();

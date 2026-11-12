@@ -28,6 +28,9 @@
     "@replit/codemirror-vim": "6.4.0"
   },
   "devDependencies": {
+    "@lexical/history": "0.53.0",
+    "@lexical/list": "0.53.0",
+    "@lexical/rich-text": "0.53.0",
     "@playwright/test": "1.65.0",
     "@types/chrome": "0.3.7",
     "@types/node": "26.6.6",
@@ -37,6 +40,7 @@
     "esbuild": "0.28.2",
     "husky": "9.1.7",
     "knip": "6.44.2",
+    "lexical": "0.53.0",
     "lint-staged": "17.6.0",
     "playwright": "1.65.0",
     "prettier": "3.9.10",
@@ -49,8 +53,13 @@
     "prosemirror-schema-list": "1.5.1",
     "prosemirror-state": "1.4.4",
     "prosemirror-view": "1.42.8",
+    "quill": "2.0.3",
     "react": "19.3.0",
     "react-dom": "19.3.0",
+    "slate": "0.147.4",
+    "slate-dom": "0.147.3",
+    "slate-history": "0.144.0",
+    "slate-react": "0.147.5",
     "typescript": "7.0.2",
     "vitest": "3.2.7"
   }

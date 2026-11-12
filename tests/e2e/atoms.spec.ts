@@ -41,17 +41,17 @@ test("l h w step over each Atom as one character; the cursor on it selects the w
   page,
 }) => {
   await page.keyboard.type("lll");
-  expect(await cursor(page)).toBe("chip");
+  await expect.poll(() => cursor(page)).toBe("chip");
   await page.keyboard.type("l");
-  expect(await cursor(page)).toBe(" ");
+  await expect.poll(() => cursor(page)).toBe(" ");
   await page.keyboard.type("h");
-  expect(await cursor(page)).toBe("chip");
+  await expect.poll(() => cursor(page)).toBe("chip");
   await page.keyboard.type("0w");
-  expect(await cursor(page)).toBe("chip");
+  await expect.poll(() => cursor(page)).toBe("chip");
   await page.keyboard.type("ww");
-  expect(await cursor(page)).toBe("img");
+  await expect.poll(() => cursor(page)).toBe("img");
   await page.keyboard.type("w");
-  expect(await cursor(page)).toBe("o");
+  await expect.poll(() => cursor(page)).toBe("o");
 });
 
 test("x on an Atom removes the whole element; u brings it back", async ({ page }) => {
@@ -63,16 +63,16 @@ test("x on an Atom removes the whole element; u brings it back", async ({ page }
   await expect(page.locator("#ce img")).toHaveCount(0);
   await page.keyboard.type("u");
   await expect(page.locator("#ce img")).toHaveAttribute("alt", "cat");
-  expect(await blockTexts(page, "#ce")).toEqual(ORIGINAL);
+  await expect.poll(() => blockTexts(page, "#ce")).toEqual(ORIGINAL);
 });
 
 test("yy then \"0p and :reg show the Atoms' visible text, never U+FFFC", async ({ page }) => {
   await page.keyboard.type('yyj"0p');
-  expect(await blockTexts(page, "#ce")).toEqual([...ORIGINAL, "hi @alice and cat ok"]);
+  await expect.poll(() => blockTexts(page, "#ce")).toEqual([...ORIGINAL, "hi @alice and cat ok"]);
   await page.keyboard.type(":reg");
   await page.keyboard.press("Enter");
   await expect.poll(() => statusText(page)).toContain("hi @alice and cat ok");
-  expect(await statusText(page)).not.toContain("\uFFFC");
+  await expect.poll(() => statusText(page)).not.toContain("\uFFFC");
 });
 
 test('"+yy puts the visible text on the system clipboard', async ({ context, page }) => {
@@ -83,7 +83,7 @@ test('"+yy puts the visible text on the system clipboard', async ({ context, pag
 
 test("a click inside the chip keeps the host's Session", async ({ page }) => {
   await page.locator("#ce .mention").click();
-  expect(await statusText(page)).toContain("NORMAL");
+  await expect.poll(() => statusText(page)).toContain("NORMAL");
   await page.keyboard.type("x");
   await expect(page.locator("#ce .mention")).toHaveCount(0);
 });

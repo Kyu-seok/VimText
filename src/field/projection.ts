@@ -12,7 +12,7 @@
  * a table row) is a new kind and its handler, not an edit to the others.
  */
 
-import { ATOM_CHAR, isAtom } from "./atoms";
+import { ATOM_CHAR, atomKind } from "./atoms";
 
 /** A DOM boundary point: a child index in an element, or a character offset in a text node. */
 export interface DomPoint {
@@ -74,7 +74,8 @@ function kindOf(node: Node): Kind {
   if (display === "none") return "skip";
   if (node.localName === "br") return "br";
   if (display === "table-cell") return "cell";
-  if (isAtom(node)) return "atom";
+  const atom = atomKind(node);
+  if (atom) return atom === "atom" ? "atom" : "skip";
   return isBlockDisplay(display) ? "block" : "inline";
 }
 
@@ -101,17 +102,21 @@ function collapseOf(node: Text): Collapse {
 
 /** One run of a text node as it renders, at DOM offset `at`. */
 interface Run {
-  /** A line break (a `\n` where breaks are preserved), collapsible whitespace, or characters that render one for one. */
-  kind: "break" | "space" | "chars";
+  /**
+   * A line break (a `\n` where breaks are preserved), collapsible whitespace,
+   * characters that render one for one, or zero-width no-break spaces, which
+   * render as nothing (Slate's placeholder in an empty leaf).
+   */
+  kind: "break" | "space" | "chars" | "nothing";
   at: number;
   text: string;
 }
 
-/** Document whitespace; U+00A0 is not, it never collapses. */
+/** Document whitespace; U+00A0 is not, it never collapses. U+FEFF runs on their own. */
 const RUN_PATTERNS: Record<Collapse, RegExp> = {
-  collapse: /[ \t\n\r\f]+|[^ \t\n\r\f]+/g,
-  "preserve-breaks": /\n|[ \t\r\f]+|[^\n \t\r\f]+/g,
-  preserve: /\n|[^\n]+/g,
+  collapse: /\ufeff+|[ \t\n\r\f]+|[^ \t\n\r\f\ufeff]+/g,
+  "preserve-breaks": /\ufeff+|\n|[ \t\r\f]+|[^\n \t\r\f\ufeff]+/g,
+  preserve: /\ufeff+|\n|[^\n\ufeff]+/g,
 };
 
 function runsOf(node: Text): Run[] {
@@ -119,11 +124,13 @@ function runsOf(node: Text): Run[] {
   return [...node.data.matchAll(RUN_PATTERNS[mode])].map((m) => {
     const text = m[0];
     const kind =
-      text === "\n" && mode !== "collapse"
-        ? "break"
-        : mode !== "preserve" && /^[ \t\n\r\f]/.test(text)
-          ? "space"
-          : "chars";
+      text[0] === "\ufeff"
+        ? "nothing"
+        : text === "\n" && mode !== "collapse"
+          ? "break"
+          : mode !== "preserve" && /^[ \t\n\r\f]/.test(text)
+            ? "space"
+            : "chars";
     return { kind, at: m.index, text };
   });
 }
@@ -220,6 +227,7 @@ class Walker {
     for (const run of runsOf(node)) {
       const at = { node, offset: run.at };
       if (run.kind === "break") this.lineBreak({ kind: "text", from: at, to: { node, offset: run.at + 1 } });
+      else if (run.kind === "nothing") continue;
       else if (run.kind === "space") this.space(node, run);
       else this.chars(node, run);
     }

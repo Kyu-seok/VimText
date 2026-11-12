@@ -13,7 +13,7 @@ import {
   THREE_LINES,
   typeNatively,
 } from "./contenteditable";
-import { keyDriver } from "./keys";
+import { settledKeyDriver } from "./keys";
 import { hostCount, keydown as keydownOn, settle, statusText } from "./dom";
 import { controlledPort, settingsFor } from "./settings-port";
 
@@ -38,7 +38,7 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-const { keydown, keys } = keyDriver(() => current!.session);
+const { keydown, keys } = settledKeyDriver(() => current!.session);
 
 function open(html = THREE_LINES) {
   current = activeHost(html);
@@ -59,7 +59,8 @@ describe("Activation on a contenteditable host", () => {
     expect(keydownOn(host, "Escape").defaultPrevented).toBe(true);
     expect(statusText()).toContain("NORMAL");
     keydownOn(host.querySelector("b")!, "x");
-    expect(blockTexts(host)[0]).toBe("he quick brown fox");
+    // The write lands asynchronously (ADR 0008).
+    await expect.poll(() => blockTexts(host)[0]).toBe("he quick brown fox");
   });
 
   it("the Session ends when the host stops being editable", async () => {
@@ -82,7 +83,7 @@ describe("Activation on a contenteditable host", () => {
 });
 
 describe("motions across lines", () => {
-  it("j k w $ gg G and Enter land where they land in a textarea with the same text", () => {
+  it("j k w $ gg G and Enter land where they land in a textarea with the same text", async () => {
     const ta = document.createElement("textarea");
     ta.value = "the quick brown fox\njumps over the lazy dog\nthird line here";
     document.body.appendChild(ta);
@@ -93,7 +94,7 @@ describe("motions across lines", () => {
       taSession.destroy();
       taField.destroy();
     });
-    const onTextarea = keyDriver(() => taSession);
+    const onTextarea = settledKeyDriver(() => taSession);
     const ce = open();
     ce.host.focus();
     for (const key of ["w", "w", "j", "$", "k", "j", "j", "w", "gg", "G", "k", "0", "Enter", "gg", "Enter"]) {
@@ -107,42 +108,42 @@ describe("motions across lines", () => {
 });
 
 describe("Normal-mode edits go through editing commands", () => {
-  it("x dw cw dd J edit the blocks, each write an input event of an editing type", () => {
+  it("x dw cw dd J edit the blocks, each write a beforeinput and an input event of an editing type", async () => {
     const { host } = open();
     const log = inputLog(host);
-    keys("x");
+    await keys("x");
     expect(blockTexts(host)[0]).toBe("he quick brown fox");
-    keys("dw");
+    await keys("dw");
     expect(blockTexts(host)[0]).toBe("quick brown fox");
-    keys("cw");
+    await keys("cw");
     typeNatively("slow");
-    keydown("Escape");
+    await keydown("Escape");
     expect(blockTexts(host)[0]).toBe("slow brown fox");
-    keys("jdd");
+    await keys("jdd");
     expect(blockTexts(host)).toEqual(["slow brown fox", "third line here"]);
-    keys("ggJ");
+    await keys("ggJ");
     expect(blockTexts(host)).toEqual(["slow brown fox third line here"]);
     expect(log.length).toBeGreaterThan(0);
     expect(
-      log.every((e) => /^input:(insertText|deleteContentBackward|insertParagraph)$/.test(e)),
+      log.every((e) => /^(before|input):(insertText|deleteContentBackward|insertParagraph)$/.test(e)),
       log.join(),
     ).toBe(true);
   });
 
-  it("o and O open new blocks; a linewise p adds one", () => {
+  it("o and O open new blocks; a linewise p adds one", async () => {
     const { host } = open();
-    keys("o");
+    await keys("o");
     typeNatively("below");
-    keydown("Escape");
+    await keydown("Escape");
     expect(blockTexts(host)).toEqual([
       "the quick brown fox",
       "below",
       "jumps over the lazy dog",
       "third line here",
     ]);
-    keys("GO");
+    await keys("GO");
     typeNatively("above");
-    keydown("Escape");
+    await keydown("Escape");
     expect(blockTexts(host)).toEqual([
       "the quick brown fox",
       "below",
@@ -150,7 +151,7 @@ describe("Normal-mode edits go through editing commands", () => {
       "above",
       "third line here",
     ]);
-    keys("ggyyGp");
+    await keys("ggyyGp");
     expect(blockTexts(host)).toEqual([
       "the quick brown fox",
       "below",
@@ -161,92 +162,92 @@ describe("Normal-mode edits go through editing commands", () => {
     ]);
   });
 
-  it("dd on a middle line and J merge blocks", () => {
+  it("dd on a middle line and J merge blocks", async () => {
     const { host } = open();
-    keys("jdd");
+    await keys("jdd");
     expect(blockTexts(host)).toEqual(["the quick brown fox", "third line here"]);
-    keys("kJ");
+    await keys("kJ");
     expect(blockTexts(host)).toEqual(["the quick brown fox third line here"]);
   });
 
-  it("u and Ctrl-r walk VimText's history and restore the text exactly", () => {
+  it("u and Ctrl-r walk VimText's history and restore the text exactly", async () => {
     const { host, field } = open();
     const original = field.getValue();
-    keys("x");
-    keys("jdd");
-    keys("kJ");
+    await keys("x");
+    await keys("jdd");
+    await keys("kJ");
     const edited = field.getValue();
-    keys("uuu");
+    await keys("uuu");
     expect(field.getValue()).toBe(original);
     expect(blockTexts(host)).toEqual(["the quick brown fox", "jumps over the lazy dog", "third line here"]);
-    keydown("r", { ctrlKey: true });
-    keydown("r", { ctrlKey: true });
-    keydown("r", { ctrlKey: true });
+    await keydown("r", { ctrlKey: true });
+    await keydown("r", { ctrlKey: true });
+    await keydown("r", { ctrlKey: true });
     expect(field.getValue()).toBe(edited);
   });
 });
 
 describe("the page's edits", () => {
-  it("typing in Insert re-projects the host", () => {
+  it("typing in Insert re-projects the host", async () => {
     const { host } = open();
-    keys("A");
+    await keys("A");
     typeNatively("!");
-    keydown("Escape");
-    keys("x");
+    await keydown("Escape");
+    await keys("x");
     expect(blockTexts(host)[0]).toBe("the quick brown fox");
-    keys("u");
+    await keys("u");
     expect(blockTexts(host)[0]).toBe("the quick brown fox!");
   });
 
-  it("an outside DOM change is picked up on the next key", () => {
+  it("an outside DOM change is picked up on the next key", async () => {
     const { host } = open();
     host.children[1]!.textContent = "changed";
-    keys("j0x");
+    await keys("j0x");
     expect(blockTexts(host)).toEqual(["the quick brown fox", "hanged", "third line here"]);
   });
 });
 
 describe("the Normal cursor", () => {
-  it("is the native selection of the character under it", () => {
+  it("is the native selection of the character under it", async () => {
     open();
     expect(selectedText()).toBe("t");
-    keys("w");
+    await keys("w");
     expect(selectedText()).toBe("q");
-    keys("j");
+    await keys("j");
     expect(selectedText()).toBe("s");
   });
 
-  it("is a collapsed caret on an empty block", () => {
+  it("is a collapsed caret on an empty block", async () => {
     const { host } = open("<p>one</p><p><br></p><p>three</p>");
-    keys("j");
+    await keys("j");
     expect(isCaretIn(host.children[1]!)).toBe(true);
   });
 });
 
 describe("Replace mode", () => {
-  it("R overwrites characters in place, inside the bold run they were in; Esc and u bring the old text back", () => {
+  it("R overwrites characters in place, inside the bold run they were in; Esc and u bring the old text back", async () => {
     const { host } = open("<p>the <b>quick</b> brown fox</p><p>jumps</p>");
-    keys("wRQU");
+    await keys("wRQU");
     expect(statusText()).toContain("REPLACE");
     expect(host.querySelector("b")?.textContent).toBe("QUick");
     expect(blockTexts(host)).toEqual(["the QUick brown fox", "jumps"]);
-    keydown("Escape");
-    keys("u");
+    await keydown("Escape");
+    await keys("u");
     expect(blockTexts(host)).toEqual(["the quick brown fox", "jumps"]);
   });
 });
 
 describe("Enter", () => {
-  it("in Normal is the Vim motion, taken from the page", () => {
+  it("in Normal is the Vim motion, taken from the page", async () => {
     open();
-    const e = keydown("Enter");
+    const e = await keydown("Enter");
     expect(e.defaultPrevented).toBe(true);
     expect(selectedText()).toBe("j");
   });
 
-  it("with Cmd or Ctrl passes through to the page", () => {
+  it("with Cmd or Ctrl passes through to the page", async () => {
     open();
-    expect(keydown("Enter", { metaKey: true }).defaultPrevented).toBe(false);
-    expect(keydown("Enter", { ctrlKey: true }).defaultPrevented).toBe(false);
+    expect((await keydown("Enter", { metaKey: true })).defaultPrevented).toBe(false);
+    expect((await keydown("Enter", { ctrlKey: true })).defaultPrevented).toBe(false);
   });
 });

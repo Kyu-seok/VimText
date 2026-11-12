@@ -71,6 +71,38 @@ the page's JavaScript, not a coordinate click (a late layout shift sent keys to 
 send keys, and assert the Field's `.value` after each step. Posting publicly is the user's
 call; ask before step 6.
 
+### M4: contenteditable editors
+
+Added for 0.4.0 (#56). The same blocker rule; "traps the page" includes a key the site needs
+never arriving and a form that cannot be submitted or left. Sign-ins are the user's part.
+
+**On each site,** in the rich editor named below, with the console open, after the steps above
+(a contenteditable has no `.value`: read the box's `innerText`, and after each step type one
+real character in Insert and delete it, to show the edit survived the editor's next render,
+since an edit the editor's model never took comes back on its next render):
+
+1. Line-wise: `o` a new line, `dd` it, `J` two lines, `u` and Ctrl-r each.
+2. Inside a bold or italic run (make one with the site's own shortcut): `cw`, `x`, `r`; the run stays.
+3. A count and repeat: `3x`, then `.`.
+4. Insert-mode Enter, or Cmd/Ctrl+Enter where the site sends with it, still sends (or makes a
+   new line where Enter does), with VimText Active.
+5. Esc, then `:q`: the editor keeps its text and the page takes focus back.
+
+**Which editor, per site** (record the library if the DOM shows it):
+
+- **Stack Overflow**: the answer editor in rich mode (Stacks Editor, ProseMirror).
+- **Reddit**: the rich-text comment composer on new reddit. Claude in Chrome could not
+  open reddit.com in 2026-11: the user drives it, or it is skipped and recorded so.
+- **Gmail**: the compose body. Do not send; discard the draft.
+- **Slack**: the message box; a DM to yourself. Enter sends.
+- **GitHub**: an issue or PR comment's rich editor if one is offered; otherwise the
+  `<textarea>`, and say so.
+- **Notion**: a page with several blocks. Each block is its own Field (an accepted M4
+  limitation): check `j`/`k` stay inside a block and nothing is lost crossing blocks with the mouse.
+
+Record one comment per site on #56: site, editor library, each step's outcome, and the issue
+filed for any finding.
+
 ## The package script
 
 `npm run package` (`tools/package.mjs`) is what the workflow runs and what a local check of

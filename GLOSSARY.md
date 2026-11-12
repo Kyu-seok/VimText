@@ -13,7 +13,7 @@ A Field that is one editing host: the outermost editable element of a rich-text 
 _Avoid_: rich-text field, contenteditable region, editor
 
 **Atom**:
-Something inside a contenteditable Field that is not text but sits in it like a character: a mention chip, an inline image, a non-editable island. To Vim it is one character; yanked, it is its visible text.
+Something inside a contenteditable Field that is not text but sits in it like a character: a mention chip, an inline image, a non-editable island. To Vim it is one character; yanked, it is its visible text. A non-editable element with no text and no replaced element (an image, a video, a form control) of its own (a list marker drawn by CSS) is decoration, not an Atom, and is not in the Field's text at all.
 _Avoid_: embed, node, widget, chip
 
 **Single-line Field**:

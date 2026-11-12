@@ -1,8 +1,17 @@
 import type { Field, FieldSelection, WrappingStyle } from "./Field";
-import { diffText, type TextDiff } from "./diff";
-import { project, type Projection } from "./projection";
+import { diffHunks, diffText, type TextDiff } from "./diff";
+import { project, type DomPoint, type Projection } from "./projection";
 import { readDomSelection, selectDom } from "./domSelection";
-import { insertAtomHtml, replaceDomRange } from "./editingCommands";
+import {
+  deleteMarker,
+  insertAtomHtml,
+  insertMarker,
+  nextTask,
+  offerRestore,
+  replaceDomRange,
+  settleEditor,
+  type Pauses,
+} from "./editingCommands";
 import { ATOM_CHAR, atomText } from "./atoms";
 
 /**
@@ -17,6 +26,33 @@ interface RemovedAtom {
 
 /** Holds an Atom's place while it is inserted (see `insertAtom`). */
 const MARKER = "\u200b";
+
+/**
+ * The least time between the host's last change, whoever made it (a DOM
+ * mutation inside it, or a `selectionchange`), and the selection that starts
+ * a span of a write (ADR 0008: the minimum gap between writes, and between
+ * the spans of one). Slate ignores `selectionchange` from the moment it
+ * renders until a `setTimeout` it set then has fired (docs/engine-seams.md,
+ * "Slate ignores selectionchange after it renders"), and it takes a deletion
+ * at its own selection, not the event's target, so a span selected sooner is
+ * deleted at Slate's stale caret. A render that only moves the selection (Slate
+ * putting back its own after taking VimText's cursor) changes no node, and
+ * shows only as a `selectionchange`.
+ *
+ * Set by the Slate fixture's cases in tests/e2e/slate.spec.ts. "x r cw inside
+ * the bold run": a `!` Slate typed itself, then Esc and `0dw` at Playwright's
+ * pace, deleted the `!` instead of `the ` unless the write waited 15–20 ms
+ * from Slate's render of the `!` (a gap counted only from VimText's own last
+ * write missed it), which is why the gap counts from any change to the host.
+ * "u and Ctrl-r restore Slate's text": `G` then `dd` merged the first two
+ * lines at Slate's stale caret, Slate having re-rendered only its selection
+ * after `G`, which is why a `selectionchange` counts. With the reselection in
+ * `replaceDomRange`, those two, "Slate's own history" and `J` failed at 0 ms
+ * and every case passed four runs at 10 ms; 20 ms, what the spike measured,
+ * leaves a margin of two. (tests/unit/slate.test.ts, "dd then dd in one
+ * burst", first set it at 6 ms, before the reselection made it pass at 0.)
+ */
+const WRITE_GAP_MS = 20;
 
 /** How many removed Atoms a Field keeps for undo; older ones come back as nothing. */
 const REMOVED_ATOMS_KEPT = 200;
@@ -88,9 +124,23 @@ function breakAtLineEnd(
  * always the truth; its selection is the native one mapped through the
  * projection. `setValue` writes only the span that differs, through the
  * browser's editing commands (`replaceDomRange`), never by mutating the DOM.
+ *
+ * A write is asynchronous (ADR 0008): each span is selected once the editor
+ * has settled from the host's last change (`WRITE_GAP_MS`), each step comes a
+ * task after the selection or the step before, and the promise resolves a
+ * task after the last, once the editor has caught up. The host's `input` events
+ * until then are the write's own. `destroy` stops a write between two steps,
+ * and so does the host leaving the document.
  */
 export class ContentEditableField implements Field {
   private writing = false;
+  private destroyed = false;
+  /** When the host last changed (`performance.now()`): a span waits `WRITE_GAP_MS` from it. */
+  private lastChangeAt = -Infinity;
+  private readonly noteChange = () => {
+    this.lastChangeAt = performance.now();
+  };
+  private readonly hostMutations = new MutationObserver(this.noteChange);
   private inputHandlers = new Set<() => void>();
   /** The last selection set or read inside the host, answered while the native one is elsewhere. */
   private lastSelection: FieldSelection = { anchor: 0, head: 0 };
@@ -108,6 +158,8 @@ export class ContentEditableField implements Field {
     readonly singleLine = false,
   ) {
     element.addEventListener("input", this.handleInput);
+    this.hostMutations.observe(element, { subtree: true, childList: true, characterData: true });
+    element.ownerDocument.addEventListener("selectionchange", this.noteChange);
     this.noteAtoms(project(element));
   }
 
@@ -130,24 +182,120 @@ export class ContentEditableField implements Field {
     return project(this.element).text;
   }
 
-  setValue(text: string): void {
+  /** Resolves once the write has settled. One write at a time: the Session waits for one before the next. */
+  setValue(text: string): Promise<void> {
+    const old = project(this.element).text;
+    if (old === text) return Promise.resolve();
+    // Each changed span on its own, first to last (`diffHunks`): the text
+    // after the k-th is the new text up to its end and the old text after it.
+    const textAfterEachSpan = diffHunks(old, text).map((h) => text.slice(0, h.toNew) + old.slice(h.toOld));
+    this.writing = true;
+    const write = async (): Promise<void> => {
+      try {
+        for (const target of textAfterEachSpan) await this.writeSpan(target);
+        // The editor's answer to the last step (a re-render, a rewrite) is part of the write.
+        await nextTask();
+      } finally {
+        this.writing = false;
+        if (!this.destroyed) this.noteAtoms(project(this.element));
+      }
+    };
+    return write();
+  }
+
+  /**
+   * Writes the one span by which the host's text differs from `text`, once
+   * the editor has settled from the host's last change: it is projected after
+   * that wait, which an editor's render may have changed the DOM in.
+   */
+  private async writeSpan(text: string): Promise<void> {
+    if (!(await this.settle())) return;
     const projection = project(this.element);
     const old = projection.text;
     if (old === text) return;
     const span = breakAtLineEnd(old, keepAdjacentSpaces(old, diffText(old, text), text));
-    this.writing = true;
-    try {
-      const restored = this.takeRemovedAtoms(span.from, span.insert);
-      this.keepRemovedAtoms(projection, span.from, span.to);
-      if (!span.insert.includes(ATOM_CHAR)) {
-        replaceDomRange(this.element, projection.toDom(span.from), projection.toDom(span.to), span.insert);
-      } else {
-        this.writeWithAtoms(span.from, span.to, span.insert, restored);
-      }
-    } finally {
-      this.writing = false;
-      this.noteAtoms(project(this.element));
+    const restored = this.takeRemovedAtoms(span.from, span.insert);
+    this.keepRemovedAtoms(projection, span.from, span.to);
+    if (!span.insert.includes(ATOM_CHAR)) {
+      await this.replace(span.from, span.to, span.insert, projection);
+    } else {
+      await this.writeWithAtoms(span.from, span.to, span.insert, restored);
     }
+  }
+
+  /**
+   * The wait before a span selects its range: until `WRITE_GAP_MS` have
+   * passed since the host or the selection last changed, measured once, so a
+   * page that keeps changing its DOM delays a span by `WRITE_GAP_MS` at most.
+   * False once the write must stop.
+   */
+  private settle = async (): Promise<boolean> => {
+    // A change made in this task has not reached the observer's callback yet.
+    if (this.hostMutations.takeRecords().length > 0) this.lastChangeAt = performance.now();
+    const left = this.lastChangeAt + WRITE_GAP_MS - performance.now();
+    if (left > 0) await new Promise((resolve) => setTimeout(resolve, left));
+    return this.canWrite();
+  };
+
+  /**
+   * The wait between selecting a span's range and its first step, and between
+   * two steps: a task (ADR 0008). Set by the Slate fixture: Slate takes a
+   * selection and applies a step it took over when React renders, a task
+   * later, and with only a microtask after the selection, `dw` on a bold word
+   * deleted its first letter and `cw` the first of the word it changed
+   * (tests/e2e/slate.spec.ts, "dw on a whole bold word", "x r cw inside the
+   * bold run"; see `replaceDomRange`). Between two steps a microtask was
+   * enough for the fixture's `J` under React 19.3 (the spike's `J`, under
+   * React 18.3, duplicated the joined line and threw a React `removeChild`
+   * error without a task), and ProseMirror reads each step in its
+   * MutationObserver callback before the next (#52). False once the write
+   * must stop.
+   */
+  private pause = async (): Promise<boolean> => {
+    await nextTask();
+    return this.canWrite();
+  };
+
+  /** Whether a write may go on: the Field is not destroyed and its host is still in the document. */
+  private canWrite(): boolean {
+    return !this.destroyed && this.element.isConnected;
+  }
+
+  private readonly pauses: Pauses = { step: this.pause, settle: this.settle };
+
+  /**
+   * Replaces the text from offset `from` to `to` with `insert` through
+   * `replaceDomRange`, the offsets mapped through `projection` (a fresh one
+   * by default), the caret after a paragraph break where the projection then
+   * puts the written text's end (`caretFrom`).
+   */
+  private replace(
+    from: number,
+    to: number,
+    insert: string,
+    projection = project(this.element),
+  ): Promise<boolean> {
+    const edit = {
+      from: projection.toDom(from),
+      to: projection.toDom(to),
+      text: insert,
+      caretAfter: this.caretFrom(from),
+    };
+    return replaceDomRange(this.element, edit, this.pauses);
+  }
+
+  /**
+   * Where a write that starts at offset `start` continues once it has written
+   * `written` characters: the DOM point the projection gives that offset now,
+   * after the editor's re-render (`replaceDomRange` puts the caret there after
+   * a paragraph break). None past the text's end: the editor has not rendered
+   * the break, and the caret stays where it is.
+   */
+  private caretFrom(start: number): (written: number) => DomPoint | null {
+    return (written) => {
+      const p = project(this.element);
+      return start + written <= p.text.length ? p.toDom(start + written) : null;
+    };
   }
 
   /** The Atoms in the text: each one's offset and the visible text a yank stores for it. */
@@ -193,38 +341,72 @@ export class ContentEditableField implements Field {
     return taken;
   }
 
-  /** Writes `insert` over `from`..`to`, each U+FFFC as the next of `atoms` (`undefined`: nothing). */
-  private writeWithAtoms(from: number, to: number, insert: string, atoms: (string | undefined)[]): void {
+  /**
+   * Writes `insert` over `from`..`to`, each U+FFFC as the next of `atoms`
+   * (`undefined`: nothing). Each part is a step of its own, after a pause,
+   * and re-projects the host the editor may have changed meanwhile.
+   */
+  private async writeWithAtoms(
+    from: number,
+    to: number,
+    insert: string,
+    atoms: (string | undefined)[],
+  ): Promise<void> {
     const [first, ...rest] = insert.split(ATOM_CHAR);
+    let started = false;
     if (first || from !== to) {
-      const p = project(this.element);
-      replaceDomRange(this.element, p.toDom(from), p.toDom(to), first!);
+      started = true;
+      await this.replace(from, to, first!);
     }
     let at = from + first!.length;
-    rest.forEach((part, i) => {
+    for (const [i, part] of rest.entries()) {
       const html = atoms[i];
-      if (html && this.insertAtom(at, html)) at++;
-      if (!part) return;
-      const caret = project(this.element).toDom(at);
-      replaceDomRange(this.element, caret, caret, part);
+      if (html) {
+        if (started && !(await this.pause())) return;
+        started = true;
+        if (await this.insertAtom(at, html)) at++;
+      }
+      if (!part) continue;
+      if (started && !(await this.pause())) return;
+      started = true;
+      await this.replace(at, at, part);
       at += part.length;
-    });
+    }
   }
 
   /**
    * Puts an Atom's element back at offset `at` through `insertHTML`, with a
    * marker character after it while it lands: Chrome moves a non-editable
    * element inserted at the end of a block out of that block, and leaves the
-   * caret inside it, where no later editing command applies.
+   * caret inside it, where no later editing command applies. The restore is
+   * offered to the page first (`offerRestore`); a page that takes it over
+   * gets neither the marker nor `insertHTML`, and the U+FFFC stands for
+   * whatever it did (Lexical: nothing, so `u` restores the text without the
+   * Atom, #62), which the Session folds like a Controlled Field rewrite. The
+   * marker is typed and deleted by the browser's own commands, never offered
+   * to the page (`insertMarker`): an editor that took an offered `insertText`
+   * into its model would keep it there.
    */
-  private insertAtom(at: number, html: string): boolean {
+  private async insertAtom(at: number, html: string): Promise<boolean> {
     const here = project(this.element).toDom(at);
-    replaceDomRange(this.element, here, here, MARKER);
+    selectDom(this.element, here, here);
+    settleEditor(this.element);
+    if (!(await this.pause())) return false;
+    if (offerRestore(this.element, html)) return false;
+    if (!(await this.pause())) return false;
+    const caret = project(this.element).toDom(at);
+    selectDom(this.element, caret, caret);
+    insertMarker(this.element, MARKER);
+    if (!(await this.pause())) return false;
     const before = project(this.element).toDom(at);
     selectDom(this.element, before, before);
     insertAtomHtml(html);
+    if (!(await this.pause())) return false;
     const p = project(this.element);
-    if (p.text[at + 1] === MARKER) replaceDomRange(this.element, p.toDom(at + 1), p.toDom(at + 2), "");
+    if (p.text[at + 1] === MARKER) {
+      selectDom(this.element, p.toDom(at + 1), p.toDom(at + 2));
+      deleteMarker(this.element);
+    }
     return project(this.element).text[at] === ATOM_CHAR;
   }
 
@@ -250,6 +432,11 @@ export class ContentEditableField implements Field {
     // line, which closes on blur. The render on focus sets it.
     if (!this.hasFocus()) return;
     selectDom(this.element, projection.toDom(a), projection.toDom(h));
+    // The editor takes the cursor into its model now, as after a write step: it
+    // lands a task or more after the write (ADR 0008). Without this the
+    // ProseMirror e2e intermittently ended with a collapsed selection and an
+    // input rule that never ran (#52; cause not pinned down).
+    settleEditor(this.element);
   }
 
   hasFocus(): boolean {
@@ -298,6 +485,9 @@ export class ContentEditableField implements Field {
   }
 
   destroy(): void {
+    this.destroyed = true;
+    this.hostMutations.disconnect();
+    this.element.ownerDocument.removeEventListener("selectionchange", this.noteChange);
     this.element.removeEventListener("input", this.handleInput);
     this.inputHandlers.clear();
   }

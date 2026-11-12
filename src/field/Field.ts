@@ -15,8 +15,13 @@ export interface Field {
   /** True for fields that cannot hold a newline (single-line inputs). */
   readonly singleLine: boolean;
   getValue(): string;
-  /** Writes text in a way the host page's framework notices (React, Vue, …). */
-  setValue(text: string): void;
+  /**
+   * Writes text in a way the host page's framework notices (React, Vue, …).
+   * A textarea or input writes synchronously; a contenteditable host returns a
+   * promise that resolves once the write has settled (ADR 0008), and the
+   * caller makes no other write to it until then.
+   */
+  setValue(text: string): void | Promise<void>;
   getSelection(): FieldSelection;
   setSelection(anchor: number, head: number): void;
   focus(): void;

@@ -155,19 +155,27 @@ primary range is highlighted.
   where it is not what renders: each block is one line (`innerText` puts a blank line on each
   side of a `<p>`), and a break that ends its block (`<div>a<br></div>`,
   a trailing `\n` in `pre`) makes no line of its own (docs/engine-seams.md "innerText as the oracle").
+  A zero-width no-break space (U+FEFF, Slate's placeholder in an empty leaf) is nothing
+  (docs/engine-seams.md "Zero-width no-break space").
 - _Atoms_: a mention chip, an inline image, a `contenteditable="false"` island projects as
   one `U+FFFC`. Motions count it as one non-blank char; `x`/`dw` delete it whole. A yank
   stores the Atom's visible text (`@alice`, an image's `alt`, otherwise nothing), never `U+FFFC`.
   Any element inside the host whose `isContentEditable` is false is an Atom, and so is every
   replaced element or form control (`img`, `video`, `canvas`, `iframe`, `svg`, `input`,
   `button`, `select`, `textarea`, …; the list is `src/field/atoms.ts`): none is text the
-  editor writes through.
+  editor writes through. The one exception (#60, owner decision of 2026-11-12): a
+  non-editable element with no text and no replaced element of its own draws only
+  decoration, as Quill's list marker (an empty `ql-ui` span whose `::before` is the bullet)
+  does. It is not an Atom and projects as nothing, so a list item's line starts at its text
+  and `0x`, `I`, `dd` and `J` act on it as on a plain line.
 - _Writes_ (non-Insert Modes): never a DOM mutation. The bridge selects the DOM range of
   the diff and, per step, offers the editor a cancelable synthetic `beforeinput`
   (`insertText`, `deleteContentBackward`, `insertParagraph`, with the range as its target);
   only if no listener cancels it does it run `document.execCommand('insertText' | 'delete')`
   (ADR 0008). An inserted `\n` is `insertParagraph` (what Enter does in the editor), a deleted
-  one merges blocks through the delete. The write is asynchronous: its steps are spaced so the
+  one merges blocks through the delete. The write is asynchronous: each span is selected once
+  the editor has settled from the host's last change (20 ms, set by the Slate fixture) and again
+  if the editor puts its own selection back; its steps are spaced so the
   editor catches up, a render due meanwhile is merged into the next write, and the refusal and
   Controlled Field rules below read the Field once the write has settled. A write reaches the
   editor's model on the editors a pinned fixture covers (Lexical, Slate, Quill, ProseMirror);
@@ -181,11 +189,22 @@ primary range is highlighted.
   The same test holds on every Field kind: a textarea or input whose page puts its whole value
   back after a write gets the message, and the change leaves the undo history, where a page that
   writes anything else is a Controlled Field rewrite. A `U+FFFC` an undo writes back for an Atom
-  VimText no longer holds the element of is written as nothing, which is not a refusal.
+  VimText no longer holds the element of is written as nothing, which is not a refusal; nor is
+  one whose restore the editor took over and left undone (#62, accepted limitations below).
   The formatting at a write's edge is the editor's: text written at the end of a mark run takes
   the mark, as typing there would (`J` after an italic word makes the joining space italic).
 - _Insert_: the editor owns typing as on every Field; the mirror re-projects the whole host
-  on every `input`. No size budget until a measured finding asks for one.
+  on every `input`. No size budget until a measured finding asks for one. The one exception
+  is a key typed while a write is still settling (the `o` or `cw` that entered Insert has
+  not landed, so the caret is not yet where the text goes): a character, Backspace and a
+  multi-line host's Enter are taken from the page and typed into the mirror, and land with
+  the merged write (#52); any other key stays the page's.
+- _Keys during a write_ (#52): a page that refuses a write also refuses what keys pressed
+  while it settled made on top of it (the Status Line says so); a page that rewrites it
+  keeps both, its rewrite mapped under the keys' change and joined to that change's undo
+  step. A write that changes text in several places (a merged one: two `dd` far apart)
+  writes each changed run of lines as a span of its own, first to last, so the lines
+  between them, an Atom's among them, are never rewritten.
 - _Key Policy_: a multi-line contenteditable follows the textarea rows: `Enter` in Normal is
   the Vim motion; a chat composer submits with Insert-mode `Enter` or Cmd/Ctrl+Enter.
 - _Registers_: plain text only. Cmd+V stays a Pass-through, so the editor's rich paste works.
@@ -315,7 +334,7 @@ the e2e config, so a bare `playwright test` runs `e2e` alone), drives the same l
 and renders the store icon and promo tiles from their sources there (`store-art.spec.ts`);
 it is outside the gate, so PNG churn never fails `npm run check`.
 
-## Accepted limitations (M1–M3)
+## Accepted limitations
 
 - No `hlsearch` highlighting in textarea/input (`n`/`N` work).
 - Scroll commands (`Ctrl-d/u/f/b`, `zz/zt/zb`) approximate via visible line count and `scrollTop`.
@@ -389,6 +408,15 @@ it is outside the gate, so PNG churn never fails `npm run check`.
   bold run is plain, and a `plaintext-only` host keeps the `<br>` a merge left. An Atom comes
   back from `u` only while VimText still holds its element (the last 200 removed in that Field);
   an older one, or one the page took out without an `input` event, comes back as nothing.
+  The restore is offered to the editor first, as a `beforeinput` of `insertFromPaste` with the
+  Atom's markup as `text/html`; an editor that cancels it gets no `insertHTML`, and the Atom
+  comes back only if that editor brings it back itself. The U+200B that holds the Atom's place
+  while `insertHTML` lands is typed and deleted by the browser's own commands, never offered as
+  a `beforeinput`, so no editor takes it into its model. Lexical cancels it and does nothing, so
+  on Lexical `u` after deleting a decorator restores the text around it, without the decorator
+  (#62). Chosen over restoring the decorator: Lexical cannot take a decorator back through the
+  DOM (the `insertHTML` restore turned its whole line into the decorator's text), and pasting
+  it back needs Lexical's own clipboard JSON, which the isolated world never holds.
 
 ## Milestones
 

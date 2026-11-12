@@ -1,11 +1,12 @@
-import { test, expect, ready, activateAtStart, selectedText } from "./extension";
+import { test, expect, ready, activateAtStart, modelText, selectedText } from "./extension";
 import type { Page } from "@playwright/test";
 
 /**
  * VimText on the pinned ProseMirror build (#46, ADR 0007) through the built
  * extension: real keys, ProseMirror's own document read back from the editor
  * (`pmDoc`, see tests/fixtures/prosemirror.ts), not the DOM. Marks print as
- * `<b>`, `<i>`, `<a>`; a list as `ul[li[…],…]`.
+ * `<b>`, `<i>`, `<a>`; a list as `ul[li[…],…]`. Its plain text, one line per
+ * textblock, is `modelText`, the read every rich-editor fixture shares.
  */
 
 const HOST = "#editor .ProseMirror";
@@ -30,21 +31,21 @@ test.beforeEach(async ({ page }) => {
 test("x dw cw inside a bold run keep it bold; across a mark boundary the rest keeps its marks", async ({
   page,
 }) => {
-  expect(await pmDoc(page)).toEqual(ORIGINAL);
+  await expect.poll(() => pmDoc(page)).toEqual(ORIGINAL);
   await page.keyboard.type("wx");
-  expect((await pmDoc(page))[0]).toBe("the <b>uick brown</b> fox");
-  expect(await selectedText(page)).toBe("u");
+  await expect.poll(async () => (await pmDoc(page))[0]).toBe("the <b>uick brown</b> fox");
+  await expect.poll(() => selectedText(page)).toBe("u");
   await page.keyboard.type("wcw");
   await page.keyboard.type("lazy");
   await page.keyboard.press("Escape");
   // The plain space after the bold run stays plain.
-  expect((await pmDoc(page))[0]).toBe("the <b>uick lazy</b> fox");
+  await expect.poll(async () => (await pmDoc(page))[0]).toBe("the <b>uick lazy</b> fox");
   await page.keyboard.type("0dw");
-  expect((await pmDoc(page))[0]).toBe("<b>uick lazy</b> fox");
+  await expect.poll(async () => (await pmDoc(page))[0]).toBe("<b>uick lazy</b> fox");
   await page.keyboard.type("j0wdw");
-  expect((await pmDoc(page))[1]).toBe("jumps the <a>lazy dog</a>");
+  await expect.poll(async () => (await pmDoc(page))[1]).toBe("jumps the <a>lazy dog</a>");
   await page.keyboard.type("wx");
-  expect((await pmDoc(page))[1]).toBe("jumps the <a>azy dog</a>");
+  await expect.poll(async () => (await pmDoc(page))[1]).toBe("jumps the <a>azy dog</a>");
 });
 
 test("o, dd, linewise p and J split and merge paragraphs and list items in ProseMirror's document", async ({
@@ -53,47 +54,70 @@ test("o, dd, linewise p and J split and merge paragraphs and list items in Prose
   await page.keyboard.type("o");
   await page.keyboard.type("new para");
   await page.keyboard.press("Escape");
-  expect(await pmDoc(page)).toEqual([ORIGINAL[0], "new para", ...ORIGINAL.slice(1)]);
+  await expect.poll(() => pmDoc(page)).toEqual([ORIGINAL[0], "new para", ...ORIGINAL.slice(1)]);
   await page.keyboard.type("jjo");
   await page.keyboard.type("new item");
   await page.keyboard.press("Escape");
-  expect((await pmDoc(page))[3]).toBe("ul[li[first item],li[new item],li[second <b>item</b>]]");
+  await expect
+    .poll(async () => (await pmDoc(page))[3])
+    .toBe("ul[li[first item],li[new item],li[second <b>item</b>]]");
   await page.keyboard.type("dd");
-  expect((await pmDoc(page))[3]).toBe(ORIGINAL[2]);
+  await expect.poll(async () => (await pmDoc(page))[3]).toBe(ORIGINAL[2]);
   // Registers hold plain text: the pasted line is a list item without the bold.
   await page.keyboard.type("ggyyjjjp");
-  expect((await pmDoc(page))[3]).toBe("ul[li[first item],li[the quick brown fox],li[second <b>item</b>]]");
+  await expect
+    .poll(async () => (await pmDoc(page))[3])
+    .toBe("ul[li[first item],li[the quick brown fox],li[second <b>item</b>]]");
   await page.keyboard.type("J");
-  expect((await pmDoc(page))[3]).toBe("ul[li[first item],li[the quick brown fox second <b>item</b>]]");
+  await expect
+    .poll(async () => (await pmDoc(page))[3])
+    .toBe("ul[li[first item],li[the quick brown fox second <b>item</b>]]");
   await page.keyboard.type("jdd");
-  expect(await pmDoc(page)).toEqual([
-    ORIGINAL[0],
-    "new para",
-    ORIGINAL[1],
-    "ul[li[first item],li[the quick brown fox second <b>item</b>]]",
-  ]);
+  await expect
+    .poll(() => pmDoc(page))
+    .toEqual([
+      ORIGINAL[0],
+      "new para",
+      ORIGINAL[1],
+      "ul[li[first item],li[the quick brown fox second <b>item</b>]]",
+    ]);
+  await expect
+    .poll(() => modelText(page))
+    .toEqual([
+      "the quick brown fox",
+      "new para",
+      "jumps over the lazy dog",
+      "first item",
+      "the quick brown fox second item",
+    ]);
 });
 
-/** ProseMirror's document without its marks: `u` restores the text, and a re-inserted character takes the marks of where it is typed (docs/engine-seams.md, "Block merges and splits"). */
-async function pmText(page: Page): Promise<string[]> {
-  return (await pmDoc(page)).map((block) => block.replace(/<\/?[a-z]+>/g, ""));
-}
-
+// `u` restores ProseMirror's text (`modelText`, its marks left out): a
+// re-inserted character takes the marks of where it is typed
+// (docs/engine-seams.md, "Block merges and splits").
 test("u restores the text and ProseMirror accepts it; Cmd+Z and Ctrl+Z in Normal are swallowed", async ({
   page,
 }) => {
-  const original = await pmText(page);
+  const original = await modelText(page);
+  expect(original).toEqual([
+    "the quick brown fox",
+    "jumps over the lazy dog",
+    "first item",
+    "second item",
+    "wait-x here",
+  ]);
   await page.keyboard.type("wx");
   await page.keyboard.type("jdd");
+  await expect.poll(async () => (await pmDoc(page)).length).toBe(ORIGINAL.length - 1);
   const edited = await pmDoc(page);
   await page.keyboard.press("Meta+z");
   await page.keyboard.press("Control+z");
-  expect(await pmDoc(page)).toEqual(edited);
+  await expect.poll(() => pmDoc(page)).toEqual(edited);
   await page.keyboard.type("uu");
-  expect(await pmText(page)).toEqual(original);
+  await expect.poll(() => modelText(page)).toEqual(original);
   // ProseMirror took the restored text into its model: a further edit applies to it.
   await page.keyboard.type("x");
-  expect((await pmText(page))[0]).toBe("the uick brown fox");
+  await expect.poll(async () => (await modelText(page))[0]).toBe("the uick brown fox");
 });
 
 test("an input rule's rewrite syncs into the mirror and undoes with the change that provoked it", async ({
@@ -101,11 +125,15 @@ test("an input rule's rewrite syncs into the mirror and undoes with the change t
 }) => {
   await page.keyboard.type("Gfx");
   await page.keyboard.type("r-");
-  expect((await pmDoc(page))[3]).toBe("wait— here");
+  await expect.poll(async () => (await pmDoc(page))[3]).toBe("wait— here");
+  // The Normal cursor shows once the write has settled and its rewrite has
+  // been judged (ADR 0008); for a key pressed before that, the rewrite joins
+  // that key's undo step instead of the change that provoked it.
+  await expect.poll(() => selectedText(page)).not.toBe("");
   await page.keyboard.type("$x");
-  expect((await pmDoc(page))[3]).toBe("wait— her");
+  await expect.poll(async () => (await pmDoc(page))[3]).toBe("wait— her");
   await page.keyboard.type("u");
-  expect((await pmDoc(page))[3]).toBe("wait— here");
+  await expect.poll(async () => (await pmDoc(page))[3]).toBe("wait— here");
   await page.keyboard.type("u");
-  expect((await pmDoc(page))[3]).toBe("wait-x here");
+  await expect.poll(async () => (await pmDoc(page))[3]).toBe("wait-x here");
 });
