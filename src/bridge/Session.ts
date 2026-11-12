@@ -231,7 +231,7 @@ export class Session {
       // register); the keys that complete it are the engine's too.
       const pendingInsert = vim.inputState.keyBuffer.length > 0;
       if (!pendingInsert && !isInsertModeVimKey(e)) {
-        if (this.pendingWrite) this.typeWhileWriting(e);
+        if (this.pendingWrite || this.field.selectionSettling?.()) this.typeWhileWriting(e);
         return; // native typing
       }
       this.syncFromField();
@@ -455,7 +455,10 @@ export class Session {
   /**
    * A key typed in Insert while a write is pending (ADR 0008): the Field's
    * caret is not yet where the engine's cursor is (the `o` that entered Insert
-   * has not landed), so typed natively it would go in the wrong place. A
+   * has not landed), so typed natively it would go in the wrong place. So
+   * too while the caret VimText set is settling (`Field.selectionSettling`):
+   * the page's editor may not have taken it yet, and typed natively the key
+   * would land at the editor's stale selection (#64). A
    * character, Backspace and a multi-line Field's Enter are typed into the
    * mirror instead, as the Field's own typing would sync into it, and land
    * with the merged render. Any other key stays the page's.
