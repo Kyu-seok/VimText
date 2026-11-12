@@ -334,7 +334,7 @@ the e2e config, so a bare `playwright test` runs `e2e` alone), drives the same l
 and renders the store icon and promo tiles from their sources there (`store-art.spec.ts`);
 it is outside the gate, so PNG churn never fails `npm run check`.
 
-## Accepted limitations (M1–M3)
+## Accepted limitations
 
 - No `hlsearch` highlighting in textarea/input (`n`/`N` work).
 - Scroll commands (`Ctrl-d/u/f/b`, `zz/zt/zb`) approximate via visible line count and `scrollTop`.
