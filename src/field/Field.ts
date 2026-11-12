@@ -24,6 +24,13 @@ export interface Field {
   setValue(text: string): void | Promise<void>;
   getSelection(): FieldSelection;
   setSelection(anchor: number, head: number): void;
+  /**
+   * True while the selection VimText last set may not be the page's editor's
+   * yet (a contenteditable Field's; ADR 0008): a key typed natively then would
+   * land at the editor's stale selection. Absent on Fields whose selection is
+   * the browser's own.
+   */
+  selectionSettling?(): boolean;
   focus(): void;
   blur(): void;
   hasFocus(): boolean;

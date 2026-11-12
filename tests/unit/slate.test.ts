@@ -94,6 +94,84 @@ describe("Slate takes writes made back to back", () => {
 });
 
 /**
+ * docs/engine-seams.md, "Slate puts a stale selection back over a cursor
+ * move" (#64): Slate takes VimText's Normal cursor late, on its throttled
+ * `selectionchange` handler, and a cursor move VimText makes before React has
+ * rendered that `set_selection` is dropped (its node map is dirty) and then
+ * overwritten by the render, which puts the cursor Slate took back into the
+ * DOM. Here the move is made at the worst moment, deterministically: in the
+ * same task as Slate's late `set_selection`. The e2e met it under load, where
+ * `G` then `iZ` typed the `Z` nowhere.
+ */
+describe("Slate puts a stale selection back over a cursor move", () => {
+  it("G made as Slate takes the cursor before it keeps G's cursor, and a character typed after i lands there", async () => {
+    await open();
+    const { editor, host } = current!.slate;
+    await keys("j");
+    // Slate takes `j`'s cursor up to 100 ms later; `G` goes in that same task.
+    await new Promise<void>((resolve) => {
+      const onChange = editor.onChange;
+      editor.onChange = (...args: Parameters<typeof onChange>) => {
+        onChange(...args);
+        if (!editor.operations.every((op) => op.type === "set_selection")) return;
+        editor.onChange = onChange;
+        current!.session!.handleKeydown(
+          new KeyboardEvent("keydown", { key: "G", bubbles: true, cancelable: true }),
+        );
+        resolve();
+      };
+    });
+    await new Promise((r) => setTimeout(r, 250)); // every throttled handler and render has run
+    const lastLine = "the quick brown fox\na heading\nfirst item\nsecond item\n".length;
+    expect(current!.field!.getSelection()).toEqual({ anchor: lastLine, head: lastLine + 1 });
+    await keys("i");
+    await new Promise((r) => setTimeout(r, 150));
+    // A real keystroke's `beforeinput`: Slate inserts at the selection it flushes from the DOM.
+    host.dispatchEvent(
+      new InputEvent("beforeinput", { inputType: "insertText", data: "Z", bubbles: true, cancelable: true }),
+    );
+    await new Promise((r) => setTimeout(r, 50));
+    expect(model()).toEqual(["the quick brown fox", "a heading", "first item", "second item", "Zlast line"]);
+  });
+
+  it("a character typed right after i, before Slate has rendered the cursor it took late, lands at i's caret", async () => {
+    await open();
+    const { editor, host } = current!.slate;
+    await keys("G");
+    // Slate takes `G`'s cursor late; `iZ` is typed before React renders it.
+    await new Promise<void>((resolve) => {
+      const onChange = editor.onChange;
+      editor.onChange = (...args: Parameters<typeof onChange>) => {
+        onChange(...args);
+        if (!editor.operations.every((op) => op.type === "set_selection")) return;
+        editor.onChange = onChange;
+        const press = (key: string) => {
+          const e = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+          current!.session!.handleKeydown(e);
+          return e;
+        };
+        press("i");
+        // Typed natively unless VimText took it: the browser's `beforeinput`.
+        if (!press("Z").defaultPrevented) {
+          host.dispatchEvent(
+            new InputEvent("beforeinput", {
+              inputType: "insertText",
+              data: "Z",
+              bubbles: true,
+              cancelable: true,
+            }),
+          );
+        }
+        resolve();
+      };
+    });
+    await current!.session!.settled();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(model()).toEqual(["the quick brown fox", "a heading", "first item", "second item", "Zlast line"]);
+  });
+});
+
+/**
  * docs/engine-seams.md, "Slate ignores selectionchange after it renders": a
  * bare-page probe, no VimText code running. Slate applies the `X` it took
  * over and renders it; that render puts Slate's caret back into the DOM and

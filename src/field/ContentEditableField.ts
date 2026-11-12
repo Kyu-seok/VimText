@@ -54,6 +54,16 @@ const MARKER = "\u200b";
  */
 const WRITE_GAP_MS = 20;
 
+/** The person's own ways to move a selection, besides a key: each releases the one VimText holds. */
+const PERSON_SELECTS = ["pointerdown", "mousedown", "touchstart", "compositionstart"] as const;
+
+/**
+ * How many selections VimText set before the held one a stale one put back
+ * may be: Slate puts back the cursor it took, which VimText may have moved
+ * more than once before Slate rendered it.
+ */
+const HELD_EARLIER = 3;
+
 /** How many removed Atoms a Field keeps for undo; older ones come back as nothing. */
 const REMOVED_ATOMS_KEPT = 200;
 
@@ -141,6 +151,20 @@ export class ContentEditableField implements Field {
     this.lastChangeAt = performance.now();
   };
   private readonly hostMutations = new MutationObserver(this.noteChange);
+  /**
+   * The selection VimText last set, held until the person acts (a key
+   * VimText lets through, a pointer, a composition) or a write starts, with
+   * the few it set before on the same text: an editor that puts one of those
+   * back over it meanwhile is undone once (`holdSelection`).
+   */
+  private held: { anchor: number; head: number; text: string; earlier: FieldSelection[] } | null = null;
+  private readonly release = () => {
+    this.held = null;
+  };
+  private readonly onSelectionChange = () => {
+    this.noteChange();
+    this.holdSelection();
+  };
   private inputHandlers = new Set<() => void>();
   /** The last selection set or read inside the host, answered while the native one is elsewhere. */
   private lastSelection: FieldSelection = { anchor: 0, head: 0 };
@@ -159,7 +183,12 @@ export class ContentEditableField implements Field {
   ) {
     element.addEventListener("input", this.handleInput);
     this.hostMutations.observe(element, { subtree: true, childList: true, characterData: true });
-    element.ownerDocument.addEventListener("selectionchange", this.noteChange);
+    const doc = element.ownerDocument;
+    doc.addEventListener("selectionchange", this.onSelectionChange);
+    // A key VimText takes stops at its document capture listener and never
+    // bubbles this far; one it lets through is the person's.
+    doc.defaultView?.addEventListener("keydown", this.release);
+    for (const type of PERSON_SELECTS) doc.addEventListener(type, this.release, { capture: true });
     this.noteAtoms(project(element));
   }
 
@@ -190,6 +219,7 @@ export class ContentEditableField implements Field {
     // after the k-th is the new text up to its end and the old text after it.
     const textAfterEachSpan = diffHunks(old, text).map((h) => text.slice(0, h.toNew) + old.slice(h.toOld));
     this.writing = true;
+    this.held = null;
     const write = async (): Promise<void> => {
       try {
         for (const target of textAfterEachSpan) await this.writeSpan(target);
@@ -411,6 +441,9 @@ export class ContentEditableField implements Field {
   }
 
   getSelection(): FieldSelection {
+    // The editor may have put its stale selection back before the browser
+    // announced it: the key being handled reads VimText's, not that one.
+    this.holdSelection();
     const sel = readDomSelection(this.element);
     if (!sel) return { ...this.lastSelection };
     const projection = project(this.element);
@@ -427,16 +460,66 @@ export class ContentEditableField implements Field {
     const a = Math.max(0, Math.min(len, anchor));
     const h = Math.max(0, Math.min(len, head));
     this.lastSelection = { anchor: a, head: h };
+    const before = this.held;
+    this.held = null;
     // A selection set inside a blurred host focuses it (docs/engine-seams.md,
     // Editing commands and events): it would take focus from the command
     // line, which closes on blur. The render on focus sets it.
     if (!this.hasFocus()) return;
     selectDom(this.element, projection.toDom(a), projection.toDom(h));
+    const earlier =
+      before && before.text === projection.text
+        ? [{ anchor: before.anchor, head: before.head }, ...before.earlier].slice(0, HELD_EARLIER)
+        : [];
+    this.held = { anchor: a, head: h, text: projection.text, earlier };
     // The editor takes the cursor into its model now, as after a write step: it
     // lands a task or more after the write (ADR 0008). Without this the
     // ProseMirror e2e intermittently ended with a collapsed selection and an
     // input rule that never ran (#52; cause not pinned down).
     settleEditor(this.element);
+  }
+
+  /**
+   * Selects the held selection again, once, when the host's selection has
+   * moved back to one VimText set before it, the text unchanged and nobody
+   * acting: the editor put a stale selection back (docs/engine-seams.md,
+   * "Slate puts a stale selection back over a cursor move"). Slate takes
+   * VimText's cursor late, and the render of what it took puts that cursor
+   * back over the one VimText set meanwhile; read back, `G` then `iZ` typed
+   * the `Z` nowhere (#64). Any other move is the page's own (a caret it
+   * places), and stands; and once only, so an editor that insists has the
+   * last word.
+   */
+  private holdSelection(): void {
+    const held = this.held;
+    if (!held || this.writing || this.destroyed) return;
+    const sel = readDomSelection(this.element);
+    const projection = project(this.element);
+    if (!sel || projection.text !== held.text) {
+      this.held = null;
+      return;
+    }
+    const anchor = projection.fromDom(sel.anchor.node, sel.anchor.offset);
+    const head = projection.fromDom(sel.focus.node, sel.focus.offset);
+    if (anchor === held.anchor && head === held.head) return;
+    const stale = held.earlier.some((e) => e.anchor === anchor && e.head === head);
+    this.held = null;
+    if (!stale) return;
+    selectDom(this.element, projection.toDom(held.anchor), projection.toDom(held.head));
+    settleEditor(this.element);
+  }
+
+  /**
+   * Whether the selection VimText set is still settling: nobody has acted
+   * since, and the host last changed less than `WRITE_GAP_MS` ago, the gap
+   * after which a write takes the editor to have caught up. Slate takes a
+   * selection late, and a native `beforeinput` before React has rendered what
+   * it took is applied at the selection it took, not the DOM's: `G` then
+   * `iZ` typed fast replaced the `l` of `last line` (docs/engine-seams.md,
+   * "Slate takes a selection late"; #64).
+   */
+  selectionSettling(): boolean {
+    return this.held !== null && performance.now() - this.lastChangeAt < WRITE_GAP_MS;
   }
 
   hasFocus(): boolean {
@@ -487,7 +570,10 @@ export class ContentEditableField implements Field {
   destroy(): void {
     this.destroyed = true;
     this.hostMutations.disconnect();
-    this.element.ownerDocument.removeEventListener("selectionchange", this.noteChange);
+    const doc = this.element.ownerDocument;
+    doc.removeEventListener("selectionchange", this.onSelectionChange);
+    doc.defaultView?.removeEventListener("keydown", this.release);
+    for (const type of PERSON_SELECTS) doc.removeEventListener(type, this.release, { capture: true });
     this.element.removeEventListener("input", this.handleInput);
     this.inputHandlers.clear();
   }
