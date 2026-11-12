@@ -64,7 +64,7 @@ so motions, operators, text objects, counts, registers, marks, macros, Visual
 charwise, linewise and block, `.`, search and ex commands (`:s`, `:g`, `:sort`,
 `:map`, `:set`, ...) work on day one. VimText itself is the bridge between that
 engine and the page. Where the engine or the bridge deviates from Vim, the
-[accepted limitations in DESIGN.md](DESIGN.md#accepted-limitations-m1m3) say so.
+[accepted limitations in DESIGN.md](DESIGN.md#accepted-limitations) say so.
 
 ## Plugins
 
@@ -90,7 +90,7 @@ While a Plugin is on, the Baseline keys it claims (`i(`, `i"`, Visual `S`)
 behave as the plugin makes them behave in Vim, and a vimrc mapping on a key a
 Plugin also binds wins. The points where each Plugin differs from its upstream
 are listed under the
-[accepted limitations in DESIGN.md](DESIGN.md#accepted-limitations-m1m3).
+[accepted limitations in DESIGN.md](DESIGN.md#accepted-limitations).
 
 ## Develop
 
@@ -143,6 +143,6 @@ and targets Plugins, and the Web Store release. Earlier milestones brought the
 textarea with the full engine and the command line (M1) and Single-line Fields,
 Controlled Fields and frames (M2). See the
 [milestones](DESIGN.md#milestones) and the
-[accepted limitations](DESIGN.md#accepted-limitations-m1m3) in DESIGN.md.
+[accepted limitations](DESIGN.md#accepted-limitations) in DESIGN.md.
 
 MIT licensed.
