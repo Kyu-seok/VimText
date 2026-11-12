@@ -1,6 +1,6 @@
 import { test as base, chromium, type BrowserContext, type Frame, type Page } from "@playwright/test";
 import { resolve } from "node:path";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
 
@@ -28,6 +28,9 @@ export const test = base.extend<{ context: BrowserContext; page: Page }>({
     });
     await use(context);
     await context.close();
+    // Each profile is about 5 MB; left behind, a gate run leaves ~125 of them
+    // and a session of gates filled 37 GB of the temp folder.
+    rmSync(userDataDir, { recursive: true, force: true });
   },
   page: async ({ context }, use) => {
     const page = await context.newPage();
