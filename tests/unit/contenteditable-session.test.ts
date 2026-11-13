@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { Session } from "../../src/bridge/Session";
 import { TextareaField } from "../../src/field/TextareaField";
 import { Sessions } from "../../src/content/Sessions";
+import { project } from "../../src/field/projection";
 import {
   activeHost,
   blockTexts,
@@ -128,6 +129,18 @@ describe("Normal-mode edits go through editing commands", () => {
       log.every((e) => /^(before|input):(insertText|deleteContentBackward|insertParagraph)$/.test(e)),
       log.join(),
     ).toBe(true);
+  });
+
+  it("o on a bare text line above a <div> (Gmail's compose body) opens a line, and typing lands on it (#67)", async () => {
+    const { host } = open("one<div>two</div>");
+    await keys("o");
+    typeNatively("new");
+    await keydown("Escape");
+    // innerText reads a line more here than renders (projection-innertext.test.ts).
+    expect(project(host).text).toBe("one\nnew\ntwo");
+    expect(statusText()).not.toContain("refused");
+    await keys("dd");
+    expect(project(host).text).toBe("one\ntwo");
   });
 
   it("o and O open new blocks; a linewise p adds one", async () => {

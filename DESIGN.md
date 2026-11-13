@@ -151,10 +151,12 @@ primary range is highlighted.
   which is the oracle where a case is ambiguous: a block-level computed `display` boundary,
   a `<br>` (not the trailing placeholder `<br>` of an empty block), a `\n` in
   `white-space: pre*` text; table cells in a row are joined by a tab; collapsed whitespace
-  projects as rendered. Formatting is not in the projection. Two departures from `innerText`,
+  projects as rendered. Formatting is not in the projection. Three departures from `innerText`,
   where it is not what renders: each block is one line (`innerText` puts a blank line on each
-  side of a `<p>`), and a break that ends its block (`<div>a<br></div>`,
-  a trailing `\n` in `pre`) makes no line of its own (docs/engine-seams.md "innerText as the oracle").
+  side of a `<p>`), a break that ends its block (`<div>a<br></div>`,
+  a trailing `\n` in `pre`) makes no line of its own, and a `<br>` in front of a nested block is
+  an empty line when alone on its line and no line after text (`innerText` reads one more for
+  each) (docs/engine-seams.md "innerText as the oracle").
   A zero-width no-break space (U+FEFF, Slate's placeholder in an empty leaf) is nothing
   (docs/engine-seams.md "Zero-width no-break space").
 - _Atoms_: a mention chip, an inline image, a `contenteditable="false"` island projects as

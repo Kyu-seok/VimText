@@ -150,6 +150,8 @@ interface HeldBreak {
   kind: "node" | "text";
   from: DomPoint;
   to: DomPoint;
+  /** Nothing rendered before it on its line: it makes an empty line of its own. */
+  alone: boolean;
 }
 
 function indexIn(node: Node): number {
@@ -162,7 +164,9 @@ function indexIn(node: Node): number {
  * trailing boundaries and the boundaries between nested blocks collapse to
  * one. A `<br>`, or a `\n` where breaks are preserved, is held (`heldBreak`)
  * until content follows it in its block: one that ends its block renders no
- * line (the block's placeholder) and is never a break.
+ * line (the block's placeholder) and is never a break. One alone on its line
+ * in front of a nested block renders an empty line (`one<div><br><div>two`,
+ * #67), so a nested block opening keeps it as one.
  *
  * Collapsible whitespace renders as CSS lays it out: nothing at a line's
  * start, one space for a run (across inline elements too), nothing at a line's
@@ -226,7 +230,7 @@ class Walker {
   private textNode(node: Text): void {
     for (const run of runsOf(node)) {
       const at = { node, offset: run.at };
-      if (run.kind === "break") this.lineBreak({ kind: "text", from: at, to: { node, offset: run.at + 1 } });
+      if (run.kind === "break") this.lineBreak("text", at, { node, offset: run.at + 1 });
       else if (run.kind === "nothing") continue;
       else if (run.kind === "space") this.space(node, run);
       else this.chars(node, run);
@@ -251,12 +255,12 @@ class Walker {
   private br(el: Element): void {
     const i = indexIn(el);
     const parent = el.parentNode!;
-    this.lineBreak({ kind: "node", from: { node: parent, offset: i }, to: { node: parent, offset: i + 1 } });
+    this.lineBreak("node", { node: parent, offset: i }, { node: parent, offset: i + 1 });
   }
 
-  private lineBreak(held: HeldBreak): void {
+  private lineBreak(kind: HeldBreak["kind"], from: DomPoint, to: DomPoint): void {
     if (this.heldBreak) this.beforeContent();
-    this.heldBreak = held;
+    this.heldBreak = { kind, from, to, alone: this.lineStart };
     this.newLine();
   }
 
@@ -267,6 +271,12 @@ class Walker {
   }
 
   private block(el: Element): void {
+    const held = this.heldBreak;
+    if (held?.alone) {
+      // A break alone on its line before a nested block: an empty line, as rendered.
+      this.beforeContent(false);
+      this.push("line", "", held.from, held.to);
+    }
     this.heldBreak = null;
     this.newLine();
     this.breakPending = this.hasContent();

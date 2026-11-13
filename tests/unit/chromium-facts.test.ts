@@ -69,6 +69,13 @@ describe("Block merges and splits", () => {
     expect(el.innerHTML).toBe("<h1>head</h1><div><br></div>");
   });
 
+  it("insertParagraph at the end of a bare text line above a <div> nests the new line in front of that <div> (#67)", () => {
+    const el = host("one<div>two</div>");
+    caretAt(el.firstChild!, 3);
+    document.execCommand("insertParagraph");
+    expect(el.innerHTML).toBe("one<div><br><div>two</div></div>");
+  });
+
   it("deleting from one block's start to the next's moves the next block's first line into the first block's element", () => {
     const el = host("<p>one</p><div>third<br>fourth</div>");
     select(el.querySelector("p")!.firstChild!, 0, el.querySelector("div")!.firstChild!, 0);
@@ -124,6 +131,26 @@ describe("innerText as the oracle", () => {
   it("a heading gets no blank line of its own: between <div>s it reads one line, beside <p>s the <p>s' blank lines", () => {
     expect(host("<div>a</div><h1>b</h1><div>c</div>").innerText).toBe("a\nb\nc");
     expect(host("<p>a</p><h1>b</h1><p>c</p>").innerText).toBe("a\n\nb\n\nc");
+  });
+
+  it("a <br> before a nested block reads as a line more than renders: alone on its line one empty line, ending text none (#67)", () => {
+    const topOf = (html: string, last: string) => {
+      const el = host(html);
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      let text: Node | null;
+      while ((text = walker.nextNode()) && text.textContent !== last);
+      const range = document.createRange();
+      range.selectNodeContents(text!);
+      const top = range.getClientRects()[0]!.top - el.getBoundingClientRect().top;
+      el.remove();
+      return top;
+    };
+    expect(topOf("one<div><br><div>two</div></div>", "two")).toBe(
+      topOf("one<div>x</div><div>two</div>", "two"),
+    );
+    expect(topOf("<div>a<br><div>b</div></div>", "b")).toBe(topOf("<div>a</div><div>b</div>", "b"));
+    expect(host("one<div><br><div>two</div></div>").innerText).toBe("one\n\n\ntwo");
+    expect(host("<div>a<br><div>b</div></div>").innerText).toBe("a\n\nb");
   });
 
   it("a break that ends its block reads as a trailing newline", () => {
