@@ -80,6 +80,15 @@ describe("projection departs from innerText where innerText departs from the ren
     expect(project(host).text).toBe("title\none\ntwo");
   });
 
+  it("a <br> before a nested block: alone on its line it is an empty line, ending a line of text it is no line (#67)", () => {
+    // innerText adds a line for each (Chromium facts, "innerText as the oracle").
+    expect(editableHost("one<div><br><div>two</div></div>").innerText).toBe("one\n\n\ntwo");
+    expect(text("one<div><br><div>two</div></div>")).toBe("one\n\ntwo");
+    expect(text("<div><br><div>two</div></div>")).toBe("\ntwo");
+    expect(text("<div>a<br><div>b</div></div>")).toBe("a\nb");
+    expect(text("<div>x<br><br><div>b</div></div>")).toBe("x\n\nb");
+  });
+
   it("a break that ends its block renders no line, a <br> or a preserved \\n alike", () => {
     expect(text("<div>a<br></div><div>b</div>")).toBe("a\nb");
     expect(text("<pre>a\n</pre><div>b</div>")).toBe("a\nb");

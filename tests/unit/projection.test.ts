@@ -64,6 +64,14 @@ describe("projection text", () => {
     expect(text("<p>a\ufeffb\ufeff</p>")).toBe("ab");
   });
 
+  // Quill's cursor blot: Cmd+B on an empty line leaves a block holding only a
+  // U+FEFF, no <br>. It renders a line; read as no line, VimText's write could
+  // not put the caret on the line it had just made (Slack, #68).
+  it("a block holding only a zero-width no-break space is an empty line", () => {
+    expect(text("<p>one</p><p><span>\ufeff</span></p><p>three</p>")).toBe("one\n\nthree");
+    expect(text("<p>one</p><p><strong><span>\ufeff</span></strong></p>")).toBe("one\n");
+  });
+
   it("skips what is not rendered", () => {
     expect(text('<p>one<span style="display:none">hidden</span></p><p style="display:none">x</p>')).toBe(
       "one",

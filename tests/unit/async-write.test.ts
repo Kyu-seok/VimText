@@ -200,6 +200,32 @@ describe("A write judged once it has settled", () => {
   });
 });
 
+describe("A refused line break typed while a write is pending (#68)", () => {
+  it("drops only the line break: the text typed after it is written on the line, and the Status Line says so", async () => {
+    // Notion and Slack cancel a synthetic paragraph break and do nothing.
+    // `fast` is typed while that write is pending, as a person typing on does.
+    const { host, session } = open("<p>abc</p>");
+    let typed = false;
+    host.addEventListener("beforeinput", (e) => {
+      if (e.inputType !== "insertParagraph" && e.inputType !== "insertLineBreak") return;
+      e.preventDefault();
+      if (!typed) {
+        typed = true;
+        keys("fast");
+      }
+    });
+    keys("A");
+    keydown("Enter");
+    await session.settled();
+    expect(typed).toBe(true);
+    expect(blockTexts(host)).toEqual(["abcfast"]);
+    expect(statusText()).toContain(REFUSED);
+    keydown("Escape");
+    await session.settled();
+    expect(blockTexts(host)).toEqual(["abcfast"]);
+  });
+});
+
 describe("Keys pressed during a write the page then changes", () => {
   /** A smart-dash rule: the page turns "--" into an em dash a microtask after the edit is in. */
   function smartDashes(host: HTMLElement): void {

@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { Session } from "../../src/bridge/Session";
 import { TextareaField } from "../../src/field/TextareaField";
 import { Sessions } from "../../src/content/Sessions";
+import { project } from "../../src/field/projection";
 import {
   activeHost,
   blockTexts,
@@ -61,6 +62,61 @@ describe("Activation on a contenteditable host", () => {
     keydownOn(host.querySelector("b")!, "x");
     // The write lands asynchronously (ADR 0008).
     await expect.poll(() => blockTexts(host)[0]).toBe("he quick brown fox");
+  });
+
+  it("on a page root holding blocks marked contenteditable (Notion), Esc Activates the block with the caret and edits stay in it (#69)", async () => {
+    const port = controlledPort();
+    const sessions = new Sessions(document, port.port, location.origin);
+    cleanups.push(() => sessions.destroy());
+    port.arrive(settingsFor(null));
+    await settle();
+    const root = editableHost(
+      '<div id="a" contenteditable="true">alpha beta</div><div id="b" contenteditable="true">line one<br>line two<br>line three</div>',
+    );
+    const [a, b] = [document.getElementById("a")!, document.getElementById("b")!];
+    root.focus();
+    caretAt(b.lastChild!, 4);
+    expect(keydownOn(root, "Escape").defaultPrevented).toBe(true);
+    expect(statusText()).toContain("NORMAL");
+    for (const k of ["g", "g", "J"]) keydownOn(root, k);
+    await expect.poll(() => b.innerText).toBe("line one line two\nline three");
+    expect(a.innerText).toBe("alpha beta");
+    for (const k of ["g", "g", "k", "d", "d"]) keydownOn(root, k);
+    await expect.poll(() => b.innerText).toBe("line three");
+    expect(a.innerText).toBe("alpha beta");
+  });
+
+  it("on a Notion-like root, moving the caret to another block hides the Status Line of the one left; back in a block with a Session shows its own (#69)", async () => {
+    const port = controlledPort();
+    const sessions = new Sessions(document, port.port, location.origin);
+    cleanups.push(() => sessions.destroy());
+    port.arrive(settingsFor(null));
+    await settle();
+    const root = editableHost(
+      '<div id="a" contenteditable="true">alpha</div><div id="b" contenteditable="true">beta</div>',
+    );
+    const [a, b] = [document.getElementById("a")!, document.getElementById("b")!];
+    const visible = () =>
+      [...document.querySelectorAll<HTMLElement>("vimtext-status")].filter((h) => h.style.display !== "none")
+        .length;
+    root.focus();
+    caretAt(b.firstChild!, 0);
+    keydownOn(root, "Escape");
+    expect(visible()).toBe(1);
+    caretAt(a.firstChild!, 0);
+    await expect.poll(visible).toBe(0);
+    keydownOn(root, "Escape");
+    expect(visible()).toBe(1);
+    const shownIn = () =>
+      [...document.querySelectorAll<HTMLElement>("vimtext-status")].map((h) => h.style.display !== "none");
+    const aShown = shownIn();
+    caretAt(b.firstChild!, 0);
+    // a's bar hides and b's shows again: still one, but not the same one.
+    await expect.poll(() => shownIn().join()).not.toBe(aShown.join());
+    expect(visible()).toBe(1);
+    keydownOn(root, "x");
+    await expect.poll(() => b.innerText).toBe("eta");
+    expect(a.innerText).toBe("alpha");
   });
 
   it("the Session ends when the host stops being editable", async () => {
@@ -128,6 +184,18 @@ describe("Normal-mode edits go through editing commands", () => {
       log.every((e) => /^(before|input):(insertText|deleteContentBackward|insertParagraph)$/.test(e)),
       log.join(),
     ).toBe(true);
+  });
+
+  it("o on a bare text line above a <div> (Gmail's compose body) opens a line, and typing lands on it (#67)", async () => {
+    const { host } = open("one<div>two</div>");
+    await keys("o");
+    typeNatively("new");
+    await keydown("Escape");
+    // innerText reads a line more here than renders (projection-innertext.test.ts).
+    expect(project(host).text).toBe("one\nnew\ntwo");
+    expect(statusText()).not.toContain("refused");
+    await keys("dd");
+    expect(project(host).text).toBe("one\ntwo");
   });
 
   it("o and O open new blocks; a linewise p adds one", async () => {

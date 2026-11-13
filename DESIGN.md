@@ -141,8 +141,11 @@ primary range is highlighted.
 
 - _Which element_: the editing host, the outermost element whose `isContentEditable` is true
   and whose parent's is not (`contenteditable="true"` and `"plaintext-only"`). Non-editable
-  islands inside it are part of the Field. A page that makes every block its own host
-  (Notion) has one Field, Session and undo history per block.
+  islands inside it are part of the Field. An element inside the host that is itself marked
+  editable is its own Field, the innermost one around the caret winning (#69): Notion puts
+  every block, marked `contenteditable`, inside one editable page root that keeps focus, so a
+  key on the root resolves by the caret, and such a Field has focus while the root does and
+  the caret is in it. So Notion has one Field, Session and undo history per block.
 - _Single-line_: only when the host declares `aria-multiline="false"`; it then takes every
   Single-line Field rule (newline strip, rule 6, rule 7). No guessing from height or role. Adding or removing the
   attribute ends a Session on that host; the next Activation makes the Field of the new kind.
@@ -151,10 +154,12 @@ primary range is highlighted.
   which is the oracle where a case is ambiguous: a block-level computed `display` boundary,
   a `<br>` (not the trailing placeholder `<br>` of an empty block), a `\n` in
   `white-space: pre*` text; table cells in a row are joined by a tab; collapsed whitespace
-  projects as rendered. Formatting is not in the projection. Two departures from `innerText`,
+  projects as rendered. Formatting is not in the projection. Three departures from `innerText`,
   where it is not what renders: each block is one line (`innerText` puts a blank line on each
-  side of a `<p>`), and a break that ends its block (`<div>a<br></div>`,
-  a trailing `\n` in `pre`) makes no line of its own (docs/engine-seams.md "innerText as the oracle").
+  side of a `<p>`), a break that ends its block (`<div>a<br></div>`,
+  a trailing `\n` in `pre`) makes no line of its own, and a `<br>` in front of a nested block is
+  an empty line when alone on its line and no line after text (`innerText` reads one more for
+  each) (docs/engine-seams.md "innerText as the oracle").
   A zero-width no-break space (U+FEFF, Slate's placeholder in an empty leaf) is nothing
   (docs/engine-seams.md "Zero-width no-break space").
 - _Atoms_: a mention chip, an inline image, a `contenteditable="false"` island projects as
