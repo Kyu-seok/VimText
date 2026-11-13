@@ -773,7 +773,9 @@ export class Session {
    * silent no-op.
    */
   private dropRefusedChange(before: string): void {
-    const kept = this.mirror.vim.insertMode ? this.typedWithoutBreaks(before) : null;
+    // Esc may have landed before the write settled (keys typed back to back):
+    // the typing is kept in Normal too.
+    const kept = this.typedWithoutBreaks(before);
     this.withSyncing(() => {
       if (this.mirror.vim.insertMode) {
         this.syncFromFieldInner(true);
@@ -788,7 +790,9 @@ export class Session {
       const d = diffText(before, kept.text);
       this.mirror.view.dispatch({
         changes: { from: d.start, to: d.endOld, insert: kept.text.slice(d.start, d.endNew) },
-        selection: EditorSelection.cursor(kept.cursor),
+        selection: EditorSelection.cursor(
+          this.mirror.vim.insertMode ? kept.cursor : Math.max(d.start, kept.cursor - 1),
+        ),
         userEvent: "input.type.compose",
       });
     }
