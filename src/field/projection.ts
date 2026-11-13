@@ -183,9 +183,12 @@ class Walker {
   private lineStart = true;
   /** Per open block, innermost last: whether it has projected anything yet. */
   private readonly blockHasContent: boolean[] = [];
+  /** Per open block, innermost last: whether it holds a zero-width no-break space, which reads as nothing but gives an empty block its line. */
+  private readonly blockHasZeroWidth: boolean[] = [];
 
   walkHost(host: Element): string {
     this.blockHasContent.push(false);
+    this.blockHasZeroWidth.push(false);
     for (const child of host.childNodes) this.walk(child);
     return this.text;
   }
@@ -231,7 +234,7 @@ class Walker {
     for (const run of runsOf(node)) {
       const at = { node, offset: run.at };
       if (run.kind === "break") this.lineBreak("text", at, { node, offset: run.at + 1 });
-      else if (run.kind === "nothing") continue;
+      else if (run.kind === "nothing") this.blockHasZeroWidth[this.blockHasZeroWidth.length - 1] = true;
       else if (run.kind === "space") this.space(node, run);
       else this.chars(node, run);
     }
@@ -281,14 +284,17 @@ class Walker {
     this.newLine();
     this.breakPending = this.hasContent();
     this.blockHasContent.push(false);
+    this.blockHasZeroWidth.push(false);
     for (const child of el.childNodes) this.walk(child);
     const hadContent = this.blockHasContent.pop()!;
-    if (!hadContent && this.heldBreak) {
-      // An empty block holding its placeholder <br>: an empty line, as rendered.
+    const zeroWidth = this.blockHasZeroWidth.pop()!;
+    if (!hadContent && (this.heldBreak || zeroWidth)) {
+      // An empty block holding its placeholder <br>, or only a U+FEFF (Quill's
+      // cursor blot, #68): an empty line, as rendered.
       this.beforeContent(false);
       this.push("line", "", { node: el, offset: 0 }, { node: el, offset: el.childNodes.length });
     }
-    if (hadContent || this.heldBreak) this.markContent();
+    if (hadContent || this.heldBreak || zeroWidth) this.markContent();
     this.heldBreak = null;
     this.newLine();
     this.breakPending = this.hasContent();
@@ -308,8 +314,10 @@ class Walker {
     }
     this.newLine();
     this.blockHasContent.push(false);
+    this.blockHasZeroWidth.push(false);
     for (const child of el.childNodes) this.walk(child);
     const hadContent = this.blockHasContent.pop()!;
+    this.blockHasZeroWidth.pop();
     this.heldBreak = null;
     if (!hadContent) {
       this.beforeContent();
