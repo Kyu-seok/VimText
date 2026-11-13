@@ -1,7 +1,7 @@
 # VimText
 
 - Design and milestones: `DESIGN.md`. Vocabulary: `GLOSSARY.md` (use its terms). Decisions: `docs/adr/`.
-- Before touching `src/bridge`, `src/engine` or `src/plugins`, read `docs/engine-seams.md`: it caches the engine gotchas the bridge and the Plugins depend on.
+- Before touching `src/bridge`, `src/engine`, `src/field` or `src/plugins`, read `docs/engine-seams.md`: it caches the engine and editor gotchas the bridge, the Fields' write path and the Plugins depend on.
 - Reviewing a diff: `CODING_STANDARDS.md`.
 - One gate: `npm run check` (typecheck, import check, unused-code check, unit tests in Chromium, build, e2e against the built extension).
 - A fresh clone or worktree gets `npm ci` first: it installs the git hooks (pre-commit runs the fast checks, pre-push runs the gate). Without it git skips them silently.
