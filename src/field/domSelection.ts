@@ -12,7 +12,7 @@ import type { DomPoint } from "./projection";
  */
 
 /** The Selection that reports positions inside `host`'s tree. */
-function selectionFor(host: Element): Selection | null {
+export function selectionFor(host: Element): Selection | null {
   const root = host.getRootNode();
   if (!(root instanceof ShadowRoot)) return document.getSelection();
   const shadow = root as ShadowRoot & { getSelection?: () => Selection | null };

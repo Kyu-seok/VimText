@@ -15,7 +15,7 @@ import {
   typeNatively,
 } from "./contenteditable";
 import { settledKeyDriver } from "./keys";
-import { hostCount, keydown as keydownOn, settle, statusText } from "./dom";
+import { hostCount, keydown as keydownOn, settle, shownStatusBars, statusText } from "./dom";
 import { controlledPort, settingsFor } from "./settings-port";
 
 /**
@@ -97,9 +97,7 @@ describe("Activation on a contenteditable host", () => {
       '<div id="a" contenteditable="true">alpha</div><div id="b" contenteditable="true">beta</div>',
     );
     const [a, b] = [document.getElementById("a")!, document.getElementById("b")!];
-    const visible = () =>
-      [...document.querySelectorAll<HTMLElement>("vimtext-status")].filter((h) => h.style.display !== "none")
-        .length;
+    const visible = () => shownStatusBars().filter(Boolean).length;
     root.focus();
     caretAt(b.firstChild!, 0);
     keydownOn(root, "Escape");
@@ -108,8 +106,7 @@ describe("Activation on a contenteditable host", () => {
     await expect.poll(visible).toBe(0);
     keydownOn(root, "Escape");
     expect(visible()).toBe(1);
-    const shownIn = () =>
-      [...document.querySelectorAll<HTMLElement>("vimtext-status")].map((h) => h.style.display !== "none");
+    const shownIn = shownStatusBars;
     const aShown = shownIn();
     caretAt(b.firstChild!, 0);
     // a's bar hides and b's shows again: still one, but not the same one.
@@ -137,8 +134,7 @@ describe("Activation on a contenteditable host", () => {
       for (const k of ["Escape", ...enter]) keydownOn(root, k);
       return { root, a, b };
     }
-    const shown = () =>
-      [...document.querySelectorAll<HTMLElement>("vimtext-status")].some((h) => h.style.display !== "none");
+    const shown = () => shownStatusBars().some(Boolean);
 
     /** Moves the caret to `a`, checks the bar hides and `a` is untouched, then puts it back in `b` at offset 5. */
     async function leaveAndReturn(a: HTMLElement, b: HTMLElement) {

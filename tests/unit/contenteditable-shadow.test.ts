@@ -10,7 +10,7 @@ import {
   typeNatively,
 } from "./contenteditable";
 import { settledKeyDriver } from "./keys";
-import { hostCount, keydown as keydownOn, settle, statusText } from "./dom";
+import { hostCount, keydown as keydownOn, settle, shownStatusBars, statusText } from "./dom";
 import { controlledPort, settingsFor } from "./settings-port";
 
 /**
@@ -146,8 +146,7 @@ describe("a contenteditable host in a custom element, through the content entry"
       { parent: shadow },
     );
     const [a, b] = [shadow.getElementById("a")!, shadow.getElementById("b")!];
-    const shown = () =>
-      [...document.querySelectorAll<HTMLElement>("vimtext-status")].some((h) => h.style.display !== "none");
+    const shown = () => shownStatusBars().some(Boolean);
     root.focus();
     selectionOf(shadow).collapse(b.firstChild!, 0);
     expect(keydownOn(root, "Escape").defaultPrevented).toBe(true);
