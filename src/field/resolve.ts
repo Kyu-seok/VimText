@@ -1,6 +1,7 @@
 import type { Field, TextControl } from "./Field";
 import { TextareaField } from "./TextareaField";
 import { ContentEditableField } from "./ContentEditableField";
+import { selectionFor } from "./domSelection";
 
 /**
  * An element that is a Field, and how to make its Field. `element` is the
@@ -54,9 +55,7 @@ function marksEditable(el: Element): el is HTMLElement {
 
 /** The Selection that reports positions inside `host`'s tree (see `domSelection.ts`). */
 function selectionNodeIn(host: HTMLElement): Node | null {
-  const root = host.getRootNode() as Document | (ShadowRoot & { getSelection?: () => Selection | null });
-  const sel = root.getSelection ? root.getSelection() : document.getSelection();
-  const node = sel?.anchorNode ?? null;
+  const node = selectionFor(host)?.anchorNode ?? null;
   return node && host.contains(node) && node !== host ? node : null;
 }
 

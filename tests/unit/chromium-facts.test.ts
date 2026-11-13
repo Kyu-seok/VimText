@@ -163,6 +163,13 @@ describe("Zero-width no-break space", () => {
     expect(host("<div>a﻿b</div>").innerText).toBe("a﻿b");
     expect(host("<div>﻿<br></div>").innerText).toBe("﻿\n");
   });
+  it("a block holding only a U+FEFF and no <br> renders a line, while an empty block renders none (#68)", () => {
+    const el = host("<div>a</div><div>﻿</div><div></div>");
+    const [text, zw, empty] = [...el.children].map((c) => c.getBoundingClientRect().height);
+    expect(zw).toBeGreaterThan(0);
+    expect(zw).toBe(text);
+    expect(empty).toBe(0);
+  });
 });
 
 describe("Whitespace in the offset map", () => {
@@ -246,6 +253,30 @@ describe("Atoms under editing", () => {
 });
 
 describe("Selection and focus", () => {
+  /** An editable root holding a block itself marked editable, as Notion's page holds its blocks (#69). */
+  function nested(): { root: HTMLElement; block: HTMLElement } {
+    const root = host('<div>title</div><div id="block" contenteditable="true">body</div>');
+    return { root, block: root.querySelector<HTMLElement>("#block")! };
+  }
+
+  it("a nested editable is never focused itself: focus() on it does nothing, the root focused or not", () => {
+    const { root, block } = nested();
+    block.focus();
+    expect(document.activeElement).toBe(root);
+    root.blur();
+    block.focus();
+    expect(document.activeElement).toBe(document.body);
+    expect(block.matches(":focus")).toBe(false);
+  });
+
+  it("an editable root keeps focus while the caret is in a nested editable", () => {
+    const { root, block } = nested();
+    caretAt(block.firstChild!, 2);
+    expect(document.activeElement).toBe(root);
+    expect(root.matches(":focus")).toBe(true);
+    expect(getSelection()!.anchorNode).toBe(block.firstChild);
+  });
+
   it("setting a selection inside a blurred host focuses it", () => {
     const el = host("<p>hello</p>");
     el.blur();

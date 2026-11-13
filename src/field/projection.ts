@@ -151,7 +151,7 @@ interface HeldBreak {
   from: DomPoint;
   to: DomPoint;
   /** Nothing rendered before it on its line: it makes an empty line of its own. */
-  alone: boolean;
+  startsLine: boolean;
 }
 
 function indexIn(node: Node): number {
@@ -263,7 +263,7 @@ class Walker {
 
   private lineBreak(kind: HeldBreak["kind"], from: DomPoint, to: DomPoint): void {
     if (this.heldBreak) this.beforeContent();
-    this.heldBreak = { kind, from, to, alone: this.lineStart };
+    this.heldBreak = { kind, from, to, startsLine: this.lineStart };
     this.newLine();
   }
 
@@ -275,7 +275,7 @@ class Walker {
 
   private block(el: Element): void {
     const held = this.heldBreak;
-    if (held?.alone) {
+    if (held?.startsLine) {
       // A break alone on its line before a nested block: an empty line, as rendered.
       this.beforeContent(false);
       this.push("line", "", held.from, held.to);

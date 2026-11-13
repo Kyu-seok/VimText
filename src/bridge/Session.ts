@@ -1,4 +1,4 @@
-import { ChangeSet, EditorSelection, type Text } from "@codemirror/state";
+import { ChangeSet, EditorSelection, Text } from "@codemirror/state";
 import type { Field } from "../field/Field";
 import { diffText } from "../field/diff";
 import { ATOM_CHAR } from "../field/atoms";
@@ -119,6 +119,17 @@ function defineExCommands(): void {
  * One activated Field: owns the mirror, routes keys by Mode, keeps the Field
  * and the mirror in sync, and renders the engine's cursor into the Field.
  */
+/**
+ * Where the mirror stood at a point the Field may agree on: its undo depth,
+ * its `commandChanges`, and the changes made to its text since, kept while the
+ * point is open (null once they could not be kept).
+ */
+interface AgreedPoint {
+  readonly depth: number;
+  readonly commandChanges: number;
+  since: ChangeSet | null;
+}
+
 export class Session {
   readonly mirror: Mirror;
   readonly status: StatusLine;
@@ -137,8 +148,17 @@ export class Session {
   private lastRendered: { anchor: number; head: number } | null = null;
   /** The Field text the bridge last wrote or agreed with; anything else means the page changed the Field. */
   private lastText: string | null = null;
-  /** The mirror's undo depth when `lastText` was last agreed: a refused edit undoes back to it. */
-  private agreedDepth = 0;
+  /** Where the mirror stood when `lastText` was last agreed: a refused edit undoes back to it. */
+  private agreed: AgreedPoint = { depth: 0, commandChanges: 0, since: null };
+  /** The points whose `since` takes each mirror change: the agreed one, and a pending write's. */
+  private readonly openPoints = new Set<AgreedPoint>();
+  /**
+   * How many mirror text changes were made outside an Insert session (Insert
+   * or Replace): Normal and Visual commands, `o`'s new line before Insert
+   * begins, pastes, the page's rewrites. Typing, and the Insert keys the
+   * engine runs (Ctrl-w, a counted insert's repeats at Esc), are not counted.
+   */
+  private commandChanges = 0;
   /**
    * A contenteditable write in flight (ADR 0008), until it has settled and
    * been judged. The Field is VimText's own until then: it is not read back.
@@ -174,11 +194,13 @@ export class Session {
     (this.mirror.cm.state as any).vimtextSession = this;
     this.mirror.cm.on("vim-mode-change", this.onModeChange);
     this.mirror.cm.on("dialog", this.onDialogChange);
-    this.mirror.onUpdate((docChanged, selectionSet) => {
+    this.mirror.onUpdate((docChanged, selectionSet, changes) => {
+      if (docChanged) this.logChanges(changes);
       // Ex commands typed into the command line (:s, :g, :sort, …) and the
       // engine's own async work change the mirror outside handleKeydown.
       if (this.syncing || !(docChanged || selectionSet)) return;
       if (docChanged) this.queuedDocChange = true;
+      if (docChanged && !this.inInsertSession()) this.commandChanges++;
       this.scheduleRender();
     });
     this.stopInput = field.onInput(this.onFieldInput);
@@ -191,6 +213,37 @@ export class Session {
   /** The engine has no Command-line mode of its own: it is the `:` `/` `?` input being open. */
   get mode(): Mode {
     return this.mirror.commandLineOpen() ? "command-line" : this.mirror.mode;
+  }
+
+  /** Whether the engine is in an Insert session: Insert or Replace, by the Mode it last announced. */
+  private inInsertSession(): boolean {
+    const mode = this.mirror.mode;
+    return mode === "insert" || mode === "replace";
+  }
+
+  /** Where the mirror stands now, a point open to its changes from here on. */
+  private here(): AgreedPoint {
+    const point: AgreedPoint = {
+      depth: this.mirror.undoDepth(),
+      commandChanges: this.commandChanges,
+      since: ChangeSet.empty(this.mirror.view.state.doc.length),
+    };
+    this.openPoints.add(point);
+    return point;
+  }
+
+  /** `point` is now the agreed one; the one it replaces takes no more changes. */
+  private agreeOn(point: AgreedPoint): void {
+    if (this.agreed !== point) this.openPoints.delete(this.agreed);
+    this.agreed = point;
+  }
+
+  /** Adds a mirror change to each open point's `since`. */
+  private logChanges(changes: ChangeSet): void {
+    for (const point of this.openPoints) {
+      // A change the log did not see (its length tells) leaves it unusable.
+      point.since = point.since?.newLength === changes.length ? point.since.compose(changes) : null;
+    }
   }
 
   private get nativeInsert(): boolean {
@@ -571,7 +624,7 @@ export class Session {
         selection: EditorSelection.cursor(insert ? head : clipToLine(newDoc, head)),
         userEvent,
       });
-      this.agreedDepth = this.mirror.undoDepth();
+      this.agreeOn(this.here());
       return;
     }
 
@@ -658,10 +711,10 @@ export class Session {
     const text = this.mirror.view.state.doc.toString();
     const before = this.field.getValue();
     if (text !== before) {
-      const depth = this.mirror.undoDepth();
+      const writtenAt = this.here();
       const write = this.field.setValue(text);
       if (write) {
-        const settled = () => this.writeSettled(before, text, depth);
+        const settled = () => this.writeSettled(before, text, writtenAt);
         this.pendingWrite = write.then(settled, (err: unknown) => {
           console.error("VimText write error", err);
           settled();
@@ -670,24 +723,25 @@ export class Session {
       }
       this.judgeWrite(before, text);
     }
-    this.finishRender(this.mirror.undoDepth());
+    this.finishRender(this.here());
   }
 
   /**
    * The asynchronous write of `text` over `before` has settled: it is judged
    * now, against the Field as it stands, and the render that came due
    * meanwhile writes what the keys pressed since made of the mirror. A Session
-   * destroyed meanwhile judges nothing. `depth` is the mirror's undo depth
-   * the written text stood for.
+   * destroyed meanwhile judges nothing. `writtenAt` is where the mirror stood
+   * when `text` was written.
    */
-  private writeSettled(before: string, text: string, depth: number): void {
+  private writeSettled(before: string, text: string, writtenAt: AgreedPoint): void {
     this.pendingWrite = null;
     if (this.destroyed) return;
     const after = this.field.getValue();
     this.judgeWrite(before, text);
-    // Accepted as written: `text` is the agreed text, at the depth it was
+    // Accepted as written: `text` is the agreed text, at the point it was
     // written from; the keys pressed since are the merged render's change.
-    this.finishRender(after === text ? depth : this.mirror.undoDepth());
+    if (after !== text) this.openPoints.delete(writtenAt);
+    this.finishRender(after === text ? writtenAt : this.here());
     if (this.renderDue) {
       this.renderDue = false;
       this.render();
@@ -733,18 +787,18 @@ export class Session {
 
   /**
    * Lands the engine's cursor and records what the Field and the mirror now
-   * agree on, at undo depth `depth`. With a merged render due, the cursor is
+   * agree on, the mirror at `point`. With a merged render due, the cursor is
    * left to it: the mirror's cursor is where the keys pressed during the write
    * put it, in text the Field does not hold yet, and an editor that takes the
    * selection into its model (Lexical) would apply the merged write there.
    */
-  private finishRender(depth: number): void {
+  private finishRender(point: AgreedPoint): void {
     const sel = this.renderedSelection();
     if (!this.renderDue) this.field.setSelection(sel.anchor, sel.head);
     this.lastRendered = this.field.getSelection();
     this.lastText = this.field.getValue();
     this.readAtoms();
-    this.agreedDepth = depth;
+    this.agreeOn(point);
     this.status.setMode(this.mode);
     this.status.reposition();
   }
@@ -773,13 +827,15 @@ export class Session {
    * silent no-op.
    */
   private dropRefusedChange(before: string): void {
-    const kept = this.mirror.vim.insertMode ? this.typedWithoutBreaks(before) : null;
+    // Esc may have landed before the write settled (keys typed back to back):
+    // the typing is kept in Normal too.
+    const kept = this.typedWithoutBreaks(before);
     this.withSyncing(() => {
       if (this.mirror.vim.insertMode) {
         this.syncFromFieldInner(true);
         return;
       }
-      this.mirror.takeBackSince(this.agreedDepth, this.field.getValue());
+      this.mirror.takeBackSince(this.agreed.depth, this.field.getValue());
     });
     // The person's typing outlives a refused line break (#68): a page that
     // refuses a synthetic paragraph break (Notion, Slack) takes plain text, so
@@ -788,7 +844,9 @@ export class Session {
       const d = diffText(before, kept.text);
       this.mirror.view.dispatch({
         changes: { from: d.start, to: d.endOld, insert: kept.text.slice(d.start, d.endNew) },
-        selection: EditorSelection.cursor(kept.cursor),
+        selection: EditorSelection.cursor(
+          this.mirror.vim.insertMode ? kept.cursor : Math.max(d.start, kept.cursor - 1),
+        ),
         userEvent: "input.type.compose",
       });
     }
@@ -798,16 +856,34 @@ export class Session {
   /**
    * What the mirror's Insert typing over `before` leaves without its line
    * breaks, and where the cursor goes; null when the typing held no break or
-   * nothing is left. A refused write that held no break is refused whole.
+   * nothing is left. A refused write that held no break is refused whole, and
+   * so is one holding a change made outside an Insert session (#73): a
+   * refused `u` of `J`, `o`'s new line, a linewise `p` keep nothing.
    */
   private typedWithoutBreaks(before: string): { text: string; cursor: number } | null {
-    const now = this.mirror.view.state.doc.toString();
-    const d = diffText(before, now);
-    const inserted = now.slice(d.start, d.endNew);
-    if (!inserted.includes("\n")) return null;
-    const flat = inserted.replace(/\n/g, "");
-    const text = before.slice(0, d.start) + flat + before.slice(d.endOld);
-    return text === before ? null : { text, cursor: d.start + flat.length };
+    const since = this.agreed.since;
+    if (this.commandChanges !== this.agreed.commandChanges || !since || since.length !== before.length)
+      return null;
+    // The typing's own changes, where they were made: a diff of the texts
+    // cannot tell a typed break from one beside it (Enter at a line's end
+    // above an empty line).
+    const head = this.mirror.view.state.selection.main.head;
+    let breaks = false;
+    let cursor = head;
+    const flat: { from: number; to: number; insert: string }[] = [];
+    since.iterChanges((fromA, toA, fromB, _toB, inserted) => {
+      const typed = inserted.toString();
+      for (let i = typed.indexOf("\n"); i >= 0; i = typed.indexOf("\n", i + 1)) {
+        breaks = true;
+        if (fromB + i < head) cursor--;
+      }
+      flat.push({ from: fromA, to: toA, insert: typed.replace(/\n/g, "") });
+    });
+    if (!breaks) return null;
+    const text = ChangeSet.of(flat, before.length)
+      .apply(Text.of(before.split("\n")))
+      .toString();
+    return text === before ? null : { text, cursor };
   }
 
   onFocus(): void {

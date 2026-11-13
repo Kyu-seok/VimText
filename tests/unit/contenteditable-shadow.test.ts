@@ -10,7 +10,7 @@ import {
   typeNatively,
 } from "./contenteditable";
 import { settledKeyDriver } from "./keys";
-import { hostCount, keydown as keydownOn, settle, statusText } from "./dom";
+import { hostCount, keydown as keydownOn, settle, shownStatusBars, statusText } from "./dom";
 import { controlledPort, settingsFor } from "./settings-port";
 
 /**
@@ -97,6 +97,20 @@ describe("a contenteditable host in an open shadow root", () => {
   });
 });
 
+describe("a refused edit in an open shadow root (#73)", () => {
+  it("a refused u of J leaves the joined line as it is", async () => {
+    const { host } = open("<p>a</p><p>b</p>");
+    host.addEventListener("beforeinput", (e) => {
+      if (e.inputType === "insertParagraph" || e.inputType === "insertLineBreak") e.preventDefault();
+    });
+    await keys("J");
+    await expect.poll(() => blockTexts(host)).toEqual(["a b"]);
+    await keys("u");
+    await expect.poll(statusText).toContain("refused the edit");
+    expect(blockTexts(host)).toEqual(["a b"]);
+  });
+});
+
 /** A web component whose open shadow root holds a contenteditable editor. */
 class ShadowEditor extends HTMLElement {
   constructor() {
@@ -130,6 +144,34 @@ describe("a contenteditable host in a custom element, through the content entry"
     keydownOn(host.querySelector("p")!, "x");
     // The write lands asynchronously (ADR 0008).
     await expect.poll(() => blockTexts(host)).toEqual(["ne", "two"]);
+  });
+
+  it("on a Notion-like root in the shadow tree, the caret moving to another block hides the Status Line, and back the block's Session edits it (#69)", async () => {
+    const port = controlledPort();
+    const sessions = new Sessions(document, port.port, location.origin);
+    cleanups.push(() => sessions.destroy());
+    port.arrive(settingsFor(null));
+    await settle();
+    component = document.createElement("vimtext-test-editor");
+    document.body.appendChild(component);
+    const shadow = component.shadowRoot!;
+    const root = editableHost(
+      '<div id="a" contenteditable="true">alpha</div><div id="b" contenteditable="true">beta</div>',
+      { parent: shadow },
+    );
+    const [a, b] = [shadow.getElementById("a")!, shadow.getElementById("b")!];
+    const shown = () => shownStatusBars().some(Boolean);
+    root.focus();
+    selectionOf(shadow).collapse(b.firstChild!, 0);
+    expect(keydownOn(root, "Escape").defaultPrevented).toBe(true);
+    expect(shown()).toBe(true);
+    selectionOf(shadow).collapse(a.firstChild!, 0);
+    await expect.poll(shown).toBe(false);
+    selectionOf(shadow).collapse(b.firstChild!, 0);
+    await expect.poll(shown).toBe(true);
+    keydownOn(root, "x");
+    await expect.poll(() => b.innerText).toBe("eta");
+    expect(a.innerText).toBe("alpha");
   });
 
   it("removing the custom element disposes the Session", async () => {

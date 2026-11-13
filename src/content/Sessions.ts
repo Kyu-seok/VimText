@@ -87,7 +87,10 @@ export class Sessions {
    * The Field the caret was last seen in. A Field nested in an editable root
    * (a Notion block, #69) is left and entered with no focus event, the root
    * keeping focus: a key or a selection change resolving to another Field
-   * blurs this one's Session and focuses that one's (`caretIn`).
+   * blurs this one's Session and focuses that one's (`caretIn`). Covered in
+   * every mode by `tests/unit/contenteditable-session.test.ts`, "on a
+   * Notion-like root, the caret leaving a block and coming back in each mode",
+   * and in an open shadow root by `tests/unit/contenteditable-shadow.test.ts`.
    */
   private caretField: HTMLElement | null = null;
   private readonly stateSync: SessionStateSync | null;

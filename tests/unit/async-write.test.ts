@@ -226,6 +226,100 @@ describe("A refused line break typed while a write is pending (#68)", () => {
   });
 });
 
+describe("A refused line break, then Insert keys the engine runs (#73)", () => {
+  /** Opens `html` on a page that cancels a paragraph break and, the first time, presses `then` while that write is pending. */
+  function refusingOnce(html: string, then: () => void) {
+    const opened = open(html);
+    let pressed = false;
+    opened.host.addEventListener("beforeinput", (e) => {
+      if (e.inputType !== "insertParagraph" && e.inputType !== "insertLineBreak") return;
+      e.preventDefault();
+      if (!pressed) {
+        pressed = true;
+        then();
+      }
+    });
+    return opened;
+  }
+
+  it("Ctrl-w typed after the refused break still keeps the typing on the line", async () => {
+    const { host, session } = refusingOnce("<p>abc</p>", () => {
+      keys("fast wo");
+      keydown("w", { ctrlKey: true });
+    });
+    keys("A");
+    keydown("Enter");
+    await session.settled();
+    expect(blockTexts(host)).toEqual(["abcfast "]);
+    expect(statusText()).toContain(REFUSED);
+  });
+
+  it("in Replace, an Enter pressed during a pending write is the page's own key, never written, so never refused", async () => {
+    const { host, session } = refusingOnce("<p>abcd</p>", () => {});
+    keys("xR");
+    expect(keydown("Enter").defaultPrevented).toBe(false);
+    await session.settled();
+    expect(blockTexts(host)).toEqual(["bcd"]);
+    expect(statusText()).not.toContain(REFUSED);
+  });
+
+  it("a refused break typed at the end of a line above an empty line keeps the typing on that line, and the empty line", async () => {
+    const { host, session } = refusingOnce("<p>abc</p><p><br></p>", () => keys("one"));
+    keys("A");
+    keydown("Enter");
+    await session.settled();
+    expect(blockTexts(host)).toEqual(["abcone", ""]);
+    expect(statusText()).toContain(REFUSED);
+  });
+
+  it("a counted insert whose break is refused keeps every repeat's typing on the line", async () => {
+    const { host, session } = refusingOnce("<p>abc</p>", () => {
+      keys("x");
+      keydown("Escape");
+    });
+    keys("2A");
+    keydown("Enter");
+    await session.settled();
+    expect(blockTexts(host)).toEqual(["abcxx"]);
+    expect(statusText()).toContain(REFUSED);
+  });
+});
+
+describe("A refused line break no one typed (#73)", () => {
+  /** Opens `html` on a page that cancels every paragraph or line break, as Notion does. */
+  function refusingBreaks(html: string) {
+    const opened = open(html);
+    opened.host.addEventListener("beforeinput", (e) => {
+      if (e.inputType === "insertParagraph" || e.inputType === "insertLineBreak") e.preventDefault();
+    });
+    return opened;
+  }
+
+  it("a refused u of J leaves the joined line as it is", async () => {
+    const { host } = refusingBreaks("<p>a</p><p>b</p>");
+    await settledKeys("J");
+    expect(blockTexts(host)).toEqual(["a b"]);
+    await settledKeys("u");
+    expect(blockTexts(host)).toEqual(["a b"]);
+    expect(statusText()).toContain(REFUSED);
+  });
+
+  it("a refused o drops the line it opened, and the text typed on it, refused whole", async () => {
+    const { host, session } = refusingBreaks("<p>one</p><p>two</p>");
+    keys("ox"); // `x` is typed while the `o` write is pending
+    await session.settled();
+    expect(blockTexts(host)).toEqual(["one", "two"]);
+    expect(statusText()).toContain(REFUSED);
+  });
+
+  it("a refused linewise p leaves the lines as they are", async () => {
+    const { host } = refusingBreaks("<p>one</p><p>two</p>");
+    await settledKeys("yyp");
+    expect(blockTexts(host)).toEqual(["one", "two"]);
+    expect(statusText()).toContain(REFUSED);
+  });
+});
+
 describe("Keys pressed during a write the page then changes", () => {
   /** A smart-dash rule: the page turns "--" into an em dash a microtask after the edit is in. */
   function smartDashes(host: HTMLElement): void {

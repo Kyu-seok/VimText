@@ -79,14 +79,19 @@ never arriving and a form that cannot be submitted or left. Sign-ins are the use
 **On each site,** in the rich editor named below, with the console open, after the steps above
 (a contenteditable has no `.value`: read the box's `innerText`, and after each step type one
 real character in Insert and delete it, to show the edit survived the editor's next render,
-since an edit the editor's model never took comes back on its next render):
+since an edit the editor's model never took comes back on its next render; that check is an
+undo step of its own, so a `u` goes before it):
 
 1. Line-wise: `o` a new line, `dd` it, `J` two lines, `u` and Ctrl-r each.
 2. Inside a bold or italic run (make one with the site's own shortcut): `cw`, `x`, `r`; the run stays.
 3. A count and repeat: `3x`, then `.`.
 4. Insert-mode Enter, or Cmd/Ctrl+Enter where the site sends with it, still sends (or makes a
    new line where Enter does), with VimText Active.
-5. Esc, then `:q`: the editor keeps its text and the page takes focus back.
+5. From Insert, one Esc, then `:q`: the editor keeps its text and the page takes focus back. A
+   second Esc in Normal reaches the page (DESIGN.md "Key Policy" row 5), and Gmail closes its
+   compose window on it.
+6. Keys back to back: `G A`, Enter, a word, Esc with no pause between them. The word is kept.
+   Reading the page between those keys hides a loss there (#68).
 
 **Which editor, per site** (record the library if the DOM shows it):
 
@@ -97,11 +102,28 @@ since an edit the editor's model never took comes back on its next render):
 - **Slack**: the message box; a DM to yourself. Enter sends.
 - **GitHub**: an issue or PR comment's rich editor if one is offered; otherwise the
   `<textarea>`, and say so.
-- **Notion**: a page with several blocks. Each block is its own Field (an accepted M4
-  limitation): check `j`/`k` stay inside a block and nothing is lost crossing blocks with the mouse.
+- **Notion**: a scratch page with several blocks, one of them several lines (Shift+Enter),
+  moved to trash afterwards. Notion holds every block, each marked `contenteditable`, inside one
+  editable page root that keeps focus; each block is its own Field (#69, an accepted M4
+  limitation): check `j`/`k` stay inside a block and nothing is lost crossing blocks with the
+  mouse. Notion refuses a line break VimText writes inside a block (#70).
 
-Record one comment per site on #56: site, editor library, each step's outcome, and the issue
-filed for any finding.
+Record one comment per site on the gate ticket: site, editor library, each step's outcome, and
+the issue filed for any finding. A finding the site's markup causes adds that markup to
+`tests/fixtures/site-shapes.html` and its steps to `tests/e2e/site-shapes.spec.ts`, so the gate
+catches it from then on.
+
+**A blocking finding** is fixed on its own branch with a regression test, passes `/code-review`
+against `main`, and merges with `Closes #<n>`. The pass then re-checks it live on the rebuilt
+extension, reloaded in `chrome://extensions`.
+
+**An agent driving the pass** (Claude in Chrome), beside the rules above: a write settles
+asynchronously (ADR 0008), so read the page half a second after a step. What the tool cannot
+do: Ctrl-r reaches Chrome as a reload, never the page, so the owner checks redo by hand;
+reddit.com is blocked; `app.notion.com` needs the owner to allow it in the extension first; a
+send or post (Slack's Enter, Gmail's and GitHub's Cmd+Enter) waits for the owner's go-ahead
+in chat. A confirm dialog stops the tool: discard Stack Overflow's draft with `window.confirm`
+stubbed.
 
 **No one at a signed-in browser** (the owner remote, #56): `npm run build`, then
 `npm run dogfood:demos [prosemirror|lexical|slate|quill]` runs these steps on the libraries'
