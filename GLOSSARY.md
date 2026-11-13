@@ -9,7 +9,7 @@ An editable element on a web page that VimText can attach to: a textarea, a sing
 _Avoid_: input, element, editor, box
 
 **contenteditable Field**:
-A Field that is one editing host: the outermost editable element of a rich-text region, such as Gmail's compose body or Stack Overflow's answer editor. Its text is its plain text, each block a line; regions marked non-editable inside it belong to it. A page that makes every block its own editing host (Notion) has one Field per block.
+A Field that is one editing host: the outermost editable element of a rich-text region, such as Gmail's compose body or Stack Overflow's answer editor. Its text is its plain text, each block a line; regions marked non-editable inside it belong to it. An element inside it that is itself marked editable is its own Field, the innermost one around the caret winning: Notion marks every block editable inside one editable page root, so it has one Field per block.
 _Avoid_: rich-text field, contenteditable region, editor
 
 **Atom**:
