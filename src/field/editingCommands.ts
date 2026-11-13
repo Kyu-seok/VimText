@@ -80,6 +80,10 @@ type Step = { command: "insertText"; text: string } | { command: "insertParagrap
  * later step waits on `pauses.step` (ADR 0008: the steps are spaced so the
  * editor catches up). Nothing more runs once a pause says stop.
  *
+ * A paragraph break that changed nothing in the host by the next step, nor
+ * within `BREAK_WAIT_MS` after, was refused: the write stops before the text
+ * after it.
+ *
  * Resolves false when the browser refused a command (no editable selection,
  * an editor that cancelled it) or the write stopped.
  */
@@ -102,18 +106,60 @@ export async function replaceDomRange(host: Element, edit: DomEdit, pauses: Paus
   });
   let ok = true;
   let written = 0;
+  let breakChanged: ((wait?: boolean) => Promise<boolean>) | null = null;
   for (const [i, step] of steps.entries()) {
     if (i > 0 && !(await pauses.step())) return false;
-    if (
-      steps[i - 1]?.command === "insertParagraph" &&
-      !(await placeCaret(host, caretAfter?.(written), pauses))
-    ) {
-      return false;
+    if (breakChanged) {
+      // A break the editor cancelled and never made (Notion): the text after
+      // it would join the line it was to open (#73). The write stops here.
+      if (!(await breakChanged())) return false;
+      if (!(await placeCaret(host, caretAfter?.(written), pauses))) return false;
     }
+    breakChanged = step.command === "insertParagraph" ? watchChanges(host) : null;
     ok = run(host, step) && ok;
     written += step.command === "insertText" ? step.text.length : 1;
   }
+  void breakChanged?.(false);
   return ok;
+}
+
+/**
+ * How long a paragraph break that has changed nothing in the host by the next
+ * step is still waited for. Slate makes a break it took over only when React
+ * renders, which can come more than the step's one task later
+ * (tests/e2e/slate.spec.ts, "o and linewise p"); Notion never makes one. Only
+ * a refused break, or a late one, waits.
+ */
+const BREAK_WAIT_MS = 100;
+
+/**
+ * Starts watching `host`'s DOM; the function returned tells whether anything
+ * in it changed since, waiting up to `BREAK_WAIT_MS` for a change when none
+ * has come yet (unless `wait` is false), and stops watching. A page that changes its DOM for its own
+ * reasons reads as changed: the check only ever lets a write on.
+ */
+function watchChanges(host: Element): (wait?: boolean) => Promise<boolean> {
+  let changed = false;
+  let onChange = (): void => {};
+  const observer = new MutationObserver(() => {
+    changed = true;
+    onChange();
+  });
+  observer.observe(host, { childList: true, characterData: true, subtree: true });
+  return async (wait = true) => {
+    if (observer.takeRecords().length) changed = true;
+    if (!changed && wait) {
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, BREAK_WAIT_MS);
+        onChange = () => {
+          clearTimeout(timer);
+          resolve();
+        };
+      });
+    }
+    observer.disconnect();
+    return changed;
+  };
 }
 
 /**

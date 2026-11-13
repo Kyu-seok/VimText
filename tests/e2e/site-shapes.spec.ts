@@ -129,4 +129,16 @@ test.describe("Notion page: blocks marked contenteditable inside one editable ro
     await expect.poll(async () => (await lines(page, "#n-two")).join("|")).toContain("fast");
     expect(await page.locator("#n-one").innerText()).toBe("alpha beta gamma");
   });
+
+  test("a refused u of J and a refused o keep no text no one typed (#73)", async ({ page }) => {
+    const JOINED = "line one line two\nline three";
+    await page.keyboard.type("kkkJ");
+    await expect.poll(() => page.locator("#n-two").innerText()).toBe(JOINED);
+    await page.keyboard.type("u");
+    await expect.poll(() => statusText(page)).toContain(REFUSED);
+    expect(await page.locator("#n-two").innerText()).toBe(JOINED);
+    await burst(page, ["o", "x", "Escape"]);
+    await expect.poll(() => statusText(page)).toContain(REFUSED);
+    expect(await page.locator("#n-two").innerText()).toBe(JOINED);
+  });
 });

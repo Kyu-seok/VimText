@@ -139,6 +139,12 @@ export class Session {
   private lastText: string | null = null;
   /** The mirror's undo depth when `lastText` was last agreed: a refused edit undoes back to it. */
   private agreedDepth = 0;
+  /** Set while Insert typing is dispatched into the mirror (`typeWhileWriting`). */
+  private typing = false;
+  /** How many mirror text changes were not Insert typing: engine commands, pastes, the page's rewrites. */
+  private untypedChanges = 0;
+  /** `untypedChanges` when `lastText` was last agreed: equal now, every change since was typed. */
+  private agreedUntyped = 0;
   /**
    * A contenteditable write in flight (ADR 0008), until it has settled and
    * been judged. The Field is VimText's own until then: it is not read back.
@@ -179,6 +185,7 @@ export class Session {
       // engine's own async work change the mirror outside handleKeydown.
       if (this.syncing || !(docChanged || selectionSet)) return;
       if (docChanged) this.queuedDocChange = true;
+      if (docChanged && !this.typing) this.untypedChanges++;
       this.scheduleRender();
     });
     this.stopInput = field.onInput(this.onFieldInput);
@@ -477,11 +484,16 @@ export class Session {
     const from = main.empty && !insert ? Math.max(0, main.from - 1) : main.from;
     const opensStep = this.firstInsertSync && !this.joinNextInsert;
     this.firstInsertSync = false;
-    view.dispatch({
-      changes: { from, to: main.to, insert },
-      selection: EditorSelection.cursor(from + insert.length),
-      userEvent: opensStep ? "input.type.compose.start" : "input.type.compose",
-    });
+    this.typing = true;
+    try {
+      view.dispatch({
+        changes: { from, to: main.to, insert },
+        selection: EditorSelection.cursor(from + insert.length),
+        userEvent: opensStep ? "input.type.compose.start" : "input.type.compose",
+      });
+    } finally {
+      this.typing = false;
+    }
   }
 
   private onFieldInput = (): void => {
@@ -572,6 +584,7 @@ export class Session {
         userEvent,
       });
       this.agreedDepth = this.mirror.undoDepth();
+      this.agreedUntyped = this.untypedChanges;
       return;
     }
 
@@ -659,9 +672,10 @@ export class Session {
     const before = this.field.getValue();
     if (text !== before) {
       const depth = this.mirror.undoDepth();
+      const untyped = this.untypedChanges;
       const write = this.field.setValue(text);
       if (write) {
-        const settled = () => this.writeSettled(before, text, depth);
+        const settled = () => this.writeSettled(before, text, depth, untyped);
         this.pendingWrite = write.then(settled, (err: unknown) => {
           console.error("VimText write error", err);
           settled();
@@ -670,24 +684,25 @@ export class Session {
       }
       this.judgeWrite(before, text);
     }
-    this.finishRender(this.mirror.undoDepth());
+    this.finishRender(this.mirror.undoDepth(), this.untypedChanges);
   }
 
   /**
    * The asynchronous write of `text` over `before` has settled: it is judged
    * now, against the Field as it stands, and the render that came due
    * meanwhile writes what the keys pressed since made of the mirror. A Session
-   * destroyed meanwhile judges nothing. `depth` is the mirror's undo depth
-   * the written text stood for.
+   * destroyed meanwhile judges nothing. `depth` and `untyped` are the
+   * mirror's undo depth and `untypedChanges` the written text stood for.
    */
-  private writeSettled(before: string, text: string, depth: number): void {
+  private writeSettled(before: string, text: string, depth: number, untyped: number): void {
     this.pendingWrite = null;
     if (this.destroyed) return;
     const after = this.field.getValue();
     this.judgeWrite(before, text);
     // Accepted as written: `text` is the agreed text, at the depth it was
     // written from; the keys pressed since are the merged render's change.
-    this.finishRender(after === text ? depth : this.mirror.undoDepth());
+    if (after === text) this.finishRender(depth, untyped);
+    else this.finishRender(this.mirror.undoDepth(), this.untypedChanges);
     if (this.renderDue) {
       this.renderDue = false;
       this.render();
@@ -733,18 +748,19 @@ export class Session {
 
   /**
    * Lands the engine's cursor and records what the Field and the mirror now
-   * agree on, at undo depth `depth`. With a merged render due, the cursor is
+   * agree on, at undo depth `depth` and `untypedChanges` count `untyped`. With a merged render due, the cursor is
    * left to it: the mirror's cursor is where the keys pressed during the write
    * put it, in text the Field does not hold yet, and an editor that takes the
    * selection into its model (Lexical) would apply the merged write there.
    */
-  private finishRender(depth: number): void {
+  private finishRender(depth: number, untyped: number): void {
     const sel = this.renderedSelection();
     if (!this.renderDue) this.field.setSelection(sel.anchor, sel.head);
     this.lastRendered = this.field.getSelection();
     this.lastText = this.field.getValue();
     this.readAtoms();
     this.agreedDepth = depth;
+    this.agreedUntyped = untyped;
     this.status.setMode(this.mode);
     this.status.reposition();
   }
@@ -805,6 +821,7 @@ export class Session {
    * nothing is left. A refused write that held no break is refused whole.
    */
   private typedWithoutBreaks(before: string): { text: string; cursor: number } | null {
+    if (this.untypedChanges !== this.agreedUntyped) return null;
     const now = this.mirror.view.state.doc.toString();
     const d = diffText(before, now);
     const inserted = now.slice(d.start, d.endNew);

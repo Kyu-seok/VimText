@@ -226,6 +226,41 @@ describe("A refused line break typed while a write is pending (#68)", () => {
   });
 });
 
+describe("A refused line break no one typed (#73)", () => {
+  /** Opens `html` on a page that cancels every paragraph or line break, as Notion does. */
+  function refusingBreaks(html: string) {
+    const opened = open(html);
+    opened.host.addEventListener("beforeinput", (e) => {
+      if (e.inputType === "insertParagraph" || e.inputType === "insertLineBreak") e.preventDefault();
+    });
+    return opened;
+  }
+
+  it("a refused u of J leaves the joined line as it is", async () => {
+    const { host } = refusingBreaks("<p>a</p><p>b</p>");
+    await settledKeys("J");
+    expect(blockTexts(host)).toEqual(["a b"]);
+    await settledKeys("u");
+    expect(blockTexts(host)).toEqual(["a b"]);
+    expect(statusText()).toContain(REFUSED);
+  });
+
+  it("a refused o drops the line it opened, and the text typed on it, refused whole", async () => {
+    const { host, session } = refusingBreaks("<p>one</p><p>two</p>");
+    keys("ox"); // `x` is typed while the `o` write is pending
+    await session.settled();
+    expect(blockTexts(host)).toEqual(["one", "two"]);
+    expect(statusText()).toContain(REFUSED);
+  });
+
+  it("a refused linewise p leaves the lines as they are", async () => {
+    const { host } = refusingBreaks("<p>one</p><p>two</p>");
+    await settledKeys("yyp");
+    expect(blockTexts(host)).toEqual(["one", "two"]);
+    expect(statusText()).toContain(REFUSED);
+  });
+});
+
 describe("Keys pressed during a write the page then changes", () => {
   /** A smart-dash rule: the page turns "--" into an em dash a microtask after the edit is in. */
   function smartDashes(host: HTMLElement): void {
