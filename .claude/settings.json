@@ -1,5 +1,18 @@
 {
   "permissions": {
     "allow": ["Bash(gh issue comment *)", "Bash(gh issue close *)", "Bash(gh issue edit *)"]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-discard.mjs\""
+          }
+        ]
+      }
+    ]
   }
 }
