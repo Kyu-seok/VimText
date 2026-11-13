@@ -132,6 +132,35 @@ describe("a contenteditable host in a custom element, through the content entry"
     await expect.poll(() => blockTexts(host)).toEqual(["ne", "two"]);
   });
 
+  it("on a Notion-like root in the shadow tree, the caret moving to another block hides the Status Line, and back the block's Session edits it (#69)", async () => {
+    const port = controlledPort();
+    const sessions = new Sessions(document, port.port, location.origin);
+    cleanups.push(() => sessions.destroy());
+    port.arrive(settingsFor(null));
+    await settle();
+    component = document.createElement("vimtext-test-editor");
+    document.body.appendChild(component);
+    const shadow = component.shadowRoot!;
+    const root = editableHost(
+      '<div id="a" contenteditable="true">alpha</div><div id="b" contenteditable="true">beta</div>',
+      { parent: shadow },
+    );
+    const [a, b] = [shadow.getElementById("a")!, shadow.getElementById("b")!];
+    const shown = () =>
+      [...document.querySelectorAll<HTMLElement>("vimtext-status")].some((h) => h.style.display !== "none");
+    root.focus();
+    selectionOf(shadow).collapse(b.firstChild!, 0);
+    expect(keydownOn(root, "Escape").defaultPrevented).toBe(true);
+    expect(shown()).toBe(true);
+    selectionOf(shadow).collapse(a.firstChild!, 0);
+    await expect.poll(shown).toBe(false);
+    selectionOf(shadow).collapse(b.firstChild!, 0);
+    await expect.poll(shown).toBe(true);
+    keydownOn(root, "x");
+    await expect.poll(() => b.innerText).toBe("eta");
+    expect(a.innerText).toBe("alpha");
+  });
+
   it("removing the custom element disposes the Session", async () => {
     const { sessions } = await activated();
     expect(hostCount()).toBe(1);

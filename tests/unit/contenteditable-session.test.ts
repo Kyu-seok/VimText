@@ -25,8 +25,9 @@ import { controlledPort, settingsFor } from "./settings-port";
  * selection and the Status Line.
  *
  * Coverage (CODING_STANDARDS rule 5): Normal, Visual, Insert and Replace on a
- * contenteditable host in the document. A host in an open shadow root is
- * `contenteditable-shadow.test.ts` (#50).
+ * contenteditable host in the document, and on a block of a Notion-like root
+ * the caret leaves and comes back to (#69). A host in an open shadow root is
+ * `contenteditable-shadow.test.ts` (#50), the Notion-like root there too.
  */
 
 let current: ReturnType<typeof activeHost> | null = null;
@@ -117,6 +118,66 @@ describe("Activation on a contenteditable host", () => {
     keydownOn(root, "x");
     await expect.poll(() => b.innerText).toBe("eta");
     expect(a.innerText).toBe("alpha");
+  });
+
+  describe("on a Notion-like root, the caret leaving a block and coming back in each mode (#69)", () => {
+    /** A Session on block `#b` of a Notion-like root, in the mode `enter` puts it in. */
+    async function inBlock(enter: string[]) {
+      const port = controlledPort();
+      const sessions = new Sessions(document, port.port, location.origin);
+      cleanups.push(() => sessions.destroy());
+      port.arrive(settingsFor(null));
+      await settle();
+      const root = editableHost(
+        '<div id="a" contenteditable="true">alpha</div><div id="b" contenteditable="true">beta gamma</div>',
+      );
+      const [a, b] = [document.getElementById("a")!, document.getElementById("b")!];
+      root.focus();
+      caretAt(b.firstChild!, 0);
+      for (const k of ["Escape", ...enter]) keydownOn(root, k);
+      return { root, a, b };
+    }
+    const shown = () =>
+      [...document.querySelectorAll<HTMLElement>("vimtext-status")].some((h) => h.style.display !== "none");
+
+    /** Moves the caret to `a`, checks the bar hides and `a` is untouched, then puts it back in `b` at offset 5. */
+    async function leaveAndReturn(a: HTMLElement, b: HTMLElement) {
+      caretAt(a.firstChild!, 2);
+      await expect.poll(shown).toBe(false);
+      expect(a.innerText).toBe("alpha");
+      caretAt(b.firstChild!, 5);
+      await expect.poll(shown).toBe(true);
+    }
+
+    for (const [mode, enter, label] of [
+      ["Insert", ["i"], "INSERT"],
+      ["Replace", ["R"], "REPLACE"],
+    ] as const) {
+      it(`${mode} is kept, and Esc then x acts at the caret the page put in the block`, async () => {
+        const { root, a, b } = await inBlock([...enter]);
+        expect(statusText()).toContain(label);
+        await leaveAndReturn(a, b);
+        expect(statusText()).toContain(label);
+        for (const k of ["Escape", "x"]) keydownOn(root, k);
+        await expect.poll(() => b.innerText).toBe("betagamma");
+        expect(a.innerText).toBe("alpha");
+      });
+    }
+
+    for (const [mode, enter, label] of [
+      ["Visual", ["v", "l"], "VISUAL"],
+      ["Visual Line", ["V"], "VISUAL LINE"],
+    ] as const) {
+      it(`${mode} ends at the caret the page put in the block, in Normal`, async () => {
+        const { root, a, b } = await inBlock([...enter]);
+        expect(statusText()).toContain(label);
+        await leaveAndReturn(a, b);
+        await expect.poll(statusText).toContain("NORMAL");
+        keydownOn(root, "x");
+        await expect.poll(() => b.innerText).toBe("beta amma");
+        expect(a.innerText).toBe("alpha");
+      });
+    }
   });
 
   it("the Session ends when the host stops being editable", async () => {
