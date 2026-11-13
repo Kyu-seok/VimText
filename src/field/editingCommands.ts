@@ -106,20 +106,22 @@ export async function replaceDomRange(host: Element, edit: DomEdit, pauses: Paus
   });
   let ok = true;
   let written = 0;
-  let breakChanged: ((wait?: boolean) => Promise<boolean>) | null = null;
+  let breakWatch: ChangeWatch | null = null;
   for (const [i, step] of steps.entries()) {
     if (i > 0 && !(await pauses.step())) return false;
-    if (breakChanged) {
+    if (breakWatch) {
       // A break the editor cancelled and never made (Notion): the text after
       // it would join the line it was to open (#73). The write stops here.
-      if (!(await breakChanged())) return false;
+      const made = await breakWatch.changed();
+      breakWatch.stop();
+      if (!made) return false;
       if (!(await placeCaret(host, caretAfter?.(written), pauses))) return false;
     }
-    breakChanged = step.command === "insertParagraph" ? watchChanges(host) : null;
+    breakWatch = step.command === "insertParagraph" ? watchChanges(host) : null;
     ok = run(host, step) && ok;
     written += step.command === "insertText" ? step.text.length : 1;
   }
-  void breakChanged?.(false);
+  breakWatch?.stop();
   return ok;
 }
 
@@ -132,13 +134,18 @@ export async function replaceDomRange(host: Element, edit: DomEdit, pauses: Paus
  */
 const BREAK_WAIT_MS = 100;
 
+/** A watch on a host's DOM: whether it changed since the watch began, and a way to end the watch. */
+interface ChangeWatch {
+  /** Whether anything in the host changed; when nothing has yet, waits up to `BREAK_WAIT_MS` for a change. */
+  changed(): Promise<boolean>;
+  stop(): void;
+}
+
 /**
- * Starts watching `host`'s DOM; the function returned tells whether anything
- * in it changed since, waiting up to `BREAK_WAIT_MS` for a change when none
- * has come yet (unless `wait` is false), and stops watching. A page that changes its DOM for its own
- * reasons reads as changed: the check only ever lets a write on.
+ * Starts watching `host`'s DOM. A page that changes its DOM for its own
+ * reasons reads as changed: the watch only ever lets a write go on.
  */
-function watchChanges(host: Element): (wait?: boolean) => Promise<boolean> {
+function watchChanges(host: Element): ChangeWatch {
   let changed = false;
   let onChange = (): void => {};
   const observer = new MutationObserver(() => {
@@ -146,19 +153,21 @@ function watchChanges(host: Element): (wait?: boolean) => Promise<boolean> {
     onChange();
   });
   observer.observe(host, { childList: true, characterData: true, subtree: true });
-  return async (wait = true) => {
-    if (observer.takeRecords().length) changed = true;
-    if (!changed && wait) {
-      await new Promise<void>((resolve) => {
-        const timer = setTimeout(resolve, BREAK_WAIT_MS);
-        onChange = () => {
-          clearTimeout(timer);
-          resolve();
-        };
-      });
-    }
-    observer.disconnect();
-    return changed;
+  return {
+    async changed() {
+      if (observer.takeRecords().length) changed = true;
+      if (!changed) {
+        await new Promise<void>((resolve) => {
+          const timer = setTimeout(resolve, BREAK_WAIT_MS);
+          onChange = () => {
+            clearTimeout(timer);
+            resolve();
+          };
+        });
+      }
+      return changed;
+    },
+    stop: () => observer.disconnect(),
   };
 }
 

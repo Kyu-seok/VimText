@@ -106,11 +106,10 @@ describe("Activation on a contenteditable host", () => {
     await expect.poll(visible).toBe(0);
     keydownOn(root, "Escape");
     expect(visible()).toBe(1);
-    const shownIn = shownStatusBars;
-    const aShown = shownIn();
+    const aShown = shownStatusBars();
     caretAt(b.firstChild!, 0);
     // a's bar hides and b's shows again: still one, but not the same one.
-    await expect.poll(() => shownIn().join()).not.toBe(aShown.join());
+    await expect.poll(() => shownStatusBars().join()).not.toBe(aShown.join());
     expect(visible()).toBe(1);
     keydownOn(root, "x");
     await expect.poll(() => b.innerText).toBe("eta");
