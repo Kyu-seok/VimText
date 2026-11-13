@@ -97,6 +97,20 @@ describe("a contenteditable host in an open shadow root", () => {
   });
 });
 
+describe("a refused edit in an open shadow root (#73)", () => {
+  it("a refused u of J leaves the joined line as it is", async () => {
+    const { host } = open("<p>a</p><p>b</p>");
+    host.addEventListener("beforeinput", (e) => {
+      if (e.inputType === "insertParagraph" || e.inputType === "insertLineBreak") e.preventDefault();
+    });
+    await keys("J");
+    await expect.poll(() => blockTexts(host)).toEqual(["a b"]);
+    await keys("u");
+    await expect.poll(statusText).toContain("refused the edit");
+    expect(blockTexts(host)).toEqual(["a b"]);
+  });
+});
+
 /** A web component whose open shadow root holds a contenteditable editor. */
 class ShadowEditor extends HTMLElement {
   constructor() {
