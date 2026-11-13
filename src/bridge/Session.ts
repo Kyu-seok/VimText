@@ -704,7 +704,7 @@ export class Session {
    */
   private judgeWrite(before: string, text: string): void {
     const after = this.field.getValue();
-    if (after === before && !onlyAtomsUnwritten(before, text)) this.dropRefusedChange();
+    if (after === before && !onlyAtomsUnwritten(before, text)) this.dropRefusedChange(before);
     // A Controlled Field rewrote the text inside the write; the Field is the truth.
     else if (after !== text) {
       if (this.mirror.view.state.doc.toString() === text)
@@ -772,7 +772,8 @@ export class Session {
    * one undo step anyway. The Status Line says so: a refused `x` is never a
    * silent no-op.
    */
-  private dropRefusedChange(): void {
+  private dropRefusedChange(before: string): void {
+    const kept = this.mirror.vim.insertMode ? this.typedWithoutBreaks(before) : null;
     this.withSyncing(() => {
       if (this.mirror.vim.insertMode) {
         this.syncFromFieldInner(true);
@@ -780,7 +781,33 @@ export class Session {
       }
       this.mirror.takeBackSince(this.agreedDepth, this.field.getValue());
     });
+    // The person's typing outlives a refused line break (#68): a page that
+    // refuses a synthetic paragraph break (Notion, Slack) takes plain text, so
+    // what was typed is written again without the break, on the line.
+    if (kept) {
+      const d = diffText(before, kept.text);
+      this.mirror.view.dispatch({
+        changes: { from: d.start, to: d.endOld, insert: kept.text.slice(d.start, d.endNew) },
+        selection: EditorSelection.cursor(kept.cursor),
+        userEvent: "input.type.compose",
+      });
+    }
     this.mirror.notify("VimText: the page refused the edit");
+  }
+
+  /**
+   * What the mirror's Insert typing over `before` leaves without its line
+   * breaks, and where the cursor goes; null when the typing held no break or
+   * nothing is left. A refused write that held no break is refused whole.
+   */
+  private typedWithoutBreaks(before: string): { text: string; cursor: number } | null {
+    const now = this.mirror.view.state.doc.toString();
+    const d = diffText(before, now);
+    const inserted = now.slice(d.start, d.endNew);
+    if (!inserted.includes("\n")) return null;
+    const flat = inserted.replace(/\n/g, "");
+    const text = before.slice(0, d.start) + flat + before.slice(d.endOld);
+    return text === before ? null : { text, cursor: d.start + flat.length };
   }
 
   onFocus(): void {
