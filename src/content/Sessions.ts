@@ -83,6 +83,13 @@ export class Sessions {
   /** The Field an Activation key was pressed on while the policy was unknown; the last one only. */
   private remembered: HTMLElement | null = null;
   private lifecycleObserver: MutationObserver | null = null;
+  /**
+   * The Field the caret was last seen in. A Field nested in an editable root
+   * (a Notion block, #69) is left and entered with no focus event, the root
+   * keeping focus: a key or a selection change resolving to another Field
+   * blurs this one's Session and focuses that one's (`caretIn`).
+   */
+  private caretField: HTMLElement | null = null;
   private readonly stateSync: SessionStateSync | null;
   private readonly stopWatching: () => void;
 
@@ -105,6 +112,7 @@ export class Sessions {
     document.addEventListener("keydown", this.onKeydown, { capture: true });
     document.addEventListener("focusin", this.onFocusin);
     document.addEventListener("focusout", this.onFocusout);
+    document.addEventListener("selectionchange", this.onSelectionChange);
     this.stopWatching = port.watch(this.onSettings);
     // A change delivered before the read resolves is newer than what the read returns.
     void port.load().then((s) => {
@@ -196,6 +204,7 @@ export class Sessions {
     if (this.sessions.size) this.stateSync?.queueSnapshot();
     const resolved = resolveField(deepTarget(e));
     if (!resolved) return;
+    this.caretIn(resolved.element);
     const entry = this.sessions.get(resolved.element);
     if (entry) {
       entry.session.handleKeydown(e);
@@ -215,9 +224,25 @@ export class Sessions {
     this.activate(resolved);
   };
 
+  /** The caret moved into `el` without a focus event: the Session it left loses focus, the one it entered gains it. */
+  private caretIn(el: HTMLElement): void {
+    const left = this.caretField;
+    this.caretField = el;
+    if (left === null || left === el) return;
+    this.sessions.get(left)?.session.onBlur();
+    this.sessions.get(el)?.session.onFocus();
+  }
+
+  private onSelectionChange = (): void => {
+    if (!this.sessions.size) return;
+    const resolved = resolveField(deepActiveElement(this.document));
+    if (resolved) this.caretIn(resolved.element);
+  };
+
   private onFocusin = (e: FocusEvent): void => {
     const resolved = resolveField(deepTarget(e));
     if (!resolved) return;
+    this.caretField = resolved.element;
     const entry = this.sessions.get(resolved.element);
     if (entry) entry.session.onFocus();
     else if (this.policy() === "normal") this.activate(resolved);
@@ -227,6 +252,7 @@ export class Sessions {
     const resolved = resolveField(deepTarget(e));
     if (!resolved) return;
     this.sessions.get(resolved.element)?.session.onBlur();
+    if (this.caretField === resolved.element) this.caretField = null;
     if (this.remembered === resolved.element) this.remembered = null;
   };
 
@@ -269,5 +295,6 @@ export class Sessions {
     this.document.removeEventListener("keydown", this.onKeydown, { capture: true });
     this.document.removeEventListener("focusin", this.onFocusin);
     this.document.removeEventListener("focusout", this.onFocusout);
+    this.document.removeEventListener("selectionchange", this.onSelectionChange);
   }
 }

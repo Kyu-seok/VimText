@@ -86,6 +86,39 @@ describe("Activation on a contenteditable host", () => {
     expect(a.innerText).toBe("alpha beta");
   });
 
+  it("on a Notion-like root, moving the caret to another block hides the Status Line of the one left; back in a block with a Session shows its own (#69)", async () => {
+    const port = controlledPort();
+    const sessions = new Sessions(document, port.port, location.origin);
+    cleanups.push(() => sessions.destroy());
+    port.arrive(settingsFor(null));
+    await settle();
+    const root = editableHost(
+      '<div id="a" contenteditable="true">alpha</div><div id="b" contenteditable="true">beta</div>',
+    );
+    const [a, b] = [document.getElementById("a")!, document.getElementById("b")!];
+    const visible = () =>
+      [...document.querySelectorAll<HTMLElement>("vimtext-status")].filter((h) => h.style.display !== "none")
+        .length;
+    root.focus();
+    caretAt(b.firstChild!, 0);
+    keydownOn(root, "Escape");
+    expect(visible()).toBe(1);
+    caretAt(a.firstChild!, 0);
+    await expect.poll(visible).toBe(0);
+    keydownOn(root, "Escape");
+    expect(visible()).toBe(1);
+    const shownIn = () =>
+      [...document.querySelectorAll<HTMLElement>("vimtext-status")].map((h) => h.style.display !== "none");
+    const aShown = shownIn();
+    caretAt(b.firstChild!, 0);
+    // a's bar hides and b's shows again: still one, but not the same one.
+    await expect.poll(() => shownIn().join()).not.toBe(aShown.join());
+    expect(visible()).toBe(1);
+    keydownOn(root, "x");
+    await expect.poll(() => b.innerText).toBe("eta");
+    expect(a.innerText).toBe("alpha");
+  });
+
   it("the Session ends when the host stops being editable", async () => {
     const port = controlledPort();
     const sessions = new Sessions(document, port.port, location.origin);
