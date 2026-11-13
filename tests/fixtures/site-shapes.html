@@ -49,6 +49,13 @@
     <!-- Slack's message box (a Quill fork): Cmd+B on an empty line leaves a line holding only Quill's U+FEFF cursor blot, no <br> (#68). -->
     <!-- prettier-ignore -->
     <div id="slack" class="ql-editor" contenteditable="true" role="textbox"><p>alpha beta gamma</p><p>delta <strong>bold run</strong> epsilon</p><p>zeta eta theta</p><p><strong><span class="ql-cursor">&#xFEFF;</span></strong></p></div>
+    <script>
+      // Slack, like Notion, cancels a synthetic paragraph or line break and does nothing (#68).
+      document.getElementById("slack").addEventListener("beforeinput", (e) => {
+        if (!e.isTrusted && (e.inputType === "insertParagraph" || e.inputType === "insertLineBreak"))
+          e.preventDefault();
+      });
+    </script>
 
     <!--
       Notion's page: one editable root that keeps focus, holding the header's
