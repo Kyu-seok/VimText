@@ -36,6 +36,27 @@ function fieldOn(html: string) {
 }
 
 describe("ContentEditableField", () => {
+  // A Notion block: marked contenteditable inside the page's editable root,
+  // which keeps focus (#69).
+  it("a host nested in an editable root has focus while the root does and the caret is in it; blur releases the root", () => {
+    const root = editableHost(
+      '<div id="a" contenteditable="true">one</div><div id="b" contenteditable="true">two</div>',
+    );
+    const [a, b] = [document.getElementById("a")!, document.getElementById("b")!];
+    const field = new ContentEditableField(b);
+    root.focus();
+    caretAt(b.firstChild!, 1);
+    expect(field.hasFocus()).toBe(true);
+    caretAt(a.firstChild!, 1);
+    expect(field.hasFocus()).toBe(false);
+    caretAt(b.firstChild!, 1);
+    field.blur();
+    expect(document.activeElement).not.toBe(root);
+    field.focus();
+    expect(document.activeElement).toBe(root);
+    field.destroy();
+  });
+
   it("is a multi-line Field on its host, its text the projection", async () => {
     const { host, field } = fieldOn("<p>one</p><p><br></p><p>three</p>");
     expect(field.element).toBe(host);

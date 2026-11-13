@@ -29,7 +29,8 @@ function isTextControl(el: EventTarget | null): el is TextControl {
  * The editing host around a node (DESIGN.md "contenteditable Fields", _Which
  * element_): the outermost element whose `isContentEditable` is true and whose
  * parent's is not. A node inside a non-editable island (`contenteditable="false"`)
- * or a nested editable belongs to the host around it. Null outside any host.
+ * belongs to the host around it; one inside a nested element marked editable
+ * is that element's Field (`fieldIn`). Null outside any host.
  */
 function editingHost(target: EventTarget | null): HTMLElement | null {
   if (!(target instanceof Node)) return null;
@@ -41,6 +42,35 @@ function editingHost(target: EventTarget | null): HTMLElement | null {
   ) {
     if (n instanceof HTMLElement && n.isContentEditable) host = n;
     else if (host) break;
+  }
+  return host;
+}
+
+/** An element that says it is editable itself, not only by inheritance: `contenteditable` of "true", "" or "plaintext-only". */
+function marksEditable(el: Element): el is HTMLElement {
+  const v = el.getAttribute("contenteditable");
+  return el instanceof HTMLElement && el.isContentEditable && v !== null && v !== "false";
+}
+
+/** The Selection that reports positions inside `host`'s tree (see `domSelection.ts`). */
+function selectionNodeIn(host: HTMLElement): Node | null {
+  const root = host.getRootNode() as Document | (ShadowRoot & { getSelection?: () => Selection | null });
+  const sel = root.getSelection ? root.getSelection() : document.getSelection();
+  const node = sel?.anchorNode ?? null;
+  return node && host.contains(node) && node !== host ? node : null;
+}
+
+/**
+ * The Field inside an editing host (DESIGN.md "contenteditable Fields", _Which
+ * element_; #69): the innermost element below it that is marked editable and
+ * holds `from`, else the host. A page that marks each block editable inside one
+ * editable root (Notion) keeps focus, and so key and focus targets, on the
+ * root: there `from` is the root itself and the caret decides.
+ */
+function fieldIn(host: HTMLElement, from: Node): HTMLElement {
+  const start = from === host ? selectionNodeIn(host) : from;
+  for (let n: Node | null = start; n && n !== host; n = n.parentNode) {
+    if (n instanceof Element && marksEditable(n)) return n as HTMLElement;
   }
   return host;
 }
@@ -68,8 +98,9 @@ export function resolveField(target: EventTarget | null): ResolvedField | null {
       create: () => new TextareaField(target),
     };
   }
-  const host = editingHost(target);
-  if (host) {
+  const outer = editingHost(target);
+  if (outer) {
+    const host = fieldIn(outer, target as Node);
     const singleLine = declaresSingleLine(host);
     return { element: host, singleLine, create: () => new ContentEditableField(host, singleLine) };
   }

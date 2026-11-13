@@ -522,16 +522,30 @@ export class ContentEditableField implements Field {
     return this.held !== null && performance.now() - this.lastChangeAt < WRITE_GAP_MS;
   }
 
+  /**
+   * The element that takes focus for this Field: the host itself, or for a
+   * host nested in an editable root (a Notion block, #69) that root, since a
+   * nested editable is never focused itself. Such a Field has focus while the
+   * root does and the caret is inside it.
+   */
+  private focusTarget(): HTMLElement {
+    let root = this.element;
+    while (root.parentElement?.isContentEditable) root = root.parentElement;
+    return root;
+  }
+
   hasFocus(): boolean {
-    return this.element.matches(":focus");
+    const target = this.focusTarget();
+    if (!target.matches(":focus")) return false;
+    return target === this.element || readDomSelection(this.element) !== null;
   }
 
   focus(): void {
-    this.element.focus({ preventScroll: true });
+    this.focusTarget().focus({ preventScroll: true });
   }
 
   blur(): void {
-    this.element.blur();
+    this.focusTarget().blur();
   }
 
   visibleLineCount(): number {

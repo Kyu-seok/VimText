@@ -83,15 +83,39 @@ describe("resolveField on contenteditable", () => {
     },
   );
 
-  it("anything inside a host resolves to the host, a non-editable island and nested editables included", () => {
+  it("anything inside a host resolves to the host, a non-editable island included", () => {
     const host = editableHost(
-      '<p id="p"><b id="b">one</b><span id="island" contenteditable="false"><i id="deep">x</i></span>' +
-        '<span id="inner" contenteditable="true">y</span></p>',
+      '<p id="p"><b id="b">one</b><span id="island" contenteditable="false"><i id="deep">x</i></span></p>',
     );
-    for (const id of ["p", "b", "island", "deep", "inner"]) {
+    for (const id of ["p", "b", "island", "deep"]) {
       expect(resolveField(document.getElementById(id))?.element, id).toBe(host);
     }
     expect(resolveField(document.getElementById("b")!.firstChild)?.element).toBe(host);
+  });
+
+  // Notion's page root holds every block, each block marked contenteditable
+  // itself; focus stays on the root, so the root resolves by the caret (#69).
+  it("a nested element marked contenteditable is its own Field; the host around it resolves to the one holding the caret", () => {
+    const root = editableHost(
+      '<h1 id="title" contenteditable="true">Title</h1><div id="controls">Add icon</div>' +
+        '<div id="a" contenteditable="true"><b id="ab">one</b></div><div id="b" contenteditable="plaintext-only">two</div>',
+    );
+    const [a, b] = [document.getElementById("a")!, document.getElementById("b")!];
+    expect(resolveField(document.getElementById("ab"))?.element).toBe(a);
+    expect(resolveField(b.firstChild)?.element).toBe(b);
+    root.focus();
+    getSelection()!.setBaseAndExtent(b.firstChild!, 1, b.firstChild!, 1);
+    expect(resolveField(root)?.element).toBe(b);
+    getSelection()!.setBaseAndExtent(
+      a.querySelector("b")!.firstChild!,
+      0,
+      a.querySelector("b")!.firstChild!,
+      0,
+    );
+    expect(resolveField(root)?.element).toBe(a);
+    const controls = document.getElementById("controls")!.firstChild!;
+    getSelection()!.setBaseAndExtent(controls, 0, controls, 0);
+    expect(resolveField(root)?.element).toBe(root);
   });
 
   it('a contenteditable="false" element outside any host is not a Field', () => {

@@ -141,8 +141,11 @@ primary range is highlighted.
 
 - _Which element_: the editing host, the outermost element whose `isContentEditable` is true
   and whose parent's is not (`contenteditable="true"` and `"plaintext-only"`). Non-editable
-  islands inside it are part of the Field. A page that makes every block its own host
-  (Notion) has one Field, Session and undo history per block.
+  islands inside it are part of the Field. An element inside the host that is itself marked
+  editable is its own Field, the innermost one around the caret winning (#69): Notion puts
+  every block, marked `contenteditable`, inside one editable page root that keeps focus, so a
+  key on the root resolves by the caret, and such a Field has focus while the root does and
+  the caret is in it. So Notion has one Field, Session and undo history per block.
 - _Single-line_: only when the host declares `aria-multiline="false"`; it then takes every
   Single-line Field rule (newline strip, rule 6, rule 7). No guessing from height or role. Adding or removing the
   attribute ends a Session on that host; the next Activation makes the Field of the new kind.

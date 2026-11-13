@@ -64,6 +64,28 @@ describe("Activation on a contenteditable host", () => {
     await expect.poll(() => blockTexts(host)[0]).toBe("he quick brown fox");
   });
 
+  it("on a page root holding blocks marked contenteditable (Notion), Esc Activates the block with the caret and edits stay in it (#69)", async () => {
+    const port = controlledPort();
+    const sessions = new Sessions(document, port.port, location.origin);
+    cleanups.push(() => sessions.destroy());
+    port.arrive(settingsFor(null));
+    await settle();
+    const root = editableHost(
+      '<div id="a" contenteditable="true">alpha beta</div><div id="b" contenteditable="true">line one<br>line two<br>line three</div>',
+    );
+    const [a, b] = [document.getElementById("a")!, document.getElementById("b")!];
+    root.focus();
+    caretAt(b.lastChild!, 4);
+    expect(keydownOn(root, "Escape").defaultPrevented).toBe(true);
+    expect(statusText()).toContain("NORMAL");
+    for (const k of ["g", "g", "J"]) keydownOn(root, k);
+    await expect.poll(() => b.innerText).toBe("line one line two\nline three");
+    expect(a.innerText).toBe("alpha beta");
+    for (const k of ["g", "g", "k", "d", "d"]) keydownOn(root, k);
+    await expect.poll(() => b.innerText).toBe("line three");
+    expect(a.innerText).toBe("alpha beta");
+  });
+
   it("the Session ends when the host stops being editable", async () => {
     const port = controlledPort();
     const sessions = new Sessions(document, port.port, location.origin);
