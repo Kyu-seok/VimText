@@ -1,0 +1,71 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>VimText fixture: site shapes</title>
+    <style>
+      body {
+        font-family: system-ui;
+        margin: 40px;
+      }
+      [contenteditable="true"] {
+        width: 480px;
+        padding: 4px;
+        margin-bottom: 24px;
+        border: 1px solid #888;
+        font:
+          14px/1.4 Menlo,
+          monospace;
+      }
+      [contenteditable="true"] [contenteditable="true"] {
+        border: 0;
+        margin: 0;
+        padding: 0;
+      }
+      #slack p {
+        margin: 0;
+      }
+      .block {
+        white-space: break-spaces;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>VimText fixture: site shapes</h1>
+    <!--
+      The markup of the real sites' editors, copied from their live DOM during a
+      dogfooding pass (docs/release.md, "M4: contenteditable editors"), without
+      the sites' own code. Each host is a shape that broke VimText on that site
+      and no library fixture had. A dogfooding finding adds its site's shape
+      here, and tests/e2e/site-shapes.spec.ts runs the M4 steps over it.
+      Sites built on a pinned library (Stack Overflow on ProseMirror) are the
+      library fixtures' job. No whitespace between tags, hence the prettier-ignore.
+    -->
+
+    <!-- Gmail's compose body: the first line is a bare text node, later lines <div>s (#67). -->
+    <!-- prettier-ignore -->
+    <div id="gmail" contenteditable="true" role="textbox" aria-label="Message body">alpha beta gamma<div>delta <b>bold run</b> epsilon</div><div>zeta eta theta</div></div>
+
+    <!-- Slack's message box (a Quill fork): Cmd+B on an empty line leaves a line holding only Quill's U+FEFF cursor blot, no <br> (#68). -->
+    <!-- prettier-ignore -->
+    <div id="slack" class="ql-editor" contenteditable="true" role="textbox"><p>alpha beta gamma</p><p>delta <strong>bold run</strong> epsilon</p><p>zeta eta theta</p><p><strong><span class="ql-cursor">&#xFEFF;</span></strong></p></div>
+
+    <!--
+      Notion's page: one editable root that keeps focus, holding the header's
+      controls and every block, each block marked contenteditable itself, its
+      line breaks literal \n under white-space: break-spaces (#69). Notion
+      cancels a synthetic paragraph or line break and does nothing (#70); this
+      script does the same.
+    -->
+    <!-- prettier-ignore -->
+    <div id="notion" contenteditable="true" class="whenContentEditable"><div class="controls">Add icon Add cover</div><div id="n-title" class="block" contenteditable="true">Scratch</div><div id="n-one" class="block" contenteditable="true">alpha beta gamma</div><div id="n-two" class="block" contenteditable="true">line one
+line two
+line three</div></div>
+    <script>
+      document.getElementById("notion").addEventListener("beforeinput", (e) => {
+        if (!e.isTrusted && (e.inputType === "insertParagraph" || e.inputType === "insertLineBreak"))
+          e.preventDefault();
+      });
+    </script>
+  </body>
+</html>

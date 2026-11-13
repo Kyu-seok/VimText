@@ -8,6 +8,7 @@
 // keystroke (a, Z, Backspace, Esc) shows whether the edit survived the editor's
 // next render ("!! changed"); an edit the editor's model never took comes back
 // there. Steps feeding a `u` skip it, so the keystroke never becomes the undo.
+// A last burst presses keys with no waits and fails if the typed text is lost.
 import { chromium } from "@playwright/test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -139,6 +140,16 @@ for (const demo of DEMOS.filter((d) => !only || d.name === only)) {
       }
       console.log(`${label.padEnd(40)} ${after}   [${await status()}]${note}`);
     }
+    // Keys back to back, as a person typing fast (or an agent's browser tool)
+    // presses them: they land while VimText's caret and write are settling.
+    // Reading the page between them hides a loss there (#68), so one read at the end.
+    for (const k of ["G", "A", "Enter", "f", "a", "s", "t", "Escape"]) await kb.press(k);
+    await sleep(1500);
+    const burst = await host.evaluate((el) => el.innerText);
+    if (!burst.includes("fast")) {
+      failures++;
+      console.log(`!! burst G A <Enter> fast <Esc>: the typed text was lost; status [${await status()}]`);
+    } else console.log(`burst G A <Enter> fast <Esc> (no waits) kept the text   [${await status()}]`);
     await press([":", "q", "Enter"]);
     const focused = await host.evaluate((el) => el.contains(el.ownerDocument.activeElement));
     console.log(`:q         focus left the editor: ${!focused}; text ${await text()}`);
