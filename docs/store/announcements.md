@@ -72,6 +72,9 @@ Known limits on contenteditable editors
   Insert can undo them; VimText catches up on the next key.
 - Notion makes each block its own editor, so each block is a field and j
   and k stop at its edge.
+- On Notion, o, O, a linewise p and u of J inside a block are refused:
+  Notion takes no line break VimText writes. The Status Line says so;
+  Enter in Insert makes a new block as usual.
 - Display-line motions and scrolls approximate on mixed fonts and sizes.
 - On an editor without a pinned test, VimText sees only the page's text,
   so an edit the editor's model did not take can go unnoticed.
