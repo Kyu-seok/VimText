@@ -1,4 +1,4 @@
-import { ChangeSet, EditorSelection, type Text } from "@codemirror/state";
+import { ChangeSet, EditorSelection, Text } from "@codemirror/state";
 import type { Field } from "../field/Field";
 import { diffText } from "../field/diff";
 import { ATOM_CHAR } from "../field/atoms";
@@ -119,10 +119,15 @@ function defineExCommands(): void {
  * One activated Field: owns the mirror, routes keys by Mode, keeps the Field
  * and the mirror in sync, and renders the engine's cursor into the Field.
  */
-/** Where the mirror stood when the Field and it last agreed: its undo depth and its `commandChanges`. */
+/**
+ * Where the mirror stood at a point the Field may agree on: its undo depth,
+ * its `commandChanges`, and the changes made to its text since, kept while the
+ * point is open (null once they could not be kept).
+ */
 interface AgreedPoint {
   readonly depth: number;
   readonly commandChanges: number;
+  since: ChangeSet | null;
 }
 
 export class Session {
@@ -144,7 +149,9 @@ export class Session {
   /** The Field text the bridge last wrote or agreed with; anything else means the page changed the Field. */
   private lastText: string | null = null;
   /** Where the mirror stood when `lastText` was last agreed: a refused edit undoes back to it. */
-  private agreed: AgreedPoint = { depth: 0, commandChanges: 0 };
+  private agreed: AgreedPoint = { depth: 0, commandChanges: 0, since: null };
+  /** The points whose `since` takes each mirror change: the agreed one, and a pending write's. */
+  private readonly openPoints = new Set<AgreedPoint>();
   /**
    * How many mirror text changes were made outside an Insert session (Insert
    * or Replace): Normal and Visual commands, `o`'s new line before Insert
@@ -187,7 +194,8 @@ export class Session {
     (this.mirror.cm.state as any).vimtextSession = this;
     this.mirror.cm.on("vim-mode-change", this.onModeChange);
     this.mirror.cm.on("dialog", this.onDialogChange);
-    this.mirror.onUpdate((docChanged, selectionSet) => {
+    this.mirror.onUpdate((docChanged, selectionSet, changes) => {
+      if (docChanged) this.logChanges(changes);
       // Ex commands typed into the command line (:s, :g, :sort, …) and the
       // engine's own async work change the mirror outside handleKeydown.
       if (this.syncing || !(docChanged || selectionSet)) return;
@@ -213,9 +221,29 @@ export class Session {
     return mode === "insert" || mode === "replace";
   }
 
-  /** Where the mirror stands now, to agree on. */
+  /** Where the mirror stands now, a point open to its changes from here on. */
   private here(): AgreedPoint {
-    return { depth: this.mirror.undoDepth(), commandChanges: this.commandChanges };
+    const point: AgreedPoint = {
+      depth: this.mirror.undoDepth(),
+      commandChanges: this.commandChanges,
+      since: ChangeSet.empty(this.mirror.view.state.doc.length),
+    };
+    this.openPoints.add(point);
+    return point;
+  }
+
+  /** `point` is now the agreed one; the one it replaces takes no more changes. */
+  private agreeOn(point: AgreedPoint): void {
+    if (this.agreed !== point) this.openPoints.delete(this.agreed);
+    this.agreed = point;
+  }
+
+  /** Adds a mirror change to each open point's `since`. */
+  private logChanges(changes: ChangeSet): void {
+    for (const point of this.openPoints) {
+      // A change the log did not see (its length tells) leaves it unusable.
+      point.since = point.since?.newLength === changes.length ? point.since.compose(changes) : null;
+    }
   }
 
   private get nativeInsert(): boolean {
@@ -596,7 +624,7 @@ export class Session {
         selection: EditorSelection.cursor(insert ? head : clipToLine(newDoc, head)),
         userEvent,
       });
-      this.agreed = this.here();
+      this.agreeOn(this.here());
       return;
     }
 
@@ -712,6 +740,7 @@ export class Session {
     this.judgeWrite(before, text);
     // Accepted as written: `text` is the agreed text, at the point it was
     // written from; the keys pressed since are the merged render's change.
+    if (after !== text) this.openPoints.delete(writtenAt);
     this.finishRender(after === text ? writtenAt : this.here());
     if (this.renderDue) {
       this.renderDue = false;
@@ -769,7 +798,7 @@ export class Session {
     this.lastRendered = this.field.getSelection();
     this.lastText = this.field.getValue();
     this.readAtoms();
-    this.agreed = point;
+    this.agreeOn(point);
     this.status.setMode(this.mode);
     this.status.reposition();
   }
@@ -832,14 +861,29 @@ export class Session {
    * refused `u` of `J`, `o`'s new line, a linewise `p` keep nothing.
    */
   private typedWithoutBreaks(before: string): { text: string; cursor: number } | null {
-    if (this.commandChanges !== this.agreed.commandChanges) return null;
-    const now = this.mirror.view.state.doc.toString();
-    const d = diffText(before, now);
-    const inserted = now.slice(d.start, d.endNew);
-    if (!inserted.includes("\n")) return null;
-    const flat = inserted.replace(/\n/g, "");
-    const text = before.slice(0, d.start) + flat + before.slice(d.endOld);
-    return text === before ? null : { text, cursor: d.start + flat.length };
+    const since = this.agreed.since;
+    if (this.commandChanges !== this.agreed.commandChanges || !since || since.length !== before.length)
+      return null;
+    // The typing's own changes, where they were made: a diff of the texts
+    // cannot tell a typed break from one beside it (Enter at a line's end
+    // above an empty line).
+    const head = this.mirror.view.state.selection.main.head;
+    let breaks = false;
+    let cursor = head;
+    const flat: { from: number; to: number; insert: string }[] = [];
+    since.iterChanges((fromA, toA, fromB, _toB, inserted) => {
+      const typed = inserted.toString();
+      for (let i = typed.indexOf("\n"); i >= 0; i = typed.indexOf("\n", i + 1)) {
+        breaks = true;
+        if (fromB + i < head) cursor--;
+      }
+      flat.push({ from: fromA, to: toA, insert: typed.replace(/\n/g, "") });
+    });
+    if (!breaks) return null;
+    const text = ChangeSet.of(flat, before.length)
+      .apply(Text.of(before.split("\n")))
+      .toString();
+    return text === before ? null : { text, cursor };
   }
 
   onFocus(): void {

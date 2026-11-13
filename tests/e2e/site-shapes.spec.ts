@@ -190,6 +190,20 @@ test.describe("Slack message box: a line holding only Quill's U+FEFF cursor blot
     ]);
   });
 
+  test("burst: A, Enter, text and Esc back to back keep the text on its line and the empty line below, the break kept or refused (#68, #73)", async ({
+    page,
+  }) => {
+    // Unlike Shift+Enter, an Enter typed while the caret settles is written as
+    // a paragraph break, which the shape refuses as Slack does.
+    await burst(page, ["G", "k", "A", "Enter", "o", "n", "e", "Escape"]);
+    // Mostly written and refused (#73: the typing once landed on the empty
+    // line below); under load sometimes the person's own key.
+    await linesOneOf(page, "#slack", [
+      ["alpha beta gamma", "delta bold run epsilon", "zeta eta thetaone", ""],
+      ["alpha beta gamma", "delta bold run epsilon", "zeta eta theta", "one", ""],
+    ]);
+  });
+
   test("cw inside the bold run keeps it bold", async ({ page }) => {
     await page.keyboard.type("ggj0wwcwwalk");
     await page.keyboard.press("Escape");
@@ -239,9 +253,13 @@ test.describe("Notion page: blocks marked contenteditable inside one editable ro
     page,
   }) => {
     await burst(page, ["G", "A", "Enter", "f", "a", "s", "t", "Escape"]);
-    await linesOneOf(page, "#n-two", [
-      ["line one", "line two", "line three", "fast"],
-      ["line one", "line two", "line threefast"],
+    // Mostly the Enter is written and refused; under load it is sometimes the
+    // person's own key, splitting the block. The refused path is pinned in
+    // async-write.test.ts.
+    const page_ = ["Add icon Add cover", "Scratch", "alpha beta gamma", "line one", "line two"];
+    await linesOneOf(page, "#notion", [
+      [...page_, "line threefast"],
+      [...page_, "line three", "fast"],
     ]);
     expect(await page.locator("#n-one").innerText()).toBe("alpha beta gamma");
   });
@@ -266,8 +284,12 @@ test.describe("Notion page: blocks marked contenteditable inside one editable ro
     await page.keyboard.type("u");
     await expect.poll(() => statusText(page)).toContain(REFUSED);
     expect(await page.locator("#n-two").innerText()).toBe(JOINED);
-    await burst(page, ["o", "x", "Escape"]);
+    // A key typed once the refused `o` has settled is the person's own, typed
+    // into the page; one typed while it is pending is unit-tested
+    // (async-write.test.ts, "a refused o drops the line it opened").
+    await page.keyboard.type("o");
     await expect.poll(() => statusText(page)).toContain(REFUSED);
+    await page.keyboard.press("Escape");
     expect(await page.locator("#n-two").innerText()).toBe(JOINED);
   });
 });

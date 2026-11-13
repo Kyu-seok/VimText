@@ -263,6 +263,15 @@ describe("A refused line break, then Insert keys the engine runs (#73)", () => {
     expect(statusText()).not.toContain(REFUSED);
   });
 
+  it("a refused break typed at the end of a line above an empty line keeps the typing on that line, and the empty line", async () => {
+    const { host, session } = refusingOnce("<p>abc</p><p><br></p>", () => keys("one"));
+    keys("A");
+    keydown("Enter");
+    await session.settled();
+    expect(blockTexts(host)).toEqual(["abcone", ""]);
+    expect(statusText()).toContain(REFUSED);
+  });
+
   it("a counted insert whose break is refused keeps every repeat's typing on the line", async () => {
     const { host, session } = refusingOnce("<p>abc</p>", () => {
       keys("x");

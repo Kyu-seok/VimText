@@ -1,4 +1,4 @@
-import { EditorSelection, EditorState, type Extension, type Text } from "@codemirror/state";
+import { type ChangeSet, EditorSelection, EditorState, type Extension, type Text } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { history, undo, undoDepth } from "@codemirror/commands";
 import { vim, getCM, Vim } from "@replit/codemirror-vim";
@@ -85,15 +85,18 @@ export function clipToLine(doc: Text, pos: number): number {
  * A hidden CodeMirror 6 view running the Vim engine. The bridge feeds it keys
  * and reads its document/selection back; it is never shown to the user.
  */
+
+/** Told of each mirror update: whether the text and the selection changed, and the text's changes. */
+type UpdateHandler = (docChanged: boolean, selectionSet: boolean, changes: ChangeSet) => void;
 export class Mirror {
   readonly view: EditorView;
   readonly cm: VimCM;
   readonly plugin: VimPlugin;
-  private updateHandlers = new Set<(docChanged: boolean, selectionSet: boolean) => void>();
+  private updateHandlers = new Set<UpdateHandler>();
 
   constructor(opts: MirrorOptions) {
     const updateListener: Extension = EditorView.updateListener.of((u) => {
-      for (const h of this.updateHandlers) h(u.docChanged, u.selectionSet);
+      for (const h of this.updateHandlers) h(u.docChanged, u.selectionSet, u.changes);
     });
     this.view = new EditorView({
       state: EditorState.create({
@@ -188,7 +191,7 @@ export class Mirror {
     this.view.dispatch({ effects: EditorView.scrollIntoView(this.view.state.selection.main.head) });
   }
 
-  onUpdate(handler: (docChanged: boolean, selectionSet: boolean) => void): () => void {
+  onUpdate(handler: UpdateHandler): () => void {
     this.updateHandlers.add(handler);
     return () => this.updateHandlers.delete(handler);
   }
