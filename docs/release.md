@@ -106,7 +106,8 @@ undo step of its own, so a `u` goes before it):
   moved to trash afterwards. Notion holds every block, each marked `contenteditable`, inside one
   editable page root that keeps focus; each block is its own Field (#69, an accepted M4
   limitation): check `j`/`k` stay inside a block and nothing is lost crossing blocks with the
-  mouse. Notion refuses a line break VimText writes inside a block (#70).
+  mouse, and that `o`, `O`, a linewise `p` and `u` of `J` inside the several-line block land
+  (#70), on its last line too.
 
 Record one comment per site on the gate ticket: site, editor library, each step's outcome, and
 the issue filed for any finding. A finding the site's markup causes adds that markup to
