@@ -93,7 +93,10 @@ reaches them:
 4. `Tab`/`Shift+Tab`: Pass-through (focus navigation).
 5. `Esc`/`Ctrl+[` while already in Normal: Pass-through (lets site modals close on 2nd press).
 6. `Enter` on a Single-line Field in plain Normal (no pending count or operator): Pass-through
-   (submits). In a textarea it is the Vim motion.
+   (submits). In a textarea it is the Vim motion. The page's keydown handler runs; on a
+   contenteditable Single-line Field the browser's own default edit for it (a trusted
+   `beforeinput` of `insertParagraph` or `insertLineBreak` the page did not cancel) is
+   cancelled, as an `<input>` inserts nothing on Enter (#51).
 7. `o`/`O` on a Single-line Field in Normal: swallowed as a Vim beep, pending count cleared.
    Visual-mode `o`/`O` (other end of the selection) keep working.
 
@@ -147,7 +150,10 @@ primary range is highlighted.
   key on the root resolves by the caret, and such a Field has focus while the root does and
   the caret is in it. So Notion has one Field, Session and undo history per block.
 - _Single-line_: only when the host declares `aria-multiline="false"`; it then takes every
-  Single-line Field rule (newline strip, rule 6, rule 7). No guessing from height or role. Adding or removing the
+  Single-line Field rule (newline strip, rule 6, rule 7). On a page that does not handle
+  Enter, rule 6 leaves the host as it was: outside Insert mode VimText cancels the browser's
+  trusted line-break `beforeinput`, which would replace the block cursor's character (#51);
+  Insert-mode Enter stays native and the newline strip rejoins the lines. No guessing from height or role. Adding or removing the
   attribute ends a Session on that host; the next Activation makes the Field of the new kind.
 - _Projection_: the Field's text is the host's plain text, read by VimText's own DOM walker
   so every offset maps back to a (node, offset) position. Line breaks follow `innerText`,

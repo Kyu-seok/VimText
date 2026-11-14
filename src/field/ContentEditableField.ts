@@ -629,6 +629,22 @@ export class ContentEditableField implements Field {
     return Math.max(1, Math.floor(inner / lh));
   }
 
+  refuseNativeBreaks(when: () => boolean): () => void {
+    const win = this.element.ownerDocument.defaultView;
+    if (!this.singleLine || !win) return () => {};
+    // On the window, bubbling: the page's own listeners have had the event
+    // first, so an editor that handles the break itself still does.
+    const refuse = (e: Event) => {
+      const type = (e as InputEvent).inputType;
+      if (!e.isTrusted || e.defaultPrevented) return;
+      if (type !== "insertParagraph" && type !== "insertLineBreak") return;
+      if (!e.composedPath().includes(this.element) || !when()) return;
+      e.preventDefault();
+    };
+    win.addEventListener("beforeinput", refuse);
+    return () => win.removeEventListener("beforeinput", refuse);
+  }
+
   onInput(handler: () => void): () => void {
     this.inputHandlers.add(handler);
     return () => this.inputHandlers.delete(handler);
