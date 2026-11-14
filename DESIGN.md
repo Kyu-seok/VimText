@@ -134,11 +134,25 @@ A frame belongs to the Site of the page around it (GLOSSARY.md **Site**): it res
 top origin from `location.ancestorOrigins` (last entry; also works for nested and
 sandboxed frames) and falls back to its own origin on a browser without that property (Firefox).
 
-**Cursor.** Normal mode block cursor = native selection of the char under the cursor;
-Visual = native selection. No overlay. On a contenteditable Field the char may be an Atom
-(the selection covers the Atom); on an empty block there is no char, so the cursor is a
-collapsed caret. Visual block edits apply correctly but only the
-primary range is highlighted.
+**Cursor.** Visual = native selection on every Field; a selection toolbar the page opens
+over it is the page behaving as for a mouse selection. Visual block edits apply correctly
+but only the primary range is highlighted. The Normal-mode Cursor depends on the Field:
+
+- _Textarea and input_: a native selection of the char under the Cursor (a selection inside
+  a text control is no document Range, so no page toolbar reacts to it).
+- _contenteditable_ (ADR 0009, #71): the native selection is a caret collapsed before the
+  Cursor's char, and VimText draws the Cursor in the Field's Status Line host: a steady block
+  over the char's rect, blended with `mix-blend-mode: difference` on the host so it inverts
+  the char beneath, ignoring the mouse. Normal and operator-pending draw the block, Replace a
+  bar along the char's bottom; Insert, Visual and Command-line draw nothing, nor does a Field
+  without focus. An Atom gets a block over its whole box; an empty line a one-char-wide block
+  (the width of `0` in the Field's font) at the line's start; a char split by a soft wrap its
+  last non-empty rect; a tab its whole rect. The block is re-measured after every render, on
+  scroll (capture phase) and resize, on a ResizeObserver over the Field, and on mutations in
+  the Field (one measurement per animation frame), and clipped to the Field's visible part.
+  While it shows, the page's caret is hidden by a constructed stylesheet adopted by the
+  Field's document or shadow root (`:focus, :focus * { caret-color: transparent !important }`),
+  never by an attribute on the page's element.
 
 **contenteditable Fields** (M4, ADR 0007, decided in the grill of 2026-11-10).
 
@@ -152,7 +166,8 @@ primary range is highlighted.
 - _Single-line_: only when the host declares `aria-multiline="false"`; it then takes every
   Single-line Field rule (newline strip, rule 6, rule 7). On a page that does not handle
   Enter, rule 6 leaves the host as it was: outside Insert mode VimText cancels the browser's
-  trusted line-break `beforeinput`, which would replace the block cursor's character (#51);
+  trusted line-break `beforeinput`, which would split the line at the caret (and replaced the
+  Cursor's character while that was a one-character selection; #51);
   Insert-mode Enter stays native and the newline strip rejoins the lines. No guessing from height or role. Adding or removing the
   attribute ends a Session on that host; the next Activation makes the Field of the new kind.
 - _Projection_: the Field's text is the host's plain text, read by VimText's own DOM walker
@@ -355,7 +370,8 @@ it is outside the gate, so PNG churn never fails `npm run check`.
 
 - No `hlsearch` highlighting in textarea/input (`n`/`N` work).
 - Scroll commands (`Ctrl-d/u/f/b`, `zz/zt/zb`) approximate via visible line count and `scrollTop`.
-- Replace-mode cursor indistinguishable from Normal except via the Status Line.
+- On a textarea or input Field the Replace-mode Cursor is indistinguishable from Normal
+  except via the Status Line (a contenteditable Field draws a bar).
 - Display-line motions are approximate on exotic fonts/CSS.
 - Visual block highlights only the primary range.
 - Engine deviation: a user mapping whose prefix is itself a bound key (e.g. `nnoremap <Space>x dd`

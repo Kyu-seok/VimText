@@ -39,6 +39,10 @@ _Avoid_: enable, wake, turn on
 **Mode**:
 The Vim editing mode a Field is currently in: Insert, Normal, Visual (charwise, linewise, blockwise), Replace, or Command-line.
 
+**Cursor**:
+Vim's position in a Field outside Insert mode: in Normal, the character it is on, shown as a block over that character. Not the caret, which is the browser's insertion point and what Insert mode types at.
+_Avoid_: caret (for the Normal position), overlay, highlight
+
 **Status Line**:
 The strip VimText shows at the edge of an activated Field, below it when there is room and above it otherwise: the current Mode, pending keys, macro-recording indicator, the command line for `:` `/` `?`, and messages such as Vim errors.
 _Avoid_: overlay, badge, mode indicator, HUD
