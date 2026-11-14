@@ -20,10 +20,21 @@ export interface DomPoint {
   offset: number;
 }
 
+/**
+ * Which text node a boundary between two of them maps into: the one after it
+ * (the node the next character belongs to, the default) or the one before.
+ */
+export type Side = "before" | "after";
+
 export interface Projection {
   readonly text: string;
-  /** The DOM position of a text offset, clamped to the text. */
-  toDom(offset: number): DomPoint;
+  /**
+   * The DOM position of a text offset, clamped to the text. Where the offset
+   * is the boundary between two text nodes, `side` picks which one's edge:
+   * the start of the one after (the default), or the end of the one before.
+   * Anywhere else (an Atom, a `<br>`, a block's edge) `side` changes nothing.
+   */
+  toDom(offset: number, side?: Side): DomPoint;
   /** The text offset of a DOM position inside the host. */
   fromDom(node: Node, offset: number): number;
   /** Each Atom's element and the offset of its U+FFFC, in text order. */
@@ -416,7 +427,7 @@ export function project(host: Element): Projection {
     return -range.comparePoint(b.node, b.offset);
   }
 
-  function toDom(offset: number): DomPoint {
+  function toDom(offset: number, side: Side = "after"): DomPoint {
     const k = Math.max(0, Math.min(text.length, offset));
     // The last piece starting at or before k: at a boundary shared by two
     // pieces, the one the character at k belongs to.
@@ -432,6 +443,10 @@ export function project(host: Element): Projection {
     }
     if (found < 0) return { node: host, offset: 0 };
     const p = pieces[found]!;
+    const prev = pieces[found - 1];
+    if (side === "before" && p.start === k && prev?.end === k && p.kind === "text" && prev.kind === "text") {
+      return { node: prev.to.node, offset: prev.to.offset };
+    }
     if (k > p.end) return p.to;
     switch (p.kind) {
       case "text":

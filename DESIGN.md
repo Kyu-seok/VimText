@@ -204,6 +204,12 @@ primary range is highlighted.
   one whose restore the editor took over and left undone (#62, accepted limitations below).
   The formatting at a write's edge is the editor's: text written at the end of a mark run takes
   the mark, as typing there would (`J` after an italic word makes the joining space italic).
+  The Insert caret VimText sets on a boundary between two runs of text takes a side (#63):
+  after a change that deleted text (`c`, `s`, `cw`, `C`, `S`), the side that held the deleted
+  text; with nothing deleted (`i`, `a`, `I`, `A`, `o`, `O`), the side before it, as native
+  typing there would. Keys typed while that caret settles are written on the same side. An
+  editor that types into the leaf of the selection (Slate) follows it; one that leaves typing
+  to Chromium takes the style before the boundary wherever the caret is (accepted limitations).
 - _Insert_: the editor owns typing as on every Field; the mirror re-projects the whole host
   on every `input`. No size budget until a measured finding asks for one. The one exception
   is a key typed while a write is still settling (the `o` or `cw` that entered Insert has
@@ -414,6 +420,11 @@ it is outside the gate, so PNG churn never fails `npm run check`.
   step; Lexical and Slate may take one per step of a write); the self-heal resyncs on the next key.
   Notion's blocks are one Field each, so `j`/`k` stop at a block's edge. A contenteditable
   in a closed shadow root is unreachable.
+- contenteditable (#63): on an editor that leaves typing to Chromium (Quill, Gmail's compose
+  body), text typed after `cw` on the first word of a mark run takes the style before the run:
+  Chromium's insertion at a boundary between two text nodes takes the style before it wherever
+  the caret is, so the Insert caret's side reaches only an editor that types into the leaf of
+  the selection (Slate). The end of a run and the no-deletion cases agree with Chromium's rule.
 - contenteditable (M4): `u` restores the text, not always its markup or marks. An undone line
   merge can leave the text in another block element, a character put back at the start of a
   bold run is plain, and a `plaintext-only` host keeps the `<br>` a merge left. An Atom comes

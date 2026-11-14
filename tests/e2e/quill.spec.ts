@@ -72,6 +72,25 @@ test("x r cw inside the bold run keep it bold; dw across its edge trims both sid
   await expect.poll(async () => (await modelText(page)).slice(1)).toEqual(ORIGINAL.slice(1));
 });
 
+/**
+ * #63: `cw` on the first word of a bold run. The owner decision puts the
+ * Insert caret in the run that held the deleted word, the start of the bold
+ * ` brown`, and that is where VimText sets it; but Quill leaves a collapsed
+ * insertion to Chromium, typed or written, and Chromium's `insertText` at a
+ * boundary between two text nodes takes the style before it wherever the
+ * caret was set (tests/unit/chromium-facts.test.ts, "Marks at a write's
+ * edges"). So the typed word is plain. Pinned as found: the decision's
+ * deleted-text side is out of reach on an editor that lets Chromium type.
+ */
+test("cw on the first word of the bold run types plain: Chromium types in the style before the run (#63)", async ({
+  page,
+}) => {
+  await page.keyboard.type("wcw");
+  await page.keyboard.type("QUICK");
+  await page.keyboard.press("Escape");
+  await expect.poll(async () => (await quillDoc(page))[0]).toBe("the QUICK<b> brown</b> fox");
+});
+
 test("dw on a whole bold word deletes it; the cursor stays where Vim puts it (#59)", async ({ page }) => {
   await page.keyboard.type("wdw");
   await expect.poll(async () => (await quillDoc(page))[0]).toBe("the <b>brown</b> fox");
