@@ -134,6 +134,7 @@ export class Session {
   readonly mirror: Mirror;
   readonly status: StatusLine;
   private readonly stopInput: () => void;
+  private readonly stopRefusingBreaks: () => void;
   /** Set when the command that entered Insert also changed text (cw, o, s…): the typed text joins its undo step. */
   private joinNextInsert = false;
   private firstInsertSync = true;
@@ -204,6 +205,9 @@ export class Session {
       this.scheduleRender();
     });
     this.stopInput = field.onInput(this.onFieldInput);
+    // Key Policy row 6 passes a Single-line Field's Enter in Normal to the
+    // page; the browser's own break it would then make is refused (#51).
+    this.stopRefusingBreaks = field.refuseNativeBreaks?.(() => !this.mirror.vim.insertMode) ?? (() => {});
     this.runVimrc(config);
     this.status.show();
     this.status.setMode(this.mode);
@@ -244,6 +248,17 @@ export class Session {
       // A change the log did not see (its length tells) leaves it unusable.
       point.since = point.since?.newLength === changes.length ? point.since.compose(changes) : null;
     }
+  }
+
+  /**
+   * The mirror's own changes from `before`, the Field's text, to `text`, the
+   * mirror's (CODING_STANDARDS rule 13): the agreed point's, when `before` is
+   * the text agreed there and they make `text` of it. None otherwise.
+   */
+  private changesFrom(before: string, text: string): ChangeSet | undefined {
+    const since = this.agreed.since;
+    if (!since || this.lastText !== before || since.length !== before.length) return undefined;
+    return since.apply(Text.of(before.split("\n"))).toString() === text ? since : undefined;
   }
 
   private get nativeInsert(): boolean {
@@ -712,7 +727,7 @@ export class Session {
     const before = this.field.getValue();
     if (text !== before) {
       const writtenAt = this.here();
-      const write = this.field.setValue(text);
+      const write = this.field.setValue(text, this.changesFrom(before, text));
       if (write) {
         const settled = () => this.writeSettled(before, text, writtenAt);
         this.pendingWrite = write.then(settled, (err: unknown) => {
@@ -794,7 +809,7 @@ export class Session {
    */
   private finishRender(point: AgreedPoint): void {
     const sel = this.renderedSelection();
-    if (!this.renderDue) this.field.setSelection(sel.anchor, sel.head);
+    if (!this.renderDue) this.field.setSelection(sel.anchor, sel.head, this.mirror.vim.insertMode);
     this.lastRendered = this.field.getSelection();
     this.lastText = this.field.getValue();
     this.readAtoms();
@@ -911,9 +926,13 @@ export class Session {
   /** `:q` — done editing here. */
   leave(): void {
     // The engine re-focuses the Field when its dialog closes; blur after that.
+    // That focus puts a contenteditable's caret at its start (its selection
+    // was in the command line), so the cursor is read now (#65).
+    const { anchor, head } = this.renderedSelection();
+    const caret = Math.min(anchor, head);
     queueMicrotask(() => {
       this.noticeOutlivesBlur = !!this.mirror.dialog;
-      this.field.blur();
+      this.field.blur(caret);
       if (!this.noticeOutlivesBlur) this.status.hide();
     });
   }
@@ -924,6 +943,7 @@ export class Session {
     this.mirror.cm.off("vim-mode-change", this.onModeChange);
     this.mirror.cm.off("dialog", this.onDialogChange);
     this.stopInput();
+    this.stopRefusingBreaks();
     this.mirror.destroy();
     this.status.destroy();
   }

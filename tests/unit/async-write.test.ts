@@ -2,7 +2,16 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { Session } from "../../src/bridge/Session";
 import { TextareaField } from "../../src/field/TextareaField";
 import { ContentEditableField } from "../../src/field/ContentEditableField";
-import { activeHost, blockTexts, caretAt, editableHost, inputLog, selectedText } from "./contenteditable";
+import {
+  activeHost,
+  blockTexts,
+  breaksOnShiftEnter,
+  caretAt,
+  editableHost,
+  inputLog,
+  keydownLog,
+  selectedText,
+} from "./contenteditable";
 import { keyDriver, settledKeyDriver } from "./keys";
 import { statusText } from "./dom";
 
@@ -317,6 +326,116 @@ describe("A refused line break no one typed (#73)", () => {
     await settledKeys("yyp");
     expect(blockTexts(host)).toEqual(["one", "two"]);
     expect(statusText()).toContain(REFUSED);
+  });
+});
+
+describe("A line break the page makes only on a Shift+Enter keydown (#70)", () => {
+  /** A Session on a block holding `text` with literal `\n` line breaks under `white-space: break-spaces`, as a Notion block does. */
+  function breakSpacesBlock(text: string) {
+    const host = editableHost(text);
+    host.style.whiteSpace = "break-spaces";
+    host.focus();
+    caretAt(host.firstChild!, 0);
+    const field = new ContentEditableField(host);
+    const session = new Session(field, { vimrc: "" });
+    current = {
+      session,
+      destroy() {
+        session.destroy();
+        field.destroy();
+      },
+    };
+    return { host, session };
+  }
+
+  /** A Notion block holding `text`: its line breaks made only on Shift+Enter. */
+  function notionBlock(text: string) {
+    const opened = breakSpacesBlock(text);
+    return { ...opened, keysSeen: breaksOnShiftEnter(opened.host) };
+  }
+
+  it("o then text opens a line below and the text lands on it", async () => {
+    const { host, session, keysSeen } = notionBlock("one\ntwo");
+    keys("ox");
+    keydown("Escape");
+    await session.settled();
+    expect(host.textContent).toBe("one\nx\ntwo");
+    expect(keysSeen).toEqual(["Shift+Enter"]);
+    expect(statusText()).not.toContain(REFUSED);
+  });
+
+  it("o then text on the block's last line opens a line below it", async () => {
+    const { host, session, keysSeen } = notionBlock("one\ntwo");
+    keys("Gox");
+    keydown("Escape");
+    await session.settled();
+    expect(host.innerText).toBe("one\ntwo\nx");
+    expect(keysSeen).toEqual(["Shift+Enter"]);
+    expect(statusText()).not.toContain(REFUSED);
+  });
+
+  it("G A, Enter, text and Esc back to back: the Enter VimText writes lands as Shift+Enter, the text below it", async () => {
+    // The e2e burst on the Notion shape (site-shapes.spec.ts) may take the
+    // person's own Enter instead; this pins the written one.
+    const { host, session, keysSeen } = notionBlock("one\ntwo");
+    keys("GA");
+    keydown("Enter");
+    keys("fast");
+    keydown("Escape");
+    await session.settled();
+    expect(host.innerText).toBe("one\ntwo\nfast");
+    expect(keysSeen).toEqual(["Shift+Enter"]);
+    expect(statusText()).not.toContain(REFUSED);
+  });
+
+  it("O then text opens a line above and the text lands on it", async () => {
+    const { host, session } = notionBlock("one\ntwo");
+    keys("jOx");
+    keydown("Escape");
+    await session.settled();
+    expect(host.textContent).toBe("one\nx\ntwo");
+    expect(statusText()).not.toContain(REFUSED);
+  });
+
+  it("a linewise p puts the line below", async () => {
+    const { host } = notionBlock("one\ntwo");
+    await settledKeys("yyp");
+    expect(host.textContent).toBe("one\none\ntwo");
+    expect(statusText()).not.toContain(REFUSED);
+  });
+
+  it("J then u restores the line break", async () => {
+    const { host, keysSeen } = notionBlock("one\ntwo");
+    await settledKeys("J");
+    expect(host.textContent).toBe("one two");
+    await settledKeys("u");
+    expect(host.textContent).toBe("one\ntwo");
+    expect(keysSeen).toEqual(["Shift+Enter"]);
+    expect(statusText()).not.toContain(REFUSED);
+  });
+
+  it("a page that ignores the Shift+Enter keydown too: o is still refused whole, with the message", async () => {
+    const { host, session } = breakSpacesBlock("one\ntwo");
+    host.addEventListener("beforeinput", (e) => {
+      if (e.inputType === "insertParagraph" || e.inputType === "insertLineBreak") e.preventDefault();
+    });
+    const keysSeen = keydownLog(host);
+    keys("ox");
+    await session.settled();
+    expect(keysSeen).toEqual(["Shift+Enter"]);
+    expect(host.textContent).toBe("one\ntwo");
+    expect(statusText()).toContain(REFUSED);
+  });
+
+  it("a page that takes insertParagraph never receives the keydown", async () => {
+    const { host, session } = open("<p>one</p><p>two</p>");
+    const keysSeen = keydownLog(host);
+    keys("ox");
+    keydown("Escape");
+    await session.settled();
+    await settledKeys("yypJu");
+    expect(blockTexts(host)).toEqual(["one", "x", "x", "two"]);
+    expect(keysSeen).toEqual([]);
   });
 });
 

@@ -1,6 +1,7 @@
+import type { ChangeSet } from "@codemirror/state";
 import type { Field, FieldSelection, WrappingStyle } from "./Field";
 import { diffHunks, diffText, type TextDiff } from "./diff";
-import { project, type DomPoint, type Projection } from "./projection";
+import { project, type DomPoint, type Projection, type Side } from "./projection";
 import { readDomSelection, selectDom } from "./domSelection";
 import {
   deleteMarker,
@@ -63,6 +64,38 @@ const PERSON_SELECTS = ["pointerdown", "mousedown", "touchstart", "compositionst
  * more than once before Slate rendered it.
  */
 const HELD_EARLIER = 3;
+
+/**
+ * The side of the boundary at `from` that held the text a write deleted from
+ * `from` to `to` (owner decision on #63): the text node the first deleted
+ * character shared with the character before the span, or with the one after
+ * it. None when it shared neither (a run deleted whole) or the span is no
+ * deletion.
+ */
+function deletedSide(projection: Projection, from: number, to: number): Side | null {
+  if (to <= from) return null;
+  const nodeOf = (i: number): Node | null => {
+    if (i < 0 || i >= projection.text.length) return null;
+    const { node } = projection.toDom(i);
+    return node.nodeType === Node.TEXT_NODE ? node : null;
+  };
+  const deleted = nodeOf(from);
+  if (!deleted) return null;
+  if (nodeOf(from - 1) === deleted) return "before";
+  if (nodeOf(to) === deleted) return "after";
+  return null;
+}
+
+/** The last of `changes`: its range in the text before them and after, and how much it inserts. */
+function lastChange(
+  changes: ChangeSet,
+): { fromA: number; toA: number; fromB: number; toB: number; inserted: number } | undefined {
+  const found: { fromA: number; toA: number; fromB: number; toB: number; inserted: number }[] = [];
+  changes.iterChanges((fromA, toA, fromB, toB, inserted) => {
+    found.push({ fromA, toA, fromB, toB, inserted: inserted.length });
+  });
+  return found.at(-1);
+}
 
 /** How many removed Atoms a Field keeps for undo; older ones come back as nothing. */
 const REMOVED_ATOMS_KEPT = 200;
@@ -157,7 +190,21 @@ export class ContentEditableField implements Field {
    * the few it set before on the same text: an editor that puts one of those
    * back over it meanwhile is undone once (`holdSelection`).
    */
-  private held: { anchor: number; head: number; text: string; earlier: FieldSelection[] } | null = null;
+  private held: {
+    anchor: number;
+    head: number;
+    side: Side;
+    text: string;
+    earlier: FieldSelection[];
+  } | null = null;
+  /**
+   * Where the Insert caret goes on a boundary between two runs of text, and
+   * where text written there lands (owner decision on #63): at offset `at`,
+   * the text unchanged since, `side`. A write that deleted text records the
+   * side that held it; an Insert caret set records the side it took; a write
+   * that inserted at it records the insertion's end, on the same side.
+   */
+  private caretSide: { at: number; side: Side; text: string } | null = null;
   private readonly release = () => {
     this.held = null;
   };
@@ -212,9 +259,11 @@ export class ContentEditableField implements Field {
   }
 
   /** Resolves once the write has settled. One write at a time: the Session waits for one before the next. */
-  setValue(text: string): Promise<void> {
-    const old = project(this.element).text;
+  setValue(text: string, changes?: ChangeSet): Promise<void> {
+    const before = project(this.element);
+    const old = before.text;
     if (old === text) return Promise.resolve();
+    const caret = changes ? this.caretSideAfter(before, changes) : null;
     // Each changed span on its own, first to last (`diffHunks`): the text
     // after the k-th is the new text up to its end and the old text after it.
     const textAfterEachSpan = diffHunks(old, text).map((h) => text.slice(0, h.toNew) + old.slice(h.toOld));
@@ -227,10 +276,38 @@ export class ContentEditableField implements Field {
         await nextTask();
       } finally {
         this.writing = false;
-        if (!this.destroyed) this.noteAtoms(project(this.element));
+        if (!this.destroyed) {
+          const projection = project(this.element);
+          this.noteAtoms(projection);
+          this.caretSide = caret && { ...caret, text: projection.text };
+        }
       }
     };
     return write();
+  }
+
+  /**
+   * Where the Insert caret's side stands after the mirror's `changes` to
+   * `before` (owner decision on #63), read from those changes, never from a
+   * diff of the texts (CODING_STANDARDS rule 13; a diff puts a deletion beside
+   * the same characters wherever it likes: `s` on the first `b` of
+   * `a<b>bbc</b>` read as the second's, inside the run). When the last of them
+   * deleted text and inserted none: where it was, on the side that held it.
+   * When it inserted at the Insert caret, on the caret's side (`sideAt`): at
+   * its end, on that side, so the next write of keys typed meanwhile lands in
+   * the same run (under load they come as more than one write). Otherwise none.
+   */
+  private caretSideAfter(before: Projection, changes: ChangeSet): { at: number; side: Side } | null {
+    if (changes.length !== before.text.length) return null;
+    const last = lastChange(changes);
+    if (!last) return null;
+    if (last.inserted === 0) {
+      const side = deletedSide(before, last.fromA, last.toA);
+      return side && { at: last.fromB, side };
+    }
+    const c = this.caretSide;
+    const atCaret = last.fromA === last.toA && c && c.at === last.fromA && c.text === before.text;
+    return atCaret ? { at: last.toB, side: c.side } : null;
   }
 
   /**
@@ -247,7 +324,7 @@ export class ContentEditableField implements Field {
     const restored = this.takeRemovedAtoms(span.from, span.insert);
     this.keepRemovedAtoms(projection, span.from, span.to);
     if (!span.insert.includes(ATOM_CHAR)) {
-      await this.replace(span.from, span.to, span.insert, projection);
+      await this.replace(span.from, span.to, span.insert, projection, this.sideAt(span.from, span.to, old));
     } else {
       await this.writeWithAtoms(span.from, span.to, span.insert, restored);
     }
@@ -294,20 +371,32 @@ export class ContentEditableField implements Field {
   private readonly pauses: Pauses = { step: this.pause, settle: this.settle };
 
   /**
+   * The side of a boundary an insertion at `from` lands on: the Insert
+   * caret's (`caretSide`), when the span inserts at it into the text the caret
+   * was set in. Keys typed while a write or the caret settles are written
+   * (`Session.typeWhileWriting`), and land where the caret is.
+   */
+  private sideAt(from: number, to: number, text: string): Side {
+    return from === to ? this.caretSideAt(from, text, "after") : "after";
+  }
+
+  /**
    * Replaces the text from offset `from` to `to` with `insert` through
    * `replaceDomRange`, the offsets mapped through `projection` (a fresh one
-   * by default), the caret after a paragraph break where the projection then
-   * puts the written text's end (`caretFrom`).
+   * by default) on `side` of a boundary between runs, the caret after a
+   * paragraph break where the projection then puts the written text's end
+   * (`caretFrom`).
    */
   private replace(
     from: number,
     to: number,
     insert: string,
     projection = project(this.element),
+    side: Side = "after",
   ): Promise<boolean> {
     const edit = {
-      from: projection.toDom(from),
-      to: projection.toDom(to),
+      from: projection.toDom(from, side),
+      to: projection.toDom(to, side),
       text: insert,
       caretAfter: this.caretFrom(from),
     };
@@ -454,7 +543,16 @@ export class ContentEditableField implements Field {
     return { ...this.lastSelection };
   }
 
-  setSelection(anchor: number, head: number): void {
+  /**
+   * An Insert caret (`insertCaret`, collapsed) on a boundary between two runs
+   * of text goes on the side the owner decision on #63 names: the side that
+   * held the text the last write deleted there, or with nothing deleted the
+   * side before it, as native typing there would. Slate types into the leaf
+   * of the selection, and a write of keys typed while the caret settles lands
+   * on the same side (`sideAt`). Any other selection maps a boundary to the
+   * start of the run after it.
+   */
+  setSelection(anchor: number, head: number, insertCaret = false): void {
     const projection = project(this.element);
     const len = projection.text.length;
     const a = Math.max(0, Math.min(len, anchor));
@@ -462,21 +560,33 @@ export class ContentEditableField implements Field {
     this.lastSelection = { anchor: a, head: h };
     const before = this.held;
     this.held = null;
+    const side = insertCaret && a === h ? this.caretSideAt(a, projection.text, "before") : "after";
+    this.caretSide = insertCaret ? { at: a, side, text: projection.text } : null;
     // A selection set inside a blurred host focuses it (docs/engine-seams.md,
     // Editing commands and events): it would take focus from the command
     // line, which closes on blur. The render on focus sets it.
     if (!this.hasFocus()) return;
-    selectDom(this.element, projection.toDom(a), projection.toDom(h));
+    selectDom(this.element, projection.toDom(a, side), projection.toDom(h, side));
     const earlier =
       before && before.text === projection.text
         ? [{ anchor: before.anchor, head: before.head }, ...before.earlier].slice(0, HELD_EARLIER)
         : [];
-    this.held = { anchor: a, head: h, text: projection.text, earlier };
+    this.held = { anchor: a, head: h, side, text: projection.text, earlier };
     // The editor takes the cursor into its model now, as after a write step: it
     // lands a task or more after the write (ADR 0008). Without this the
     // ProseMirror e2e intermittently ended with a collapsed selection and an
     // input rule that never ran (#52; cause not pinned down).
     settleEditor(this.element);
+  }
+
+  /**
+   * The side `caretSide` records for offset `at` in `text`, or `otherwise`:
+   * an Insert caret's (`otherwise` before) and an insertion written at it
+   * (`sideAt`, `otherwise` after) read the same record.
+   */
+  private caretSideAt(at: number, text: string, otherwise: Side): Side {
+    const c = this.caretSide;
+    return c && c.at === at && c.text === text ? c.side : otherwise;
   }
 
   /**
@@ -505,7 +615,7 @@ export class ContentEditableField implements Field {
     const stale = held.earlier.some((e) => e.anchor === anchor && e.head === head);
     this.held = null;
     if (!stale) return;
-    selectDom(this.element, projection.toDom(held.anchor), projection.toDom(held.head));
+    selectDom(this.element, projection.toDom(held.anchor, held.side), projection.toDom(held.head, held.side));
     settleEditor(this.element);
   }
 
@@ -544,8 +654,37 @@ export class ContentEditableField implements Field {
     this.focusTarget().focus({ preventScroll: true });
   }
 
-  blur(): void {
+  /**
+   * A host's selection outlives its focus: a Normal-mode cursor would stay
+   * drawn over a character of an editor VimText has left (#65). It becomes a
+   * caret first, at `caret`, so focusing the host again resumes there; the
+   * editor takes the caret into its model before the blur, and has no
+   * one-character selection to put back.
+   */
+  blur(caret: number): void {
+    this.held = null;
+    const focused = this.hasFocus();
+    this.selectCaret(caret);
+    if (!focused) this.selectCaretOverFocusRender(caret);
+    settleEditor(this.element);
     this.focusTarget().blur();
+  }
+
+  /**
+   * Selects the caret again after selecting it in a blurred host focused the
+   * host (`:wq`: the notice took the command line's place without
+   * re-focusing the Field): the focus event fired during that call, and the
+   * Session's focus handler drew the Normal cursor over the caret
+   * (docs/engine-seams.md, "Leaving a contenteditable Field").
+   */
+  private selectCaretOverFocusRender(caret: number): void {
+    this.selectCaret(caret);
+  }
+
+  private selectCaret(offset: number): void {
+    const projection = project(this.element);
+    const at = projection.toDom(Math.max(0, Math.min(projection.text.length, offset)));
+    selectDom(this.element, at, at);
   }
 
   visibleLineCount(): number {
@@ -554,6 +693,22 @@ export class ContentEditableField implements Field {
     const visible = Math.min(this.element.clientHeight, window.innerHeight);
     const inner = visible - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
     return Math.max(1, Math.floor(inner / lh));
+  }
+
+  refuseNativeBreaks(when: () => boolean): () => void {
+    const win = this.element.ownerDocument.defaultView;
+    if (!this.singleLine || !win) return () => {};
+    // On the window, bubbling: the page's own listeners have had the event
+    // first, so an editor that handles the break itself still does.
+    const refuse = (e: Event) => {
+      const type = (e as InputEvent).inputType;
+      if (!e.isTrusted || e.defaultPrevented) return;
+      if (type !== "insertParagraph" && type !== "insertLineBreak") return;
+      if (!e.composedPath().includes(this.element) || !when()) return;
+      e.preventDefault();
+    };
+    win.addEventListener("beforeinput", refuse);
+    return () => win.removeEventListener("beforeinput", refuse);
   }
 
   onInput(handler: () => void): () => void {

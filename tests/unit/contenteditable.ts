@@ -101,3 +101,47 @@ export function activeHost(html: string, opts: Parameters<typeof editableHost>[1
     },
   };
 }
+
+/**
+ * Makes `host` take line breaks the way a Notion block does (#70): it cancels a
+ * synthetic `insertParagraph` or `insertLineBreak` and does nothing, and makes
+ * a literal `\n` at the selection on a Shift+Enter keydown, only when its
+ * legacy `keyCode` is 13 as live Notion requires (2026-11-14), (the host
+ * should be `white-space: break-spaces`, as a Notion block is), two at the block's end
+ * so the new line renders (`tests/unit/chromium-facts.test.ts`, "A line
+ * break at the end of a pre-wrap block"). Like live Notion it
+ * leaves the keydown's `defaultPrevented` false. Returns the keydowns the
+ * host saw, as `Shift+Enter` or the key.
+ */
+export function breaksOnShiftEnter(host: HTMLElement): string[] {
+  const seen: string[] = [];
+  host.addEventListener("beforeinput", (e) => {
+    if (e.inputType === "insertParagraph" || e.inputType === "insertLineBreak") e.preventDefault();
+  });
+  host.addEventListener("keydown", (e) => {
+    seen.push(e.shiftKey && e.key === "Enter" ? "Shift+Enter" : e.key);
+    if (e.key !== "Enter" || !e.shiftKey || e.keyCode !== 13) return;
+    const sel = getSelection()!;
+    const range = sel.getRangeAt(0);
+    range.deleteContents();
+    const { startContainer: node, startOffset: offset } = range;
+    if (node instanceof Text) {
+      // At the block's end a lone `\n` renders no line: a second holds it, as Chromium's own line break does.
+      const atEnd = offset === node.length && !node.nextSibling;
+      node.insertData(offset, atEnd ? "\n\n" : "\n");
+      sel.setBaseAndExtent(node, offset + 1, node, offset + 1);
+    } else {
+      const text = document.createTextNode("\n");
+      range.insertNode(text);
+      sel.setBaseAndExtent(text, 1, text, 1);
+    }
+  });
+  return seen;
+}
+
+/** The keydowns `host` sees, by key: what a page's own keydown listener would get. */
+export function keydownLog(host: HTMLElement): string[] {
+  const seen: string[] = [];
+  host.addEventListener("keydown", (e) => seen.push(e.shiftKey && e.key === "Enter" ? "Shift+Enter" : e.key));
+  return seen;
+}

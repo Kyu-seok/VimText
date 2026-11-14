@@ -44,3 +44,35 @@ test("the same host without the attribute: yyp pastes a line, o opens one, Enter
   await expect.poll(() => blockTexts(page, "#body")).toEqual(["hello world", "hello world", "new"]);
   await expect(page.locator("#log")).not.toContainText("submit");
 });
+
+test("on a host whose page does not handle Enter, Enter in Normal edits nothing: w Enter x deletes w", async ({
+  page,
+}) => {
+  await activateAtStart(page, "#bare");
+  await page.keyboard.type("w");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("x");
+  await expect.poll(() => blockTexts(page, "#bare")).toEqual(["hello orld"]);
+  await expect(page.locator("#log")).not.toContainText("insertParagraph");
+});
+
+test("on a host whose page does not handle Enter, u after Enter undoes the edit before it", async ({
+  page,
+}) => {
+  await activateAtStart(page, "#bare");
+  await page.keyboard.type("x");
+  await expect.poll(() => blockTexts(page, "#bare")).toEqual(["ello world"]);
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("u");
+  await expect.poll(() => blockTexts(page, "#bare")).toEqual(["hello world"]);
+});
+
+test("on a host whose page does not handle Enter, Enter in Insert is still the browser's", async ({
+  page,
+}) => {
+  await activateAtStart(page, "#bare");
+  await page.keyboard.type("i");
+  await expect.poll(() => statusText(page)).toContain("INSERT");
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#log")).toContainText("input:insertParagraph");
+});

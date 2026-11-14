@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
+import { ChangeSet } from "@codemirror/state";
 import { ContentEditableField } from "../../src/field/ContentEditableField";
 import {
   blockTexts,
@@ -50,7 +51,7 @@ describe("ContentEditableField", () => {
     caretAt(a.firstChild!, 1);
     expect(field.hasFocus()).toBe(false);
     caretAt(b.firstChild!, 1);
-    field.blur();
+    field.blur(1);
     expect(document.activeElement).not.toBe(root);
     field.focus();
     expect(document.activeElement).toBe(root);
@@ -177,9 +178,135 @@ describe("ContentEditableField", () => {
   it("reports focus on its host", async () => {
     const { field } = fieldOn("<p>ab</p>");
     expect(field.hasFocus()).toBe(true);
-    field.blur();
+    field.blur(0);
     expect(field.hasFocus()).toBe(false);
     field.focus();
     expect(field.hasFocus()).toBe(true);
+  });
+
+  // #65: a host's selection outlives its focus; the cursor must not stay drawn.
+  describe("blur leaves a caret, nothing highlighted, where focusing again resumes", () => {
+    it("at the caret it is given", () => {
+      const { field } = fieldOn("<p>ab<b>cd</b></p>");
+      field.setSelection(0, 1);
+      field.blur(2);
+      expect(document.getSelection()!.isCollapsed).toBe(true);
+      field.focus();
+      expect(field.getSelection()).toEqual({ anchor: 2, head: 2 });
+    });
+
+    it("at the caret it is given while the host is already blurred, whose selection is elsewhere", () => {
+      const { host, field } = fieldOn("<p>ab</p>");
+      const input = document.createElement("input");
+      document.body.append(input);
+      input.focus();
+      expect(field.hasFocus()).toBe(false);
+      field.blur(1);
+      expect(document.activeElement).not.toBe(host);
+      expect(document.getSelection()!.isCollapsed).toBe(true);
+      field.focus();
+      expect(field.getSelection()).toEqual({ anchor: 1, head: 1 });
+      input.remove();
+    });
+  });
+});
+
+/**
+ * Owner decision on #63: the Insert caret on a boundary between two runs of
+ * text sits, after a change that deleted text, on the side that held the
+ * deleted text; with nothing deleted, on the side before it, as native typing
+ * there would. Slate types into the leaf of the selection (or of a write's
+ * target range), so the side decides the typed text's marks there; Chromium's
+ * own typing takes the style before the boundary either way
+ * (tests/unit/chromium-facts.test.ts, "Marks at a write's edges").
+ */
+describe("The Insert caret at a boundary between two runs (#63)", () => {
+  const RUNS = "<p>ab<b>cdef</b>gh</p>";
+  const bold = (host: HTMLElement) => host.querySelector("b")!.firstChild!;
+  const caret = () => ({ node: getSelection()!.focusNode, offset: getSelection()!.focusOffset });
+  /** The mirror's change that deletes `from`–`to` of RUNS' text, as the Session hands it to the write. */
+  const cut = (from: number, to: number) => ChangeSet.of({ from, to }, "abcdefgh".length);
+
+  /** The node and offset each `beforeinput` the host fires starts its target range at, as Slate reads it. */
+  function targetStarts(host: HTMLElement): { node: Node; offset: number }[] {
+    const starts: { node: Node; offset: number }[] = [];
+    host.addEventListener("beforeinput", (e) => {
+      const r = (e as InputEvent).getTargetRanges()[0];
+      if (r) starts.push({ node: r.startContainer, offset: r.startOffset });
+    });
+    return starts;
+  }
+
+  it("with nothing deleted it sits at the end of the run before the boundary", () => {
+    const { host, field } = fieldOn(RUNS);
+    field.setSelection(6, 6, true); // `a` after `cdef`
+    expect(caret()).toEqual({ node: bold(host), offset: 4 });
+    field.setSelection(2, 2, true); // `i` on `c`
+    expect(caret()).toEqual({ node: host.firstChild!.firstChild, offset: 2 });
+  });
+
+  it("a Normal cursor at a boundary is unchanged: the start of the run after it", () => {
+    const { host, field } = fieldOn(RUNS);
+    field.setSelection(2, 2);
+    expect(caret()).toEqual({ node: bold(host), offset: 0 });
+  });
+
+  it("after a deletion at a run's end it sits in that run", async () => {
+    const { host, field } = fieldOn(RUNS);
+    await field.setValue("abcdgh", cut(4, 6)); // `cw` on `ef`
+    field.setSelection(4, 4, true);
+    expect(caret()).toEqual({ node: bold(host), offset: 2 });
+  });
+
+  it("after a deletion at a run's start it sits in that run", async () => {
+    const { host, field } = fieldOn(RUNS);
+    await field.setValue("abefgh", cut(2, 4)); // `cw` on `cd`
+    field.setSelection(2, 2, true);
+    expect(caret()).toEqual({ node: bold(host), offset: 0 });
+  });
+
+  it("text typed while the caret settles is written on the caret's side", async () => {
+    const { host, field } = fieldOn(RUNS);
+    const starts = targetStarts(host);
+    field.setSelection(6, 6, true);
+    await field.setValue("abcdefSgh");
+    expect(starts[0]).toEqual({ node: bold(host), offset: 4 });
+  });
+
+  it("text typed while a deletion at a run's start settles is written in that run", async () => {
+    const { host, field } = fieldOn(RUNS);
+    const starts = targetStarts(host);
+    await field.setValue("abefgh", cut(2, 4)); // `cw` on `cd`, the caret not yet set
+    await field.setValue("abXYefgh");
+    expect(starts[1]).toEqual({ node: bold(host), offset: 0 });
+  });
+
+  it("text typed while a deletion at a run's end settles is written in that run", async () => {
+    const { host, field } = fieldOn(RUNS);
+    const starts = targetStarts(host);
+    await field.setValue("abcdgh", cut(4, 6)); // `cw` on `ef`, the caret not yet set
+    await field.setValue("abcdXYgh");
+    expect(starts[1]).toEqual({ node: bold(host), offset: 2 });
+  });
+
+  // Under load the keys typed while the deletion settles land as more than one
+  // write: Slate's "x r cw inside the bold run" ended `uXck l</b>azy` in the
+  // pre-push run, the second write at the start of the plain run.
+  it("text typed while a deletion at a run's end settles, written in two writes, is all written in that run", async () => {
+    const { host, field } = fieldOn(RUNS);
+    const starts = targetStarts(host);
+    await field.setValue("abcdgh", cut(4, 6)); // `cw` on `ef`, the caret not yet set
+    await field.setValue("abcdXgh", ChangeSet.of({ from: 4, insert: "X" }, 6));
+    await field.setValue("abcdXYgh", ChangeSet.of({ from: 5, insert: "Y" }, 7));
+    expect(starts[2]).toEqual({ node: bold(host), offset: 3 });
+  });
+
+  it("text typed while the caret settles, written in two writes, is all written on the caret's side", async () => {
+    const { host, field } = fieldOn(RUNS);
+    const starts = targetStarts(host);
+    field.setSelection(6, 6, true); // `a` after `cdef`
+    await field.setValue("abcdefSgh", ChangeSet.of({ from: 6, insert: "S" }, 8));
+    await field.setValue("abcdefSTgh", ChangeSet.of({ from: 7, insert: "T" }, 9));
+    expect(starts[1]).toEqual({ node: bold(host), offset: 5 });
   });
 });

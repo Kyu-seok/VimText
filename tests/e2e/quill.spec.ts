@@ -72,6 +72,27 @@ test("x r cw inside the bold run keep it bold; dw across its edge trims both sid
   await expect.poll(async () => (await modelText(page)).slice(1)).toEqual(ORIGINAL.slice(1));
 });
 
+/**
+ * #63: `cw` on the first word of a bold run. The owner decision puts the
+ * Insert caret in the run that held the deleted word, the start of the bold
+ * ` brown`, and that is where VimText sets it; but Quill leaves a collapsed
+ * insertion to Chromium, typed or written, and Chromium's `insertText` at a
+ * boundary between two text nodes takes the style before it wherever the
+ * caret was set (tests/unit/chromium-facts.test.ts, "Marks at a write's
+ * edges"). So the typed word is plain. Pins an accepted limitation
+ * (DESIGN.md, "Accepted limitations", #63), not a wanted behaviour: the
+ * decision's deleted-text side is out of reach on an editor that lets
+ * Chromium type.
+ */
+test("accepted limitation: cw on the first word of the bold run types plain, as Chromium types in the style before the run (#63)", async ({
+  page,
+}) => {
+  await page.keyboard.type("wcw");
+  await page.keyboard.type("QUICK");
+  await page.keyboard.press("Escape");
+  await expect.poll(async () => (await quillDoc(page))[0]).toBe("the QUICK<b> brown</b> fox");
+});
+
 test("dw on a whole bold word deletes it; the cursor stays where Vim puts it (#59)", async ({ page }) => {
   await page.keyboard.type("wdw");
   await expect.poll(async () => (await quillDoc(page))[0]).toBe("the <b>brown</b> fox");
@@ -269,4 +290,56 @@ test("u and Ctrl-r restore Quill's text", async ({ page }) => {
   await expect.poll(() => modelText(page)).toEqual(edited);
   await page.keyboard.type("u");
   await expect.poll(() => modelText(page)).toEqual(["the uick brown fox", ...ORIGINAL.slice(2)]);
+});
+
+test.describe("a formatting shortcut pressed while a write is being applied (#72)", () => {
+  const KEYS = [
+    "o",
+    "n",
+    "e",
+    " ",
+    "ControlOrMeta+b",
+    "t",
+    "w",
+    "o",
+    "ControlOrMeta+b",
+    " ",
+    "t",
+    "h",
+    "r",
+    "e",
+    "e",
+  ];
+
+  test("accepted limitation: Cmd+B pressed back to back after G A Enter keeps the line's text; its formatting depends on timing", async ({
+    page,
+  }) => {
+    // An accepted limitation (DESIGN.md, "Accepted limitations", #72), not a
+    // wanted behaviour, and an e2e that accepts more than one outcome
+    // (CODING_STANDARDS rule 7). The keys land while the caret move's write is
+    // still being applied: the characters go into the mirror and land with the
+    // merged write, while Cmd+B is not held and reaches Quill whenever it is
+    // pressed. Where it lands depends on timing: on a quiet machine before
+    // anything typed is there, so the line is plain; under the pre-push load
+    // (five repeats on four workers) also `one <b>two</b> three` and
+    // `<b>one two three</b>`. So this asserts only what holds in every
+    // outcome, that the text is kept. The working case, Cmd+B once the write
+    // has landed, is pinned deterministically by "Cmd+B pressed once the write
+    // has landed bolds what is typed after it" below.
+    for (const k of ["G", "A", "Enter", ...KEYS, "Escape"]) await page.keyboard.press(k);
+    await expect.poll(() => modelText(page)).toEqual([...ORIGINAL, "one two three"]);
+  });
+
+  test("Cmd+B pressed once the write has landed bolds what is typed after it", async ({ page }) => {
+    for (const k of ["G", "A", "Enter"]) await page.keyboard.press(k);
+    // The new empty line is in Quill's model: the write has been applied. The
+    // pause lets the caret VimText set settle too (#64), so the keys after it
+    // are the person's own, as typed at a normal pace (150 ms, as in triage).
+    await expect.poll(async () => (await modelText(page)).slice(5)).toEqual(["last line", ""]);
+    await page.waitForTimeout(150);
+    for (const k of [...KEYS, "Escape"]) await page.keyboard.press(k);
+    await expect
+      .poll(async () => (await quillDoc(page)).slice(5))
+      .toEqual(["last line", "one <b>two</b> three"]);
+  });
 });

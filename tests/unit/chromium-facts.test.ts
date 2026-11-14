@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { userEvent } from "@vitest/browser/context";
 import { caretAt, editableHost, inputLog, selectionOf } from "./contenteditable";
 
 /**
@@ -105,6 +106,42 @@ describe("Whitespace under editing", () => {
     caretAt(el.querySelector("p")!.firstChild!, 3);
     document.execCommand("insertText", false, " ");
     expect(el.querySelector("p")!.textContent).toBe("end ");
+  });
+});
+
+describe("Marks at a write's edges", () => {
+  const RUNS = "<p>ab<b>cdef</b>gh</p>";
+
+  it("insertText at a boundary between two text nodes takes the style before it, whichever node the caret is in", () => {
+    for (const [label, at] of [
+      ["start of the bold run", (b: Node) => [b, 0] as const],
+      ["end of the plain text before it", (b: Node) => [b.parentNode!.previousSibling!, 2] as const],
+    ] as const) {
+      const el = host(RUNS);
+      const [node, offset] = at(el.querySelector("b")!.firstChild!);
+      caretAt(node, offset);
+      document.execCommand("insertText", false, "X");
+      expect(el.innerHTML, label).toBe("<p>abX<b>cdef</b>gh</p>");
+    }
+    for (const [label, at] of [
+      ["end of the bold run", (b: Node) => [b, 4] as const],
+      ["start of the plain text after it", (b: Node) => [b.parentNode!.nextSibling!, 0] as const],
+    ] as const) {
+      const el = host(RUNS);
+      const [node, offset] = at(el.querySelector("b")!.firstChild!);
+      caretAt(node, offset);
+      document.execCommand("insertText", false, "X");
+      expect(el.innerHTML, label).toBe("<p>ab<b>cdefX</b>gh</p>");
+    }
+  });
+
+  it("text deleted from a run's start leaves no typing style: the next insertText takes the style before it", () => {
+    const el = host(RUNS);
+    const bold = el.querySelector("b")!.firstChild!;
+    select(bold, 0, bold, 2);
+    document.execCommand("delete");
+    document.execCommand("insertText", false, "X");
+    expect(el.innerHTML).toBe("<p>abX<b>ef</b>gh</p>");
   });
 });
 
@@ -291,5 +328,121 @@ describe("Selection and focus", () => {
     cleanup.push(() => ta.remove());
     ta.setSelectionRange(1, 1);
     expect(document.activeElement).not.toBe(ta);
+  });
+});
+
+describe("Leaving a contenteditable Field", () => {
+  it("a host keeps its selection when it blurs: a one-character range stays selected (#65)", () => {
+    const el = host("<p>hello</p>");
+    const text = el.querySelector("p")!.firstChild!;
+    select(text, 1, text, 2);
+    el.blur();
+    expect(document.activeElement).not.toBe(el);
+    expect(getSelection()!.toString()).toBe("e");
+  });
+
+  it("focus() on a host whose selection is elsewhere puts the caret at its start (#65)", () => {
+    const el = host("<p>hello</p>");
+    caretAt(el.querySelector("p")!.firstChild!, 3);
+    const input = document.createElement("input");
+    document.body.appendChild(input);
+    cleanup.push(() => input.remove());
+    input.focus();
+    el.focus();
+    const sel = getSelection()!;
+    expect(sel.isCollapsed).toBe(true);
+    expect(el.contains(sel.anchorNode)).toBe(true);
+    expect(sel.anchorOffset).toBe(0);
+  });
+
+  it("the focus that setting a selection inside a blurred host gives it fires during the call", () => {
+    const el = host("<p>hello</p>");
+    el.blur();
+    let focused = false;
+    el.addEventListener("focus", () => (focused = true));
+    caretAt(el.querySelector("p")!.firstChild!, 1);
+    expect(focused).toBe(true);
+  });
+});
+
+describe("A line break offered as Shift+Enter", () => {
+  /** A focused block holding `text` under `white-space: break-spaces`, as a Notion block is. */
+  function breakSpaces(text: string): HTMLElement {
+    const el = host(text);
+    el.style.whiteSpace = "break-spaces";
+    el.style.minHeight = "0";
+    return el;
+  }
+
+  it("a lone \\n ending the block renders no line: the block is as tall as without it", () => {
+    const el = breakSpaces("one\ntwo");
+    const height = el.getBoundingClientRect().height;
+    el.textContent = "one\ntwo\n";
+    expect(el.getBoundingClientRect().height).toBe(height);
+    el.textContent = "one\ntwo\n\n";
+    expect(el.getBoundingClientRect().height).toBeGreaterThan(height);
+  });
+
+  it("Chromium's own line break at the block's end writes two \\n, the caret between them", () => {
+    const el = breakSpaces("one\ntwo");
+    caretAt(el.firstChild!, 7);
+    document.execCommand("insertLineBreak");
+    expect(el.innerHTML).toBe("one\ntwo\n\n");
+    const beforeCaret = document.createRange();
+    beforeCaret.setStart(el, 0);
+    beforeCaret.setEnd(getSelection()!.anchorNode!, getSelection()!.anchorOffset);
+    expect(beforeCaret.toString()).toBe("one\ntwo\n");
+  });
+
+  it("a synthetic Shift+Enter keydown on the block changes nothing by itself", () => {
+    const el = breakSpaces("one\ntwo");
+    caretAt(el.firstChild!, 3);
+    const key = new KeyboardEvent("keydown", {
+      key: "Enter",
+      code: "Enter",
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    el.dispatchEvent(key);
+    expect(el.innerHTML).toBe("one\ntwo");
+  });
+
+  it("a synthetic keydown takes the legacy keyCode and which from its init, as Notion reads them (#70)", () => {
+    const key = new KeyboardEvent("keydown", {
+      key: "Enter",
+      code: "Enter",
+      shiftKey: true,
+      keyCode: 13,
+      which: 13,
+    });
+    expect(key.keyCode).toBe(13);
+    expect(key.which).toBe(13);
+  });
+});
+
+describe("Enter on a Single-line host", () => {
+  it("a trusted Enter over a one-character selection fires a cancelable insertParagraph beforeinput that replaces the selection", async () => {
+    const el = host("<p>hello world</p>", { attrs: { "aria-multiline": "false" } });
+    const seen: { type: string; trusted: boolean; cancelable: boolean }[] = [];
+    el.addEventListener("beforeinput", (e) =>
+      seen.push({ type: (e as InputEvent).inputType, trusted: e.isTrusted, cancelable: e.cancelable }),
+    );
+    const text = el.querySelector("p")!.firstChild!;
+    select(text, 6, text, 7);
+    await userEvent.keyboard("{Enter}");
+    expect(seen).toEqual([{ type: "insertParagraph", trusted: true, cancelable: true }]);
+    expect(el.innerHTML).toBe("<p>hello&nbsp;</p><p>orld</p>");
+  });
+
+  it("cancelling that beforeinput leaves the host and the selection as they were", async () => {
+    const el = host("<p>hello world</p>", { attrs: { "aria-multiline": "false" } });
+    el.addEventListener("beforeinput", (e) => e.preventDefault());
+    const text = el.querySelector("p")!.firstChild!;
+    select(text, 6, text, 7);
+    await userEvent.keyboard("{Enter}");
+    expect(el.innerHTML).toBe("<p>hello world</p>");
+    const sel = getSelection()!;
+    expect([sel.anchorNode, sel.anchorOffset, sel.focusNode, sel.focusOffset]).toEqual([text, 6, text, 7]);
   });
 });

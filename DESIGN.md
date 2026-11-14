@@ -93,7 +93,10 @@ reaches them:
 4. `Tab`/`Shift+Tab`: Pass-through (focus navigation).
 5. `Esc`/`Ctrl+[` while already in Normal: Pass-through (lets site modals close on 2nd press).
 6. `Enter` on a Single-line Field in plain Normal (no pending count or operator): Pass-through
-   (submits). In a textarea it is the Vim motion.
+   (submits). In a textarea it is the Vim motion. The page's keydown handler runs; on a
+   contenteditable Single-line Field the browser's own default edit for it (a trusted
+   `beforeinput` of `insertParagraph` or `insertLineBreak` the page did not cancel) is
+   cancelled, as an `<input>` inserts nothing on Enter (#51).
 7. `o`/`O` on a Single-line Field in Normal: swallowed as a Vim beep, pending count cleared.
    Visual-mode `o`/`O` (other end of the selection) keep working.
 
@@ -147,7 +150,10 @@ primary range is highlighted.
   key on the root resolves by the caret, and such a Field has focus while the root does and
   the caret is in it. So Notion has one Field, Session and undo history per block.
 - _Single-line_: only when the host declares `aria-multiline="false"`; it then takes every
-  Single-line Field rule (newline strip, rule 6, rule 7). No guessing from height or role. Adding or removing the
+  Single-line Field rule (newline strip, rule 6, rule 7). On a page that does not handle
+  Enter, rule 6 leaves the host as it was: outside Insert mode VimText cancels the browser's
+  trusted line-break `beforeinput`, which would replace the block cursor's character (#51);
+  Insert-mode Enter stays native and the newline strip rejoins the lines. No guessing from height or role. Adding or removing the
   attribute ends a Session on that host; the next Activation makes the Field of the new kind.
 - _Projection_: the Field's text is the host's plain text, read by VimText's own DOM walker
   so every offset maps back to a (node, offset) position. Line breaks follow `innerText`,
@@ -198,6 +204,12 @@ primary range is highlighted.
   one whose restore the editor took over and left undone (#62, accepted limitations below).
   The formatting at a write's edge is the editor's: text written at the end of a mark run takes
   the mark, as typing there would (`J` after an italic word makes the joining space italic).
+  The Insert caret VimText sets on a boundary between two runs of text takes a side (#63):
+  after a change that deleted text (`c`, `s`, `cw`, `C`, `S`), the side that held the deleted
+  text; with nothing deleted (`i`, `a`, `I`, `A`, `o`, `O`), the side before it, as native
+  typing there would. Keys typed while that caret settles are written on the same side. An
+  editor that types into the leaf of the selection (Slate) follows it; one that leaves typing
+  to Chromium takes the style before the boundary wherever the caret is (accepted limitations).
 - _Insert_: the editor owns typing as on every Field; the mirror re-projects the whole host
   on every `input`. No size budget until a measured finding asks for one. The one exception
   is a key typed while a write is still settling (the `o` or `cw` that entered Insert has
@@ -408,6 +420,13 @@ it is outside the gate, so PNG churn never fails `npm run check`.
   step; Lexical and Slate may take one per step of a write); the self-heal resyncs on the next key.
   Notion's blocks are one Field each, so `j`/`k` stop at a block's edge. A contenteditable
   in a closed shadow root is unreachable.
+- contenteditable (#63): on an editor that leaves typing to Chromium (Quill, Gmail's compose
+  body), text typed after `cw` on the first word of a mark run takes the style before the run:
+  Chromium's insertion at a boundary between two text nodes takes the style before it wherever
+  the caret is, so the Insert caret's side reaches only an editor that types into the leaf of
+  the selection (Slate). The end of a run and the no-deletion cases agree with Chromium's rule.
+  Pinned by tests/e2e/quill.spec.ts, "accepted limitation: cw on the first word of the bold run
+  types plain, as Chromium types in the style before the run (#63)".
 - contenteditable (M4): `u` restores the text, not always its markup or marks. An undone line
   merge can leave the text in another block element, a character put back at the start of a
   bold run is plain, and a `plaintext-only` host keeps the `<br>` a merge left. An Atom comes
@@ -422,6 +441,21 @@ it is outside the gate, so PNG churn never fails `npm run check`.
   (#62). Chosen over restoring the decorator: Lexical cannot take a decorator back through the
   DOM (the `insertHTML` restore turned its whole line into the decorator's text), and pasting
   it back needs Lexical's own clipboard JSON, which the isolated world never holds.
+- contenteditable (M4): a formatting shortcut (Cmd+B, Cmd+I) pressed while a write is still
+  being applied, typically right after a caret move such as `A` or `o` typed faster than about
+  60 ms, applies to nothing, and the text typed with it comes out unformatted (#72). The
+  characters typed during the write are held and land with it as plain text (rule 4's
+  exception); the shortcut is not held, so it reaches the page when nothing typed is there yet.
+  The text is kept. Under heavy load the write can land in pieces, and a shortcut pressed
+  between two of them applies at the editor's caret as it then stands, so the format can land
+  on the wrong text instead (seen on Quill: the whole line bold). Holding the shortcut too would
+  widen rule 4 and need a per-site list of formatting keys, and beeping would cross rule 4 as
+  well; both cost more than a race only typing that fast hits. Where the shortcut lands depends
+  on timing, so no test pins the unformatted outcome: tests/e2e/quill.spec.ts, "accepted
+  limitation: Cmd+B pressed back to back after G A Enter keeps the line's text; its formatting
+  depends on timing", pins only that the text is kept (under the pre-push load it ends plain,
+  `one <b>two</b> three` or all bold); "Cmd+B pressed once the write has landed bolds what is
+  typed after it" pins the shortcut once the write is in.
 
 ## Milestones
 

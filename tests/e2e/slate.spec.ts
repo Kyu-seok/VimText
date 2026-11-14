@@ -54,19 +54,45 @@ test("x r cw inside the bold run keep it bold; dw across its edge trims both sid
   await page.keyboard.type("wcw");
   await page.keyboard.type("lazy");
   await page.keyboard.press("Escape");
-  // `cw` on `brown`, the bold run's last word: the run keeps `uXck `, and
-  // `lazy`, typed by Slate itself at the run's end, is plain. Lexical makes
-  // it bold. The Insert caret VimText sets there is the start of the next
-  // text node (`projection.toDom` takes the piece the next character belongs
-  // to), and Slate types at that leaf's start. Pinned as found, not a Vim rule.
-  await expect.poll(async () => (await slateDoc(page))[0]).toBe("the <b>uXck </b>lazy fox");
+  // `cw` on `brown`, the bold run's last word: `lazy` goes in the run that
+  // held `brown` (owner decision on #63). Typed right after `cw`, it reaches
+  // Slate as a write on the side of the boundary that held `brown`, and Slate
+  // types into the leaf that write names (red on main, which wrote it at the
+  // start of ` fox`). A key typed later is Chromium's own and takes the style
+  // before the boundary, the same outcome. Each path pinned deterministically:
+  // tests/unit/contenteditable-field.test.ts, "text typed while a deletion at
+  // a run's end settles is written in that run"; tests/unit/chromium-facts.test.ts,
+  // "Marks at a write's edges".
+  await expect.poll(async () => (await slateDoc(page))[0]).toBe("the <b>uXck lazy</b> fox");
   await typeAfter(page, "!");
   await expect.poll(async () => (await modelText(page))[0]).toBe("the uXck laz!y fox");
   await page.keyboard.type("0dw");
-  await expect.poll(async () => (await slateDoc(page))[0]).toBe("<b>uXck </b>laz!y fox");
+  await expect.poll(async () => (await slateDoc(page))[0]).toBe("<b>uXck laz!y</b> fox");
   await typeAfter(page, "A");
   await expect.poll(async () => (await modelText(page))[0]).toBe("AuXck laz!y fox");
   await expect.poll(async () => (await modelText(page)).slice(1)).toEqual(ORIGINAL.slice(1));
+});
+
+/**
+ * Owner decision on #63, with nothing deleted: the Insert caret on a run's
+ * edge takes the side before it, as native typing there would. Typed right
+ * after `a` or `i`, the key reaches Slate as a write while the caret settles
+ * (`Session.typeWhileWriting`), at the caret's side (red on main, which wrote
+ * it at the start of the run after); typed later, Chromium's own typing takes
+ * the style before the boundary, the same outcome. Each path pinned
+ * deterministically: tests/unit/contenteditable-field.test.ts, "text typed
+ * while the caret settles is written on the caret's side";
+ * tests/unit/chromium-facts.test.ts, "Marks at a write's edges".
+ */
+test("a at the end of the bold run types bold; i on its first character types plain", async ({ page }) => {
+  await page.keyboard.type("wwea");
+  await page.keyboard.type("S");
+  await page.keyboard.press("Escape");
+  await expect.poll(async () => (await slateDoc(page))[0]).toBe("the <b>quick brownS</b> fox");
+  await page.keyboard.type("0wi");
+  await page.keyboard.type("Y");
+  await page.keyboard.press("Escape");
+  await expect.poll(async () => (await slateDoc(page))[0]).toBe("the Y<b>quick brownS</b> fox");
 });
 
 test("r and cw across the bold run's edge replace text on both sides of it", async ({ page }) => {

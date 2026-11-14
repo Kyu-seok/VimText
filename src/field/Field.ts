@@ -3,6 +3,8 @@
  * This is the seam between the engine bridge and the DOM: the bridge only
  * ever talks to a Field, never to a textarea/input/contenteditable directly.
  */
+import type { ChangeSet } from "@codemirror/state";
+
 export interface FieldSelection {
   /** Offset where the selection started (the fixed end). */
   anchor: number;
@@ -19,11 +21,21 @@ export interface Field {
    * Writes text in a way the host page's framework notices (React, Vue, …).
    * A textarea or input writes synchronously; a contenteditable host returns a
    * promise that resolves once the write has settled (ADR 0008), and the
-   * caller makes no other write to it until then.
+   * caller makes no other write to it until then. `changes`, when the caller
+   * has them, are the mirror's own changes from the Field's text to `text`: a
+   * contenteditable Field reads from them which side of a boundary between
+   * runs held the text they deleted (owner decision on #63; CODING_STANDARDS
+   * rule 13), never from a diff of the texts.
    */
-  setValue(text: string): void | Promise<void>;
+  setValue(text: string, changes?: ChangeSet): void | Promise<void>;
   getSelection(): FieldSelection;
-  setSelection(anchor: number, head: number): void;
+  /**
+   * `insertCaret`: the selection is the Insert caret (Insert or Replace mode),
+   * which a contenteditable Field puts on the side of a boundary between two
+   * runs of text that the owner decision on #63 names (docs/engine-seams.md,
+   * "Marks at a write's edges"). A textarea has no runs and ignores it.
+   */
+  setSelection(anchor: number, head: number, insertCaret?: boolean): void;
   /**
    * True while the selection VimText last set may not be the page's editor's
    * yet (a contenteditable Field's; ADR 0008): a key typed natively then would
@@ -32,12 +44,25 @@ export interface Field {
    */
   selectionSettling?(): boolean;
   focus(): void;
-  blur(): void;
+  /**
+   * Takes focus off the Field, leaving nothing in it highlighted. A Field
+   * whose selection outlives its focus (a contenteditable host) leaves a caret
+   * at `caret`, where focusing it again resumes; one whose selection stops
+   * showing on blur ignores `caret`.
+   */
+  blur(caret: number): void;
   hasFocus(): boolean;
   /** Number of text lines that fit in the visible area (for Ctrl-d/u, zz, …). */
   visibleLineCount(): number;
   /** Fires on native user edits (typing, paste, native undo). Not on setValue(). */
   onInput(handler: () => void): () => void;
+  /**
+   * Cancels the browser's own line break in a Single-line contenteditable
+   * Field while `when()` holds (#51, DESIGN.md Key Policy row 6): a trusted
+   * `insertParagraph`/`insertLineBreak` the page did not cancel. Returns the
+   * function that stops it. Absent on Fields where the browser inserts none.
+   */
+  refuseNativeBreaks?(when: () => boolean): () => void;
   /** Styles the mirror should copy so its line wrapping matches this Field. */
   wrappingStyle(): WrappingStyle;
   isConnected(): boolean;

@@ -81,8 +81,10 @@ type Step = { command: "insertText"; text: string } | { command: "insertParagrap
  * editor catches up). Nothing more runs once a pause says stop.
  *
  * A paragraph break that changed nothing in the host by the next step, nor
- * within `BREAK_WAIT_MS` after, was refused: the write stops before the text
- * after it.
+ * within `BREAK_WAIT_MS` after, is offered once more as a synthetic
+ * Shift+Enter keydown (`offerBreakKey`), which Notion takes inside a block
+ * (#70). If that changes nothing either, the break was refused: the write
+ * stops before the text after it.
  *
  * Resolves false when the browser refused a command (no editable selection,
  * an editor that cancelled it) or the write stopped.
@@ -110,19 +112,71 @@ export async function replaceDomRange(host: Element, edit: DomEdit, pauses: Paus
   for (const [i, step] of steps.entries()) {
     if (i > 0 && !(await pauses.step())) return false;
     if (breakWatch) {
-      // A break the editor cancelled and never made (Notion): the text after
-      // it would join the line it was to open (#73). The write stops here.
-      const made = await breakWatch.changed();
-      breakWatch.stop();
-      if (!made) return false;
+      // A break the editor refused both ways: the text after it would join
+      // the line it was to open (#73). The write stops here.
+      if (!(await breakMade(host, breakWatch, pauses))) return false;
       if (!(await placeCaret(host, caretAfter?.(written), pauses))) return false;
     }
     breakWatch = step.command === "insertParagraph" ? watchChanges(host) : null;
     ok = run(host, step) && ok;
     written += step.command === "insertText" ? step.text.length : 1;
   }
-  breakWatch?.stop();
+  // A write ending in a break (`O`, a linewise `P`) gets the second offer too.
+  if (breakWatch && !(await breakMade(host, breakWatch, pauses))) return false;
   return ok;
+}
+
+/**
+ * Whether the paragraph break offered under `watch` changed the host. One
+ * that changed nothing is offered once more, as a synthetic Shift+Enter
+ * keydown on the host at the same selection (`offerBreakKey`): Notion cancels
+ * a synthetic `insertParagraph` and `insertLineBreak` and does nothing, but
+ * makes a line break inside a block on that keydown (#70). The editor gets a
+ * task after it, as after any step. An editor that made the break from the
+ * `insertParagraph` never sees the keydown.
+ */
+async function breakMade(host: Element, watch: ChangeWatch, pauses: Pauses): Promise<boolean> {
+  const made = await watch.changed();
+  watch.stop();
+  if (made) return true;
+  const again = watchChanges(host);
+  offerBreakKey(host);
+  const madeAgain = await again.changed();
+  again.stop();
+  return madeAgain && pauses.step();
+}
+
+/** The keydowns VimText's writes dispatch (`offerBreakKey`): never a key the person pressed. */
+const writeKeys = new WeakSet<Event>();
+
+/**
+ * Whether `e` is a keydown a write dispatched, not one the person pressed.
+ * `isTrusted` cannot tell: it is false for every synthetic key, a test's too.
+ * VimText's own keydown listener ignores these (`Sessions`).
+ */
+export function isWriteKey(e: Event): boolean {
+  return writeKeys.has(e);
+}
+
+/**
+ * Offers a line break as a cancelable synthetic Shift+Enter keydown on the
+ * host, then lets the editor catch up. It carries the legacy `keyCode` and
+ * `which`: Notion reads them and makes no break without them.
+ */
+function offerBreakKey(host: Element): void {
+  const key = new KeyboardEvent("keydown", {
+    key: "Enter",
+    code: "Enter",
+    keyCode: 13,
+    which: 13,
+    shiftKey: true,
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+  });
+  writeKeys.add(key);
+  host.dispatchEvent(key);
+  settleEditor(host);
 }
 
 /**
