@@ -61,17 +61,38 @@
       Notion's page: one editable root that keeps focus, holding the header's
       controls and every block, each block marked contenteditable itself, its
       line breaks literal \n under white-space: break-spaces (#69). Notion
-      cancels a synthetic paragraph or line break and does nothing (#70); this
-      script does the same.
+      cancels a synthetic paragraph or line break and does nothing, but makes a
+      line break inside a block on a synthetic Shift+Enter keydown, leaving its
+      defaultPrevented false (#70); this script does the same.
     -->
     <!-- prettier-ignore -->
     <div id="notion" contenteditable="true" class="whenContentEditable"><div class="controls">Add icon Add cover</div><div id="n-title" class="block" contenteditable="true">Scratch</div><div id="n-one" class="block" contenteditable="true">alpha beta gamma</div><div id="n-two" class="block" contenteditable="true">line one
 line two
 line three</div></div>
     <script>
-      document.getElementById("notion").addEventListener("beforeinput", (e) => {
+      const notion = document.getElementById("notion");
+      notion.addEventListener("beforeinput", (e) => {
         if (!e.isTrusted && (e.inputType === "insertParagraph" || e.inputType === "insertLineBreak"))
           e.preventDefault();
+      });
+      notion.addEventListener("keydown", (e) => {
+        if (e.key !== "Enter" || !e.shiftKey) return;
+        // The person's own Shift+Enter would get the browser's break as well.
+        if (e.isTrusted) e.preventDefault();
+        const sel = document.getSelection();
+        const range = sel.getRangeAt(0);
+        range.deleteContents();
+        const { startContainer: node, startOffset: offset } = range;
+        if (node.nodeType === Node.TEXT_NODE) {
+          // At the block's end a lone \n renders no line: a second holds it, as Chromium's own line break does.
+          const atEnd = offset === node.length && !node.nextSibling;
+          node.insertData(offset, atEnd ? "\n\n" : "\n");
+          sel.collapse(node, offset + 1);
+        } else {
+          const text = document.createTextNode("\n");
+          range.insertNode(text);
+          sel.collapse(text, 1);
+        }
       });
     </script>
   </body>
