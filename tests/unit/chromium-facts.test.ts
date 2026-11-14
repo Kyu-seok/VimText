@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { userEvent } from "@vitest/browser/context";
 import { caretAt, editableHost, inputLog, selectionOf } from "./contenteditable";
 
 /**
@@ -335,5 +336,31 @@ describe("A line break offered as Shift+Enter", () => {
     });
     el.dispatchEvent(key);
     expect(el.innerHTML).toBe("one\ntwo");
+  });
+});
+
+describe("Enter on a Single-line host", () => {
+  it("a trusted Enter over a one-character selection fires a cancelable insertParagraph beforeinput that replaces the selection", async () => {
+    const el = host("<p>hello world</p>", { attrs: { "aria-multiline": "false" } });
+    const seen: { type: string; trusted: boolean; cancelable: boolean }[] = [];
+    el.addEventListener("beforeinput", (e) =>
+      seen.push({ type: (e as InputEvent).inputType, trusted: e.isTrusted, cancelable: e.cancelable }),
+    );
+    const text = el.querySelector("p")!.firstChild!;
+    select(text, 6, text, 7);
+    await userEvent.keyboard("{Enter}");
+    expect(seen).toEqual([{ type: "insertParagraph", trusted: true, cancelable: true }]);
+    expect(el.innerHTML).toBe("<p>hello&nbsp;</p><p>orld</p>");
+  });
+
+  it("cancelling that beforeinput leaves the host and the selection as they were", async () => {
+    const el = host("<p>hello world</p>", { attrs: { "aria-multiline": "false" } });
+    el.addEventListener("beforeinput", (e) => e.preventDefault());
+    const text = el.querySelector("p")!.firstChild!;
+    select(text, 6, text, 7);
+    await userEvent.keyboard("{Enter}");
+    expect(el.innerHTML).toBe("<p>hello world</p>");
+    const sel = getSelection()!;
+    expect([sel.anchorNode, sel.anchorOffset, sel.focusNode, sel.focusOffset]).toEqual([text, 6, text, 7]);
   });
 });

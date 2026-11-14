@@ -14,7 +14,10 @@ host match in `manifest.json` is justified below (`tests/node/summary.test.ts`,
 
 **Store icon:** `icon-128.png` beside this file: 128×128, the 96×96 artwork centred in 16px of
 transparent padding, as the store asks. `icon.svg` is its source, rendered by
-`npm run screenshots`; the extension's own `icons/` are drawn by `tools/make-icons.mjs`.
+`npm run screenshots`. The extension's own `icons/` come from the same drawing: `npm run icons`
+(`tools/make-icons.mjs`) renders `icon.svg` at 128 and at 48 (without the `-- NORMAL --` text),
+and `tools/icon16.svg`, the tile and block cursor without text, at 16. After an edit to
+`icon.svg`, run both on macOS.
 
 **Promo tiles:** `promo-small.png` (440×280, the small promo tile) and `promo-marquee.png`
 (1400×560, the marquee promo tile) beside this file, opaque 24-bit PNGs as the store asks.
