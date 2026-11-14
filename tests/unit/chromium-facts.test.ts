@@ -321,15 +321,17 @@ describe("Selection and focus", () => {
     expect(document.activeElement).toBe(el);
   });
 
-  it("the focus that setting a selection inside a blurred host gives it fires during the call", () => {
-    const el = host("<p>hello</p>");
-    el.blur();
-    let focused = false;
-    el.addEventListener("focus", () => (focused = true));
-    caretAt(el.querySelector("p")!.firstChild!, 1);
-    expect(focused).toBe(true);
+  it("setSelectionRange on a blurred textarea leaves it blurred", () => {
+    const ta = document.createElement("textarea");
+    ta.value = "hello";
+    document.body.appendChild(ta);
+    cleanup.push(() => ta.remove());
+    ta.setSelectionRange(1, 1);
+    expect(document.activeElement).not.toBe(ta);
   });
+});
 
+describe("Leaving a contenteditable Field", () => {
   it("a host keeps its selection when it blurs: a one-character range stays selected (#65)", () => {
     const el = host("<p>hello</p>");
     const text = el.querySelector("p")!.firstChild!;
@@ -353,13 +355,13 @@ describe("Selection and focus", () => {
     expect(sel.anchorOffset).toBe(0);
   });
 
-  it("setSelectionRange on a blurred textarea leaves it blurred", () => {
-    const ta = document.createElement("textarea");
-    ta.value = "hello";
-    document.body.appendChild(ta);
-    cleanup.push(() => ta.remove());
-    ta.setSelectionRange(1, 1);
-    expect(document.activeElement).not.toBe(ta);
+  it("the focus that setting a selection inside a blurred host gives it fires during the call", () => {
+    const el = host("<p>hello</p>");
+    el.blur();
+    let focused = false;
+    el.addEventListener("focus", () => (focused = true));
+    caretAt(el.querySelector("p")!.firstChild!, 1);
+    expect(focused).toBe(true);
   });
 });
 
