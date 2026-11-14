@@ -86,22 +86,15 @@ function deletedSide(projection: Projection, from: number, to: number): Side | n
   return null;
 }
 
-/**
- * Where the last of `changes` leaves the text it deleted, in the new text,
- * and the side of that boundary that held it in `projection`, the text before
- * them: read from the mirror's own changes (CODING_STANDARDS rule 13), since
- * a diff puts a deletion beside the same characters wherever it likes (`s` on
- * the first `b` of `a<b>bbc</b>` read as the second's, inside the run). None
- * when that change inserts text, deletes none, or held no side.
- */
-function lastDeletion(projection: Projection, changes: ChangeSet): { at: number; side: Side } | null {
-  if (changes.length !== projection.text.length) return null;
-  const found: { at: number; side: Side | null }[] = [];
-  changes.iterChanges((fromA, toA, fromB, _toB, inserted) => {
-    found.push({ at: fromB, side: inserted.length === 0 ? deletedSide(projection, fromA, toA) : null });
+/** The last of `changes`: its range in the text before them and after, and how much it inserts. */
+function lastChange(
+  changes: ChangeSet,
+): { fromA: number; toA: number; fromB: number; toB: number; inserted: number } | undefined {
+  const found: { fromA: number; toA: number; fromB: number; toB: number; inserted: number }[] = [];
+  changes.iterChanges((fromA, toA, fromB, toB, inserted) => {
+    found.push({ fromA, toA, fromB, toB, inserted: inserted.length });
   });
-  const last = found.at(-1);
-  return last?.side ? { at: last.at, side: last.side } : null;
+  return found.at(-1);
 }
 
 /** How many removed Atoms a Field keeps for undo; older ones come back as nothing. */
@@ -208,7 +201,8 @@ export class ContentEditableField implements Field {
    * Where the Insert caret goes on a boundary between two runs of text, and
    * where text written there lands (owner decision on #63): at offset `at`,
    * the text unchanged since, `side`. A write that deleted text records the
-   * side that held it; an Insert caret set records the side it took.
+   * side that held it; an Insert caret set records the side it took; a write
+   * that inserted at it records the insertion's end, on the same side.
    */
   private caretSide: { at: number; side: Side; text: string } | null = null;
   private readonly release = () => {
@@ -269,7 +263,7 @@ export class ContentEditableField implements Field {
     const before = project(this.element);
     const old = before.text;
     if (old === text) return Promise.resolve();
-    const deletion = changes ? lastDeletion(before, changes) : null;
+    const caret = changes ? this.caretSideAfter(before, changes) : null;
     // Each changed span on its own, first to last (`diffHunks`): the text
     // after the k-th is the new text up to its end and the old text after it.
     const textAfterEachSpan = diffHunks(old, text).map((h) => text.slice(0, h.toNew) + old.slice(h.toOld));
@@ -285,11 +279,35 @@ export class ContentEditableField implements Field {
         if (!this.destroyed) {
           const projection = project(this.element);
           this.noteAtoms(projection);
-          this.caretSide = deletion && { ...deletion, text: projection.text };
+          this.caretSide = caret && { ...caret, text: projection.text };
         }
       }
     };
     return write();
+  }
+
+  /**
+   * Where the Insert caret's side stands after the mirror's `changes` to
+   * `before` (owner decision on #63), read from those changes, never from a
+   * diff of the texts (CODING_STANDARDS rule 13; a diff puts a deletion beside
+   * the same characters wherever it likes: `s` on the first `b` of
+   * `a<b>bbc</b>` read as the second's, inside the run). When the last of them
+   * deleted text and inserted none: where it was, on the side that held it.
+   * When it inserted at the Insert caret, on the caret's side (`sideAt`): at
+   * its end, on that side, so the next write of keys typed meanwhile lands in
+   * the same run (under load they come as more than one write). Otherwise none.
+   */
+  private caretSideAfter(before: Projection, changes: ChangeSet): { at: number; side: Side } | null {
+    if (changes.length !== before.text.length) return null;
+    const last = lastChange(changes);
+    if (!last) return null;
+    if (last.inserted === 0) {
+      const side = deletedSide(before, last.fromA, last.toA);
+      return side && { at: last.fromB, side };
+    }
+    const c = this.caretSide;
+    const atCaret = last.fromA === last.toA && c && c.at === last.fromA && c.text === before.text;
+    return atCaret ? { at: last.toB, side: c.side } : null;
   }
 
   /**
