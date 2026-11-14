@@ -794,7 +794,7 @@ export class Session {
    */
   private finishRender(point: AgreedPoint): void {
     const sel = this.renderedSelection();
-    if (!this.renderDue) this.field.setSelection(sel.anchor, sel.head);
+    if (!this.renderDue) this.field.setSelection(sel.anchor, sel.head, this.mirror.vim.insertMode);
     this.lastRendered = this.field.getSelection();
     this.lastText = this.field.getValue();
     this.readAtoms();

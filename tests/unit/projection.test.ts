@@ -114,6 +114,16 @@ describe("projection offsets", () => {
     }
   });
 
+  it("side before maps a boundary between two text nodes to the end of the one before, and changes nothing elsewhere", () => {
+    const host = editableHost("<p>ab<b>cd</b><br>e</p><p>f</p>");
+    const p = project(host);
+    expect(p.text).toBe("abcd\ne\nf");
+    const [ab, cd] = [host.firstChild!.firstChild!, host.querySelector("b")!.firstChild!];
+    expect(p.toDom(2)).toEqual({ node: cd, offset: 0 });
+    expect(p.toDom(2, "before")).toEqual({ node: ab, offset: 2 });
+    for (const k of [0, 1, 3, 4, 5, 6, 7, 8]) expect(p.toDom(k, "before"), `offset ${k}`).toEqual(p.toDom(k));
+  });
+
   it("the offset of an empty line is a position inside its block", () => {
     const host = editableHost("<p>a</p><p><br></p><p>b</p>");
     const { node, offset } = project(host).toDom(2);

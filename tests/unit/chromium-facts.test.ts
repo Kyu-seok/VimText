@@ -108,6 +108,42 @@ describe("Whitespace under editing", () => {
   });
 });
 
+describe("Marks at a write's edges", () => {
+  const RUNS = "<p>ab<b>cdef</b>gh</p>";
+
+  it("insertText at a boundary between two text nodes takes the style before it, whichever node the caret is in", () => {
+    for (const [label, at] of [
+      ["start of the bold run", (b: Node) => [b, 0] as const],
+      ["end of the plain text before it", (b: Node) => [b.parentNode!.previousSibling!, 2] as const],
+    ] as const) {
+      const el = host(RUNS);
+      const [node, offset] = at(el.querySelector("b")!.firstChild!);
+      caretAt(node, offset);
+      document.execCommand("insertText", false, "X");
+      expect(el.innerHTML, label).toBe("<p>abX<b>cdef</b>gh</p>");
+    }
+    for (const [label, at] of [
+      ["end of the bold run", (b: Node) => [b, 4] as const],
+      ["start of the plain text after it", (b: Node) => [b.parentNode!.nextSibling!, 0] as const],
+    ] as const) {
+      const el = host(RUNS);
+      const [node, offset] = at(el.querySelector("b")!.firstChild!);
+      caretAt(node, offset);
+      document.execCommand("insertText", false, "X");
+      expect(el.innerHTML, label).toBe("<p>ab<b>cdefX</b>gh</p>");
+    }
+  });
+
+  it("text deleted from a run's start leaves no typing style: the next insertText takes the style before it", () => {
+    const el = host(RUNS);
+    const bold = el.querySelector("b")!.firstChild!;
+    select(bold, 0, bold, 2);
+    document.execCommand("delete");
+    document.execCommand("insertText", false, "X");
+    expect(el.innerHTML).toBe("<p>abX<b>ef</b>gh</p>");
+  });
+});
+
 describe("Selection round trip", () => {
   it("a set selection reads back as given, element positions included", () => {
     const el = host("<p>ab</p><p>cd</p>");

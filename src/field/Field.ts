@@ -23,7 +23,13 @@ export interface Field {
    */
   setValue(text: string): void | Promise<void>;
   getSelection(): FieldSelection;
-  setSelection(anchor: number, head: number): void;
+  /**
+   * `insertCaret`: the selection is the Insert caret (Insert or Replace mode),
+   * which a contenteditable Field puts on the side of a boundary between two
+   * runs of text that the owner decision on #63 names (docs/engine-seams.md,
+   * "Marks at a write's edges"). A textarea has no runs and ignores it.
+   */
+  setSelection(anchor: number, head: number, insertCaret?: boolean): void;
   /**
    * True while the selection VimText last set may not be the page's editor's
    * yet (a contenteditable Field's; ADR 0008): a key typed natively then would
