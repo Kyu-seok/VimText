@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <!-- The 16px toolbar icon: docs/store/icon.svg's tile, outline and block cursor without
+       its text, which cannot read at this size. Every edge sits on the pixel grid; the
+       outline is a 1px stroke on the half pixel. `npm run icons` renders it to icons/icon16.png. -->
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1c2a24"/>
+      <stop offset="1" stop-color="#0e1713"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="16" height="16" rx="3.5" fill="url(#tile)"/>
+  <rect x="0.5" y="0.5" width="15" height="15" rx="3" fill="none" stroke="#3fcf6a" stroke-opacity=".6"/>
+  <rect x="6" y="4" width="4" height="8" fill="#d8f5e0"/>
+</svg>
