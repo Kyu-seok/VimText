@@ -47,10 +47,10 @@ export interface Field {
   /**
    * Takes focus off the Field, leaving nothing in it highlighted. A Field
    * whose selection outlives its focus (a contenteditable host) leaves a caret
-   * at `caret`, or else at its selection's start, where focusing it again
-   * resumes; one whose selection stops showing on blur ignores `caret`.
+   * at `caret`, where focusing it again resumes; one whose selection stops
+   * showing on blur ignores `caret`.
    */
-  blur(caret?: number): void;
+  blur(caret: number): void;
   hasFocus(): boolean;
   /** Number of text lines that fit in the visible area (for Ctrl-d/u, zz, …). */
   visibleLineCount(): number;

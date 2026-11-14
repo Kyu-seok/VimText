@@ -2,7 +2,7 @@ import type { ChangeSet } from "@codemirror/state";
 import type { Field, FieldSelection, WrappingStyle } from "./Field";
 import { diffHunks, diffText, type TextDiff } from "./diff";
 import { project, type DomPoint, type Projection, type Side } from "./projection";
-import { collapseToStart, readDomSelection, selectDom } from "./domSelection";
+import { readDomSelection, selectDom } from "./domSelection";
 import {
   deleteMarker,
   insertAtomHtml,
@@ -359,8 +359,7 @@ export class ContentEditableField implements Field {
    * (`Session.typeWhileWriting`), and land where the caret is.
    */
   private sideAt(from: number, to: number, text: string): Side {
-    const c = this.caretSide;
-    return from === to && c && c.at === from && c.text === text ? c.side : "after";
+    return from === to ? this.caretSideAt(from, text, "after") : "after";
   }
 
   /**
@@ -543,7 +542,7 @@ export class ContentEditableField implements Field {
     this.lastSelection = { anchor: a, head: h };
     const before = this.held;
     this.held = null;
-    const side = insertCaret && a === h ? this.insertCaretSide(a, projection.text) : "after";
+    const side = insertCaret && a === h ? this.caretSideAt(a, projection.text, "before") : "after";
     this.caretSide = insertCaret ? { at: a, side, text: projection.text } : null;
     // A selection set inside a blurred host focuses it (docs/engine-seams.md,
     // Editing commands and events): it would take focus from the command
@@ -562,10 +561,14 @@ export class ContentEditableField implements Field {
     settleEditor(this.element);
   }
 
-  /** The side of a boundary an Insert caret at `at` takes in `text`: the deleted text's, or before. */
-  private insertCaretSide(at: number, text: string): Side {
+  /**
+   * The side `caretSide` records for offset `at` in `text`, or `otherwise`:
+   * an Insert caret's (`otherwise` before) and an insertion written at it
+   * (`sideAt`, `otherwise` after) read the same record.
+   */
+  private caretSideAt(at: number, text: string, otherwise: Side): Side {
     const c = this.caretSide;
-    return c && c.at === at && c.text === text ? c.side : "before";
+    return c && c.at === at && c.text === text ? c.side : otherwise;
   }
 
   /**
@@ -636,23 +639,28 @@ export class ContentEditableField implements Field {
   /**
    * A host's selection outlives its focus: a Normal-mode cursor would stay
    * drawn over a character of an editor VimText has left (#65). It becomes a
-   * caret first, at `caret` or else the selection's start, so focusing the
-   * host again resumes there; the editor takes the caret into its model before
-   * the blur, and has no one-character selection to put back.
+   * caret first, at `caret`, so focusing the host again resumes there; the
+   * editor takes the caret into its model before the blur, and has no
+   * one-character selection to put back.
    */
-  blur(caret?: number): void {
+  blur(caret: number): void {
     this.held = null;
-    if (caret === undefined) collapseToStart(this.element);
-    else {
-      // Selecting inside a blurred host focuses it (`:wq`: the notice took the
-      // command line's place without re-focusing the Field), and the Session's
-      // focus handler then draws the cursor over the caret: select it again.
-      const focused = this.hasFocus();
-      this.selectCaret(caret);
-      if (!focused) this.selectCaret(caret);
-    }
+    const focused = this.hasFocus();
+    this.selectCaret(caret);
+    if (!focused) this.selectCaretOverFocusRender(caret);
     settleEditor(this.element);
     this.focusTarget().blur();
+  }
+
+  /**
+   * Selects the caret again after selecting it in a blurred host focused the
+   * host (`:wq`: the notice took the command line's place without
+   * re-focusing the Field): the focus event fired during that call, and the
+   * Session's focus handler drew the Normal cursor over the caret
+   * (docs/engine-seams.md, "Leaving a contenteditable Field").
+   */
+  private selectCaretOverFocusRender(caret: number): void {
+    this.selectCaret(caret);
   }
 
   private selectCaret(offset: number): void {
