@@ -158,11 +158,17 @@ export function isWriteKey(e: Event): boolean {
   return writeKeys.has(e);
 }
 
-/** Offers a line break as a cancelable synthetic Shift+Enter keydown on the host, then lets the editor catch up. */
+/**
+ * Offers a line break as a cancelable synthetic Shift+Enter keydown on the
+ * host, then lets the editor catch up. It carries the legacy `keyCode` and
+ * `which`: Notion reads them and makes no break without them.
+ */
 function offerBreakKey(host: Element): void {
   const key = new KeyboardEvent("keydown", {
     key: "Enter",
     code: "Enter",
+    keyCode: 13,
+    which: 13,
     shiftKey: true,
     bubbles: true,
     cancelable: true,

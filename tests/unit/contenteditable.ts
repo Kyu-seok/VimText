@@ -105,8 +105,9 @@ export function activeHost(html: string, opts: Parameters<typeof editableHost>[1
 /**
  * Makes `host` take line breaks the way a Notion block does (#70): it cancels a
  * synthetic `insertParagraph` or `insertLineBreak` and does nothing, and makes
- * a literal `\n` at the selection on a Shift+Enter keydown (the host should be
- * `white-space: break-spaces`, as a Notion block is), two at the block's end
+ * a literal `\n` at the selection on a Shift+Enter keydown, only when its
+ * legacy `keyCode` is 13 as live Notion requires (2026-11-14), (the host
+ * should be `white-space: break-spaces`, as a Notion block is), two at the block's end
  * so the new line renders (`tests/unit/chromium-facts.test.ts`, "A line
  * break at the end of a pre-wrap block"). Like live Notion it
  * leaves the keydown's `defaultPrevented` false. Returns the keydowns the
@@ -119,7 +120,7 @@ export function breaksOnShiftEnter(host: HTMLElement): string[] {
   });
   host.addEventListener("keydown", (e) => {
     seen.push(e.shiftKey && e.key === "Enter" ? "Shift+Enter" : e.key);
-    if (e.key !== "Enter" || !e.shiftKey) return;
+    if (e.key !== "Enter" || !e.shiftKey || e.keyCode !== 13) return;
     const sel = getSelection()!;
     const range = sel.getRangeAt(0);
     range.deleteContents();
