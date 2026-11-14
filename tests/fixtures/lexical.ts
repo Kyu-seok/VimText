@@ -9,7 +9,8 @@
 //   window.modelText()   Lexical's own text, one line per block (a list item
 //                        is a block), a decorator as U+FFFC
 //   window.lexicalDoc()  the same lines with Lexical's formats: bold as
-//                        <b>…</b>, a block kind as a prefix ("h1:", "bullet:")
+//                        <b>…</b>, a block kind as a prefix ("h1:", "quote:",
+//                        "bullet:")
 import {
   $createParagraphNode,
   $createTextNode,
@@ -26,7 +27,9 @@ import {
 } from "lexical";
 import {
   $createHeadingNode,
+  $createQuoteNode,
   $isHeadingNode,
+  $isQuoteNode,
   HeadingNode,
   QuoteNode,
   registerRichText,
@@ -105,7 +108,7 @@ editor.setRootElement(document.getElementById("editor"));
 registerRichText(editor);
 registerList(editor);
 
-// A bold run, a heading, a list and a decorator (an Atom).
+// A bold run, a heading with a quote below it, a list and a decorator (an Atom).
 editor.update(
   () => {
     const root = $getRoot();
@@ -117,6 +120,7 @@ editor.update(
       $createTextNode(" fox"),
     );
     const heading = $createHeadingNode("h1").append($createTextNode("a heading"));
+    const quote = $createQuoteNode().append($createTextNode("a quote"));
     const list = $createListNode("bullet").append(
       $createListItemNode().append($createTextNode("first item")),
       $createListItemNode().append($createTextNode("second item")),
@@ -127,7 +131,7 @@ editor.update(
       $createTextNode(" here"),
     );
     const last = $createParagraphNode().append($createTextNode("last line"));
-    root.append(first, heading, list, cat, last);
+    root.append(first, heading, quote, list, cat, last);
   },
   { discrete: true },
 );
@@ -170,7 +174,8 @@ function lines(): Line[] {
         }
         continue;
       }
-      const line = { text: "", marked: "", block: $isHeadingNode(block) ? block.getTag() : "" };
+      const kind = $isHeadingNode(block) ? block.getTag() : $isQuoteNode(block) ? "quote" : "";
+      const line = { text: "", marked: "", block: kind };
       inline(block, line);
       out.push(line);
     }

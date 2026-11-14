@@ -21,6 +21,7 @@ const ATOM = "￼";
 const ORIGINAL = [
   "the quick brown fox",
   "a heading",
+  "a quote",
   "first item",
   "second item",
   `a cat ${ATOM} here`,
@@ -44,6 +45,7 @@ test("the fixture's model reads back one line per block", async ({ page }) => {
     .toEqual([
       "the <b>quick brown</b> fox",
       "h1:a heading",
+      "quote:a quote",
       "bullet:first item",
       "bullet:second item",
       `a cat ${ATOM} here`,
@@ -109,15 +111,15 @@ test("dd removes a block from Lexical's model; a real keystroke after it lands a
   await page.keyboard.type("dd");
   await expect
     .poll(() => modelText(page))
-    .toEqual(["a heading", "first item", "second item", `a cat ${ATOM} here`, "last line"]);
+    .toEqual(["a heading", "a quote", "first item", "second item", `a cat ${ATOM} here`, "last line"]);
   await typeAfter(page, "Z");
   await expect.poll(async () => (await modelText(page))[0]).toBe("Za heading");
   await page.keyboard.type("Gdd");
   await expect
     .poll(() => modelText(page))
-    .toEqual(["Za heading", "first item", "second item", `a cat ${ATOM} here`]);
+    .toEqual(["Za heading", "a quote", "first item", "second item", `a cat ${ATOM} here`]);
   await typeAfter(page, "Q");
-  await expect.poll(async () => (await modelText(page))[3]).toBe(`Qa cat ${ATOM} here`);
+  await expect.poll(async () => (await modelText(page))[4]).toBe(`Qa cat ${ATOM} here`);
 });
 
 test("J and a Visual delete across lines merge Lexical's blocks; a real keystroke after each keeps them", async ({
@@ -128,6 +130,7 @@ test("J and a Visual delete across lines merge Lexical's blocks; a real keystrok
     .poll(() => modelText(page))
     .toEqual([
       "the quick brown fox a heading",
+      "a quote",
       "first item",
       "second item",
       `a cat ${ATOM} here`,
@@ -137,11 +140,11 @@ test("J and a Visual delete across lines merge Lexical's blocks; a real keystrok
   await expect.poll(async () => (await modelText(page))[0]).toBe("the quick brown fox, a heading");
   // From `cat` on the decorator's line to `t` and the space after it on the last line, inclusive.
   await page.keyboard.type("Gkwvjlld");
-  await expect.poll(async () => (await modelText(page)).slice(3)).toEqual(["a line"]);
+  await expect.poll(async () => (await modelText(page)).slice(4)).toEqual(["a line"]);
   await typeAfter(page, "Y");
   await expect
     .poll(() => modelText(page))
-    .toEqual(["the quick brown fox, a heading", "first item", "second item", "a Yline"]);
+    .toEqual(["the quick brown fox, a heading", "a quote", "first item", "second item", "a Yline"]);
 });
 
 test("o and linewise p open a new block below; r<CR> splits a line without losing text", async ({ page }) => {
@@ -151,10 +154,10 @@ test("o and linewise p open a new block below; r<CR> splits a line without losin
   await expect.poll(() => modelText(page)).toEqual(["the quick brown fox", "new para", ...ORIGINAL.slice(1)]);
   await page.keyboard.type("ggyyGp");
   await expect
-    .poll(async () => (await modelText(page)).slice(6))
+    .poll(async () => (await modelText(page)).slice(7))
     .toEqual(["last line", "the quick brown fox"]);
   await typeAfter(page, ">");
-  await expect.poll(async () => (await modelText(page))[7]).toBe(">the quick brown fox");
+  await expect.poll(async () => (await modelText(page))[8]).toBe(">the quick brown fox");
   // r<CR> on the `b` of `brown`: the text before it stays (under execCommand alone it was lost).
   await page.keyboard.type("ggwwr\n");
   await expect
@@ -169,12 +172,12 @@ test("o and linewise p open a new block below; r<CR> splits a line without losin
 test("x on the decorator deletes it; u restores the text around it, without the decorator (#62)", async ({
   page,
 }) => {
-  await page.keyboard.type("4jwwx");
-  await expect.poll(async () => (await modelText(page))[4]).toBe("a cat  here");
+  await page.keyboard.type("5jwwx");
+  await expect.poll(async () => (await modelText(page))[5]).toBe("a cat  here");
   await typeAfter(page, "Z");
-  await expect.poll(async () => (await modelText(page))[4]).toBe("a cat Z here");
+  await expect.poll(async () => (await modelText(page))[5]).toBe("a cat Z here");
   await page.keyboard.type("u");
-  await expect.poll(async () => (await modelText(page))[4]).toBe("a cat  here");
+  await expect.poll(async () => (await modelText(page))[5]).toBe("a cat  here");
   // The decorator's restore is offered as a `beforeinput` of `insertFromPaste`;
   // Lexical cancels it and does nothing, and a decorator cannot come back
   // through the DOM (`insertHTML` turned the line into `@cat`), so u restores
@@ -187,7 +190,7 @@ test("x on the decorator deletes it; u restores the text around it, without the 
   // VimText follows the Field: a real keystroke and an x after it land on that text.
   await typeAfter(page, "Q");
   await page.keyboard.type("0x");
-  await expect.poll(async () => (await modelText(page))[4]).toBe(" cat Q here");
+  await expect.poll(async () => (await modelText(page))[5]).toBe(" cat Q here");
 });
 
 test("u and Ctrl-r restore Lexical's text", async ({ page }) => {
@@ -196,7 +199,7 @@ test("u and Ctrl-r restore Lexical's text", async ({ page }) => {
   await page.keyboard.type("Gdd");
   await expect
     .poll(() => modelText(page))
-    .toEqual(["the uick brown fox", "first item", "second item", `a cat ${ATOM} here`]);
+    .toEqual(["the uick brown fox", "a quote", "first item", "second item", `a cat ${ATOM} here`]);
   const edited = await modelText(page);
   await page.keyboard.type("uuu");
   await expect.poll(() => modelText(page)).toEqual(ORIGINAL);
@@ -206,6 +209,38 @@ test("u and Ctrl-r restore Lexical's text", async ({ page }) => {
   await expect.poll(() => modelText(page)).toEqual(edited);
   await page.keyboard.type("u");
   await expect.poll(() => modelText(page)).toEqual(["the uick brown fox", ...ORIGINAL.slice(2)]);
+});
+
+/**
+ * #66's sequence across a heading → quote boundary: `o` a line below the
+ * heading, `J` it in, `u` (the line comes back as a heading: DESIGN.md, "u
+ * restores text, not always marks or markup"), then `dd` on it. A linewise
+ * deletion is written as `\nX` at the end of the line above
+ * (docs/engine-seams.md, "Linewise writes"); written as `X\n` it would merge
+ * the quote into the deleted line's heading.
+ */
+test("dd on a line above a quote leaves the quote's kind and text alone (#66)", async ({ page }) => {
+  await page.keyboard.type("jo");
+  await page.keyboard.type("new");
+  await page.keyboard.press("Escape");
+  await page.keyboard.type("kJ");
+  await expect.poll(async () => (await modelText(page)).slice(1, 3)).toEqual(["a heading new", "a quote"]);
+  await page.keyboard.type("u");
+  await expect.poll(async () => (await modelText(page)).slice(1, 4)).toEqual(["a heading", "new", "a quote"]);
+  await page.keyboard.type("gg2jdd");
+  await expect
+    .poll(() => lexicalDoc(page))
+    .toEqual([
+      "the <b>quick brown</b> fox",
+      "h1:a heading",
+      "quote:a quote",
+      "bullet:first item",
+      "bullet:second item",
+      `a cat ${ATOM} here`,
+      "last line",
+    ]);
+  await typeAfter(page, "Z");
+  await expect.poll(async () => (await lexicalDoc(page))[2]).toBe("quote:Za quote");
 });
 
 /**
@@ -243,7 +278,7 @@ test("Lexical cancels a synthetic deleteContent and does nothing; deleteContentB
       return event.defaultPrevented;
     }, inputType);
   expect(await offer("deleteContent")).toBe(true);
-  expect((await modelText(page))[5]).toBe("last line");
+  expect((await modelText(page))[6]).toBe("last line");
   expect(await offer("deleteContentBackward")).toBe(true);
-  await expect.poll(async () => (await modelText(page))[5]).toBe("line");
+  await expect.poll(async () => (await modelText(page))[6]).toBe("line");
 });
