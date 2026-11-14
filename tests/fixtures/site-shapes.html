@@ -63,7 +63,8 @@
       line breaks literal \n under white-space: break-spaces (#69). Notion
       cancels a synthetic paragraph or line break and does nothing, but makes a
       line break inside a block on a synthetic Shift+Enter keydown, leaving its
-      defaultPrevented false (#70); this script does the same.
+      defaultPrevented false (#70), and only when the keydown's legacy keyCode
+      is 13 (live, 2026-11-14); this script does the same.
     -->
     <!-- prettier-ignore -->
     <div id="notion" contenteditable="true" class="whenContentEditable"><div class="controls">Add icon Add cover</div><div id="n-title" class="block" contenteditable="true">Scratch</div><div id="n-one" class="block" contenteditable="true">alpha beta gamma</div><div id="n-two" class="block" contenteditable="true">line one
@@ -76,7 +77,7 @@ line three</div></div>
           e.preventDefault();
       });
       notion.addEventListener("keydown", (e) => {
-        if (e.key !== "Enter" || !e.shiftKey) return;
+        if (e.key !== "Enter" || !e.shiftKey || e.keyCode !== 13) return;
         // The person's own Shift+Enter would get the browser's break as well.
         if (e.isTrusted) e.preventDefault();
         const sel = document.getSelection();

@@ -407,6 +407,18 @@ describe("A line break offered as Shift+Enter", () => {
     el.dispatchEvent(key);
     expect(el.innerHTML).toBe("one\ntwo");
   });
+
+  it("a synthetic keydown takes the legacy keyCode and which from its init, as Notion reads them (#70)", () => {
+    const key = new KeyboardEvent("keydown", {
+      key: "Enter",
+      code: "Enter",
+      shiftKey: true,
+      keyCode: 13,
+      which: 13,
+    });
+    expect(key.keyCode).toBe(13);
+    expect(key.which).toBe(13);
+  });
 });
 
 describe("Enter on a Single-line host", () => {
