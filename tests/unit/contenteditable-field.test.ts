@@ -182,4 +182,40 @@ describe("ContentEditableField", () => {
     field.focus();
     expect(field.hasFocus()).toBe(true);
   });
+
+  // #65: a host's selection outlives its focus; the cursor must not stay drawn.
+  describe("blur leaves a caret, nothing highlighted, where focusing again resumes", () => {
+    it("at the selection's start, a backward one too", () => {
+      const { field } = fieldOn("<p>ab<b>cd</b></p>");
+      field.setSelection(3, 1);
+      field.blur();
+      expect(field.hasFocus()).toBe(false);
+      expect(document.getSelection()!.isCollapsed).toBe(true);
+      field.focus();
+      expect(field.getSelection()).toEqual({ anchor: 1, head: 1 });
+    });
+
+    it("at the caret it is given", () => {
+      const { field } = fieldOn("<p>ab<b>cd</b></p>");
+      field.setSelection(0, 1);
+      field.blur(2);
+      expect(document.getSelection()!.isCollapsed).toBe(true);
+      field.focus();
+      expect(field.getSelection()).toEqual({ anchor: 2, head: 2 });
+    });
+
+    it("at the caret it is given while the host is already blurred, whose selection is elsewhere", () => {
+      const { host, field } = fieldOn("<p>ab</p>");
+      const input = document.createElement("input");
+      document.body.append(input);
+      input.focus();
+      expect(field.hasFocus()).toBe(false);
+      field.blur(1);
+      expect(document.activeElement).not.toBe(host);
+      expect(document.getSelection()!.isCollapsed).toBe(true);
+      field.focus();
+      expect(field.getSelection()).toEqual({ anchor: 1, head: 1 });
+      input.remove();
+    });
+  });
 });

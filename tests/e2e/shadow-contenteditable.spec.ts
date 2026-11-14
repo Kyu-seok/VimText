@@ -83,3 +83,21 @@ test("removing the custom element disposes the Session", async ({ page }) => {
   await page.evaluate(() => document.getElementById("editor")!.remove());
   await expect.poll(() => hostCount(page)).toBe(0);
 });
+
+test(":q leaves the host with nothing highlighted inside the shadow tree; refocus resumes on the same character (#65)", async ({
+  page,
+}) => {
+  const ce = page.locator("#ce");
+  await activateAtStart(page, "#ce");
+  await page.keyboard.type("l");
+  await expect.poll(() => selectedText(page, "#editor")).toBe("h");
+  await page.keyboard.type(":q");
+  await page.keyboard.press("Enter");
+  await expect(ce).not.toBeFocused();
+  await expect.poll(() => selectedText(page, "#editor")).toBe("");
+  expect(await statusText(page)).toBe("");
+  await ce.focus();
+  await expect.poll(() => statusText(page)).toContain("NORMAL");
+  await page.keyboard.type("x");
+  await expect.poll(async () => (await blockTexts(page, "#ce"))[0]).toBe("te quick brown fox");
+});

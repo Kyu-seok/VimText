@@ -1,7 +1,7 @@
 import type { Field, FieldSelection, WrappingStyle } from "./Field";
 import { diffHunks, diffText, type TextDiff } from "./diff";
 import { project, type DomPoint, type Projection } from "./projection";
-import { readDomSelection, selectDom } from "./domSelection";
+import { collapseToStart, readDomSelection, selectDom } from "./domSelection";
 import {
   deleteMarker,
   insertAtomHtml,
@@ -544,8 +544,32 @@ export class ContentEditableField implements Field {
     this.focusTarget().focus({ preventScroll: true });
   }
 
-  blur(): void {
+  /**
+   * A host's selection outlives its focus: a Normal-mode cursor would stay
+   * drawn over a character of an editor VimText has left (#65). It becomes a
+   * caret first, at `caret` or else the selection's start, so focusing the
+   * host again resumes there; the editor takes the caret into its model before
+   * the blur, and has no one-character selection to put back.
+   */
+  blur(caret?: number): void {
+    this.held = null;
+    if (caret === undefined) collapseToStart(this.element);
+    else {
+      // Selecting inside a blurred host focuses it (`:wq`: the notice took the
+      // command line's place without re-focusing the Field), and the Session's
+      // focus handler then draws the cursor over the caret: select it again.
+      const focused = this.hasFocus();
+      this.selectCaret(caret);
+      if (!focused) this.selectCaret(caret);
+    }
+    settleEditor(this.element);
     this.focusTarget().blur();
+  }
+
+  private selectCaret(offset: number): void {
+    const projection = project(this.element);
+    const at = projection.toDom(Math.max(0, Math.min(projection.text.length, offset)));
+    selectDom(this.element, at, at);
   }
 
   visibleLineCount(): number {

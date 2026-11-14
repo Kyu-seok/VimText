@@ -188,3 +188,46 @@ test("Enter in Normal is the Vim motion; Cmd/Ctrl+Enter reach the page", async (
   await expect(page.locator("#log")).toContainText("page-enter:meta");
   await expect(page.locator("#log")).toContainText("page-enter:ctrl");
 });
+
+/** Whether the page's selection shows anything: a range that is not collapsed. */
+function highlighted(page: import("@playwright/test").Page): Promise<boolean> {
+  return page.evaluate(() => {
+    const sel = document.getSelection();
+    return !!sel && sel.rangeCount > 0 && !sel.isCollapsed;
+  });
+}
+
+test(":q leaves the host with nothing highlighted; refocus resumes Normal on the same character (#65)", async ({
+  page,
+}) => {
+  const ce = page.locator("#ce");
+  await activateAtStart(page, "#ce");
+  await page.keyboard.type("l");
+  await expect.poll(() => selectedText(page)).toBe("h");
+  await page.keyboard.type(":q");
+  await page.keyboard.press("Enter");
+  await expect(ce).not.toBeFocused();
+  await expect.poll(() => highlighted(page)).toBe(false);
+  expect(await statusText(page)).toBe("");
+  await ce.focus();
+  await expect.poll(() => statusText(page)).toContain("NORMAL");
+  await page.keyboard.type("x");
+  await expect.poll(async () => (await blockTexts(page, "#ce"))[0]).toBe("te quick brown fox");
+});
+
+test(":wq shows its :w notice after the blur, with nothing highlighted; refocus resumes on the same character (#65)", async ({
+  page,
+}) => {
+  const ce = page.locator("#ce");
+  await activateAtStart(page, "#ce");
+  await page.keyboard.type("l:wq");
+  await page.keyboard.press("Enter");
+  await expect(ce).not.toBeFocused();
+  expect(await statusText(page)).toContain("nothing to write");
+  await expect.poll(() => highlighted(page)).toBe(false);
+  await expect.poll(() => statusText(page), { timeout: 5000 }).toBe("");
+  await ce.focus();
+  await expect.poll(() => statusText(page)).toContain("NORMAL");
+  await page.keyboard.type("x");
+  await expect.poll(async () => (await blockTexts(page, "#ce"))[0]).toBe("te quick brown fox");
+});

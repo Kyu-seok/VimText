@@ -1,4 +1,4 @@
-import { test, expect, ready, activateAtStart, modelText, selectedText } from "./extension";
+import { test, expect, ready, activateAtStart, modelText, selectedText, statusText } from "./extension";
 import type { Page } from "@playwright/test";
 
 /**
@@ -136,4 +136,24 @@ test("an input rule's rewrite syncs into the mirror and undoes with the change t
   await expect.poll(async () => (await pmDoc(page))[3]).toBe("wait— here");
   await page.keyboard.type("u");
   await expect.poll(async () => (await pmDoc(page))[3]).toBe("wait-x here");
+});
+
+test(":q leaves ProseMirror with nothing highlighted and its document unchanged; refocus resumes on the same character (#65)", async ({
+  page,
+}) => {
+  const host = page.locator(HOST);
+  await page.keyboard.type("l");
+  await expect.poll(() => selectedText(page)).toBe("h");
+  await page.keyboard.type(":q");
+  await page.keyboard.press("Enter");
+  await expect(host).not.toBeFocused();
+  // ProseMirror re-applies its own selection when the DOM's changes: it must
+  // not put the one-character cursor back.
+  await expect.poll(() => page.evaluate(() => document.getSelection()!.isCollapsed)).toBe(true);
+  expect(await statusText(page)).toBe("");
+  expect(await pmDoc(page)).toEqual(ORIGINAL);
+  await host.focus();
+  await expect.poll(() => statusText(page)).toContain("NORMAL");
+  await page.keyboard.type("x");
+  await expect.poll(async () => (await pmDoc(page))[0]).toBe("te <b>quick brown</b> fox");
 });

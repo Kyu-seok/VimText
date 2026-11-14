@@ -915,9 +915,13 @@ export class Session {
   /** `:q` — done editing here. */
   leave(): void {
     // The engine re-focuses the Field when its dialog closes; blur after that.
+    // That focus puts a contenteditable's caret at its start (its selection
+    // was in the command line), so the cursor is read now (#65).
+    const { anchor, head } = this.renderedSelection();
+    const caret = Math.min(anchor, head);
     queueMicrotask(() => {
       this.noticeOutlivesBlur = !!this.mirror.dialog;
-      this.field.blur();
+      this.field.blur(caret);
       if (!this.noticeOutlivesBlur) this.status.hide();
     });
   }

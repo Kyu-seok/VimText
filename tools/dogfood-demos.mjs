@@ -96,7 +96,8 @@ for (const demo of DEMOS.filter((d) => !only || d.name === only)) {
     const status = () =>
       frame.evaluate(() => {
         const s = document.querySelector("vimtext-status");
-        if (!s) return "";
+        // A hidden Status Line keeps its last text (#65): read it as empty.
+        if (!s || s.style.display === "none") return "";
         const root = s.shadowRoot ?? s;
         return [...root.querySelectorAll(".bar span, .bar input")]
           .map((e) => e.value ?? e.textContent)
@@ -152,7 +153,10 @@ for (const demo of DEMOS.filter((d) => !only || d.name === only)) {
     } else console.log(`burst G A <Enter> fast <Esc> (no waits) kept the text   [${await status()}]`);
     await press([":", "q", "Enter"]);
     const focused = await host.evaluate((el) => el.contains(el.ownerDocument.activeElement));
-    console.log(`:q         focus left the editor: ${!focused}; text ${await text()}`);
+    const highlighted = await frame.evaluate(() => !(document.getSelection()?.isCollapsed ?? true));
+    console.log(
+      `:q         focus left the editor: ${!focused}; highlighted: ${highlighted}; text ${await text()}   [${await status()}]`,
+    );
   } catch (e) {
     failures++;
     console.log(`!! ${demo.name}: ${e.message.split("\n")[0]}`);
