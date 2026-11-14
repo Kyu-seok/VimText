@@ -446,3 +446,102 @@ describe("Enter on a Single-line host", () => {
     expect([sel.anchorNode, sel.anchorOffset, sel.focusNode, sel.focusOffset]).toEqual([text, 6, text, 7]);
   });
 });
+
+describe("Measuring the drawn Cursor", () => {
+  it("a selection inside a textarea is no document Range over its text: the document's range is collapsed beside the textarea, though toString reads the selected text", () => {
+    const ta = document.createElement("textarea");
+    ta.value = "hello";
+    document.body.appendChild(ta);
+    cleanup.push(() => ta.remove());
+    ta.focus();
+    ta.setSelectionRange(0, 1);
+    const range = getSelection()!.getRangeAt(0);
+    expect(range.collapsed).toBe(true);
+    expect(range.startContainer).toBe(document.body);
+    expect(range.toString()).toBe("");
+    expect(getSelection()!.toString()).toBe("h");
+  });
+
+  it("a Range over a tab in pre-wrap text has one client rect, the tab's whole advance", () => {
+    const el = host("<p>a\tb</p>");
+    el.style.whiteSpace = "pre-wrap";
+    el.style.font = "14px/20px monospace";
+    el.style.tabSize = "4";
+    const text = el.querySelector("p")!.firstChild!;
+    const range = document.createRange();
+    range.setStart(text, 0);
+    range.setEnd(text, 1);
+    const a = range.getClientRects()[0]!.width;
+    range.setStart(text, 1);
+    range.setEnd(text, 2);
+    const rects = [...range.getClientRects()];
+    expect(rects.length).toBe(1);
+    expect(rects[0]!.width).toBeCloseTo(3 * a, 0);
+  });
+
+  it("a Range over a space at a soft wrap has only zero-width rects, one at each line's edge", () => {
+    const el = host("<p>aaaa bbbb</p>");
+    el.style.width = "40px";
+    el.style.font = "14px/20px monospace";
+    const text = el.querySelector("p")!.firstChild!;
+    const range = document.createRange();
+    range.setStart(text, 4);
+    range.setEnd(text, 5);
+    const rects = [...range.getClientRects()];
+    expect(rects.map((r) => r.width)).toEqual([0, 0]);
+    expect(rects[1]!.top).toBeGreaterThan(rects[0]!.top);
+    // The letter before it ends the first line where the space's first rect stands.
+    range.setStart(text, 3);
+    range.setEnd(text, 4);
+    expect(range.getClientRects()[0]!.right).toBeCloseTo(rects[0]!.left, 0);
+  });
+
+  it("a collapsed Range in an empty block has no client rects; its placeholder <br> has the line's", () => {
+    const el = host("<p>x</p><p><br></p>");
+    const empty = el.querySelectorAll("p")[1]!;
+    const range = document.createRange();
+    range.setStart(empty, 0);
+    expect(range.getClientRects().length).toBe(0);
+    range.selectNode(empty.firstChild!);
+    const br = range.getClientRects()[0]!;
+    expect(br.height).toBeGreaterThan(0);
+    expect(br.top).toBeGreaterThanOrEqual(empty.getBoundingClientRect().top);
+  });
+});
+
+describe("The caret-hiding stylesheet under editing", () => {
+  function adopt(rule: string): void {
+    const sheet = new CSSStyleSheet();
+    sheet.replaceSync(rule);
+    document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+    cleanup.push(
+      () => (document.adoptedStyleSheets = document.adoptedStyleSheets.filter((s) => s !== sheet)),
+    );
+  }
+
+  function merge(el: HTMLElement): void {
+    const [a, b] = el.querySelectorAll("p");
+    select(a!.firstChild!, 3, b!.firstChild!, 0);
+    document.execCommand("delete");
+  }
+
+  it("without it, a block merge moves the second block's text in bare", () => {
+    const el = host("<p>one</p><p>two</p>");
+    merge(el);
+    expect(el.innerHTML).toBe("<p>onetwo</p>");
+  });
+
+  it("with `:focus, :focus *` caret-color adopted, a block merge wraps the moved text in a <span>", () => {
+    adopt(":focus, :focus * { caret-color: transparent !important; }");
+    const el = host("<p>one</p><p>two</p>");
+    merge(el);
+    expect(el.innerHTML).toBe("<p>one<span>two</span></p>");
+  });
+
+  it("with `:focus` alone, the merge writes the caret-color into the moved text's style", () => {
+    adopt(":focus { caret-color: transparent !important; }");
+    const el = host("<p>one</p><p>two</p>");
+    merge(el);
+    expect(el.innerHTML).toBe('<p>one<span style="caret-color: transparent;">two</span></p>');
+  });
+});

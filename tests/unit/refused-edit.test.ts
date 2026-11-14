@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { Session } from "../../src/bridge/Session";
-import { activeHost, blockTexts, selectedText } from "./contenteditable";
+import { activeHost, blockTexts, cursorChar } from "./contenteditable";
 import { FakeField } from "./FakeField";
 import { settledKeyDriver } from "./keys";
 import { statusText } from "./dom";
@@ -60,10 +60,10 @@ describe("A refused edit on a contenteditable host", () => {
   it("x in the locked span leaves the text unchanged, the cursor on its character, and the message on the Status Line", async () => {
     const { host } = open();
     await keys("ll");
-    expect(selectedText()).toBe("L");
+    expect(cursorChar()).toBe("L");
     await keys("x");
     expect(blockTexts(host)).toEqual(["abLOCKcd", "next line"]);
-    expect(selectedText()).toBe("L");
+    expect(cursorChar()).toBe("L");
     expect(statusText()).toContain(REFUSED);
   });
 
@@ -71,7 +71,7 @@ describe("A refused edit on a contenteditable host", () => {
     const { host } = open();
     await keys("llx");
     await keys("l");
-    expect(selectedText()).toBe("O");
+    expect(cursorChar()).toBe("O");
     await keys("$x");
     expect(blockTexts(host)).toEqual(["abLOCKc", "next line"]);
     await keys("j0x");

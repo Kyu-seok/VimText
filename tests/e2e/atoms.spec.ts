@@ -14,30 +14,30 @@ test.beforeEach(async ({ page }) => {
   await activateAtStart(page, "#ce");
 });
 
-/** Which Atom the native selection covers exactly ("chip", "img"), or its text. */
-function cursor(page: import("@playwright/test").Page): Promise<string> {
+/**
+ * Which Atom the collapsed caret stands just before ("chip", "img"): the
+ * Cursor on it (ADR 0009). Otherwise the character after the caret.
+ */
+function cursor(page: import("@playwright/test").Page): Promise<string | null> {
   return page.evaluate(() => {
     const sel = document.getSelection()!;
+    if (!sel.isCollapsed) return null;
+    const at = sel.getRangeAt(0);
     for (const [name, el] of [
       ["chip", document.querySelector(".mention")],
       ["img", document.querySelector("img")],
     ] as const) {
       if (!el) continue;
-      const whole = document.createRange();
-      whole.selectNode(el);
-      const range = sel.getRangeAt(0);
-      if (
-        sel.containsNode(el, false) &&
-        range.compareBoundaryPoints(Range.START_TO_START, whole) === 0 &&
-        range.toString() === whole.toString()
-      )
-        return name;
+      const before = document.createRange();
+      before.setStartBefore(el);
+      if (at.compareBoundaryPoints(Range.START_TO_START, before) === 0) return name;
     }
-    return sel.toString();
+    const node = sel.anchorNode;
+    return node instanceof Text ? (node.data[sel.anchorOffset] ?? "") : "";
   });
 }
 
-test("l h w step over each Atom as one character; the cursor on it selects the whole Atom", async ({
+test("l h w step over each Atom as one character; the cursor on it is a caret before the Atom", async ({
   page,
 }) => {
   await page.keyboard.type("lll");

@@ -560,12 +560,14 @@ export class Session {
   private onModeChange = (): void => {
     if (this.destroyed) return;
     this.status.setMode(this.mode);
+    this.drawCursor();
   };
 
   /** After `:wq`, the `:w` notice outlives the Field's focus; the bar hides once it closes. */
   private onDialogChange = (): void => {
     if (this.destroyed) return;
     this.onDialog?.();
+    this.drawCursor();
     if (!this.noticeOutlivesBlur || this.mirror.dialog) return;
     this.noticeOutlivesBlur = false;
     if (!this.field.hasFocus()) this.status.hide();
@@ -667,6 +669,10 @@ export class Session {
     const main = state.selection.main;
     const vim = this.mirror.vim;
     if (vim.insertMode || vim.visualMode || !main.empty) return { anchor: main.anchor, head: main.head };
+    // A Field that measures the Cursor's box gets a caret before the Cursor's
+    // character, and VimText draws the Cursor (ADR 0009): a page reads a
+    // one-character selection as a person selecting it.
+    if (this.field.cursorBox) return { anchor: main.head, head: main.head };
     const line = state.doc.lineAt(main.head);
     return main.head < line.to
       ? { anchor: main.head, head: main.head + 1 }
@@ -729,6 +735,7 @@ export class Session {
       const writtenAt = this.here();
       const write = this.field.setValue(text, this.changesFrom(before, text));
       if (write) {
+        this.status.cursor.setWriting(true);
         const settled = () => this.writeSettled(before, text, writtenAt);
         this.pendingWrite = write.then(settled, (err: unknown) => {
           console.error("VimText write error", err);
@@ -751,6 +758,7 @@ export class Session {
   private writeSettled(before: string, text: string, writtenAt: AgreedPoint): void {
     this.pendingWrite = null;
     if (this.destroyed) return;
+    this.status.cursor.setWriting(false);
     const after = this.field.getValue();
     this.judgeWrite(before, text);
     // Accepted as written: `text` is the agreed text, at the point it was
@@ -816,6 +824,26 @@ export class Session {
     this.agreeOn(point);
     this.status.setMode(this.mode);
     this.status.reposition();
+    this.drawCursor();
+  }
+
+  /**
+   * Draws the Cursor on a Field whose selection outside Insert and Visual is a
+   * caret (ADR 0009, DESIGN.md "Cursor"): a block in Normal and
+   * operator-pending, a bar in Replace, nothing in Insert, Visual and
+   * Command-line or while the Field does not have focus.
+   */
+  private drawCursor(): void {
+    if (!this.field.cursorBox) return;
+    const mode = this.mode;
+    const shape = !this.field.hasFocus()
+      ? null
+      : mode === "normal"
+        ? "block"
+        : mode === "replace"
+          ? "bar"
+          : null;
+    this.status.cursor.draw(shape, this.mirror.view.state.selection.main.head);
   }
 
   /**
@@ -916,6 +944,7 @@ export class Session {
     // starts afresh. A Pass-through key that keeps focus (Cmd+C) leaves both
     // alone, like a pending operator.
     this.pluginKeys.discard();
+    this.status.cursor.hide();
     for (const plugin of this.plugins) plugin.onBlur?.();
     // Keep the bar while the command line has focus (it lives in our shadow
     // root) or `:wq` is leaving behind its notice.
@@ -931,8 +960,20 @@ export class Session {
     const { anchor, head } = this.renderedSelection();
     const caret = Math.min(anchor, head);
     queueMicrotask(() => {
+      if (this.destroyed) return;
       this.noticeOutlivesBlur = !!this.mirror.dialog;
       this.field.blur(caret);
+      // On a Field whose Normal selection is a caret (ADR 0009): the re-focus
+      // moved the mirror to the host's start, and an editor that puts its own
+      // selection back (ProseMirror) left the Field's caret elsewhere, so the
+      // render's caret read back as the old one. The mirror goes back to the
+      // caret the Field is left with, the render state with it, and a focus
+      // that finds the caret there resumes on it, not at the start (#76;
+      // tests/e2e/prosemirror.spec.ts, ":q leaves ProseMirror …").
+      if (this.field.cursorBox) {
+        this.withSyncing(() => this.mirror.view.dispatch({ selection: EditorSelection.cursor(caret) }));
+        this.lastRendered = this.field.getSelection();
+      }
       if (!this.noticeOutlivesBlur) this.status.hide();
     });
   }

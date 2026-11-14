@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { project } from "../../src/field/projection";
 import { resolveField } from "../../src/field/resolve";
-import { activeHost, backspaceNatively, editableHost, selectedText } from "./contenteditable";
+import { activeHost, backspaceNatively, editableHost, cursorChar } from "./contenteditable";
 import { settledKeyDriver } from "./keys";
 import { statusText } from "./dom";
 import { Session } from "../../src/bridge/Session";
@@ -32,17 +32,12 @@ function open(html = ATOMS) {
   return current;
 }
 
-/** Whether the native selection covers `el` and nothing more: the cursor on an Atom. */
-function coversExactly(el: Element): boolean {
+/** Whether the native selection is a caret just before `el`: the Cursor on an Atom (ADR 0009). */
+function caretBefore(el: Element): boolean {
   const sel = getSelection()!;
-  const range = sel.getRangeAt(0);
-  const whole = document.createRange();
-  whole.selectNode(el);
-  return (
-    sel.containsNode(el, false) &&
-    range.compareBoundaryPoints(Range.START_TO_START, whole) === 0 &&
-    range.toString() === whole.toString()
-  );
+  const before = document.createRange();
+  before.setStartBefore(el);
+  return sel.isCollapsed && sel.getRangeAt(0).compareBoundaryPoints(Range.START_TO_START, before) === 0;
 }
 
 describe("Atoms in the projection", () => {
@@ -99,28 +94,28 @@ describe("Atoms in the projection", () => {
 });
 
 describe("motions over Atoms", () => {
-  it("l and h step over each Atom as one character, and the cursor on it selects the whole Atom", async () => {
+  it("l and h step over each Atom as one character, and the cursor on it is a caret before the Atom", async () => {
     const { host } = open();
     const chip = host.querySelector("span")!;
     const img = host.querySelector("img")!;
     await keys("lll");
-    expect(coversExactly(chip)).toBe(true);
+    expect(caretBefore(chip)).toBe(true);
     await keys("l");
-    expect(selectedText()).toBe(" ");
+    expect(cursorChar()).toBe(" ");
     await keys("lllll");
-    expect(coversExactly(img)).toBe(true);
+    expect(caretBefore(img)).toBe(true);
     await keys("h");
-    expect(selectedText()).toBe(" ");
+    expect(cursorChar()).toBe(" ");
   });
 
   it("w lands on each Atom as a word of its own", async () => {
     const { host } = open();
     await keys("w");
-    expect(coversExactly(host.querySelector("span")!)).toBe(true);
+    expect(caretBefore(host.querySelector("span")!)).toBe(true);
     await keys("ww");
-    expect(coversExactly(host.querySelector("img")!)).toBe(true);
+    expect(caretBefore(host.querySelector("img")!)).toBe(true);
     await keys("w");
-    expect(selectedText()).toBe("o");
+    expect(cursorChar()).toBe("o");
   });
 });
 

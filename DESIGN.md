@@ -152,7 +152,11 @@ but only the primary range is highlighted. The Normal-mode Cursor depends on the
   the Field (one measurement per animation frame), and clipped to the Field's visible part.
   While it shows, the page's caret is hidden by a constructed stylesheet adopted by the
   Field's document or shadow root (`:focus, :focus * { caret-color: transparent !important }`),
-  never by an attribute on the page's element.
+  never by an attribute on the page's element. The stylesheet is lifted while a VimText write
+  runs: Chromium's block merge carries it into the markup it writes, as a `<span>` around
+  the moved text (#76; docs/engine-seams.md, "The caret-hiding stylesheet under editing"). A
+  collapsible space at a soft wrap has no rect with a width; its block goes at the end of the
+  line it ends, one `0` wide ("Measuring the drawn Cursor").
 
 **contenteditable Fields** (M4, ADR 0007, decided in the grill of 2026-11-10).
 
