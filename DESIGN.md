@@ -428,6 +428,18 @@ it is outside the gate, so PNG churn never fails `npm run check`.
   (#62). Chosen over restoring the decorator: Lexical cannot take a decorator back through the
   DOM (the `insertHTML` restore turned its whole line into the decorator's text), and pasting
   it back needs Lexical's own clipboard JSON, which the isolated world never holds.
+- contenteditable (M4): a formatting shortcut (Cmd+B, Cmd+I) pressed while a write is still
+  being applied, typically right after a caret move such as `A` or `o` typed faster than about
+  60 ms, applies to nothing, and the text typed with it comes out unformatted (#72). The
+  characters typed during the write are held and land with it as plain text (rule 4's
+  exception); the shortcut is not held, so it reaches the page when nothing typed is there yet.
+  The text is kept. Under heavy load the write can land in pieces, and a shortcut pressed
+  between two of them applies at the editor's caret as it then stands, so the format can land
+  on the wrong text instead (seen on Quill: the whole line bold). Holding the shortcut too would widen rule 4 and need a per-site list of
+  formatting keys, and beeping would cross rule 4 as well; both cost more than a race only
+  typing that fast hits. Pinned by tests/e2e/quill.spec.ts, "accepted limitation: Cmd+B pressed
+  back to back after G A Enter applies to nothing; the line is typed plain"; "Cmd+B pressed once
+  the write has landed bolds what is typed after it" shows the shortcut once the write is in.
 
 ## Milestones
 

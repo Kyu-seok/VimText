@@ -270,3 +270,52 @@ test("u and Ctrl-r restore Quill's text", async ({ page }) => {
   await page.keyboard.type("u");
   await expect.poll(() => modelText(page)).toEqual(["the uick brown fox", ...ORIGINAL.slice(2)]);
 });
+
+test.describe("a formatting shortcut pressed while a write is being applied (#72)", () => {
+  const KEYS = [
+    "o",
+    "n",
+    "e",
+    " ",
+    "ControlOrMeta+b",
+    "t",
+    "w",
+    "o",
+    "ControlOrMeta+b",
+    " ",
+    "t",
+    "h",
+    "r",
+    "e",
+    "e",
+  ];
+
+  test("accepted limitation: Cmd+B pressed back to back after G A Enter applies to nothing; the line is typed plain", async ({
+    page,
+  }) => {
+    // Pins an accepted limitation (DESIGN.md, "Accepted limitations", #72), not
+    // a wanted behaviour. The keys land while the caret move's write is still
+    // being applied: the characters go into the mirror and land with the merged
+    // write as plain text, while Cmd+B reaches Quill at a moment when nothing
+    // typed is there yet, so `two` is not bold. On a quiet machine every key
+    // lands before the first piece of the write does; on a heavily loaded one
+    // the write can land in pieces and a Cmd+B between two of them applies at
+    // Quill's caret as it then stands (seen: the whole line bold), which this
+    // test does not cover.
+    for (const k of ["G", "A", "Enter", ...KEYS, "Escape"]) await page.keyboard.press(k);
+    await expect.poll(async () => (await quillDoc(page)).slice(5)).toEqual(["last line", "one two three"]);
+  });
+
+  test("Cmd+B pressed once the write has landed bolds what is typed after it", async ({ page }) => {
+    for (const k of ["G", "A", "Enter"]) await page.keyboard.press(k);
+    // The new empty line is in Quill's model: the write has been applied. The
+    // pause lets the caret VimText set settle too (#64), so the keys after it
+    // are the person's own, as typed at a normal pace (150 ms, as in triage).
+    await expect.poll(async () => (await modelText(page)).slice(5)).toEqual(["last line", ""]);
+    await page.waitForTimeout(150);
+    for (const k of [...KEYS, "Escape"]) await page.keyboard.press(k);
+    await expect
+      .poll(async () => (await quillDoc(page)).slice(5))
+      .toEqual(["last line", "one <b>two</b> three"]);
+  });
+});
