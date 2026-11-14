@@ -374,6 +374,23 @@ describe("the Normal cursor", () => {
   });
 });
 
+describe("the Insert caret after a deletion at a boundary between two runs (#63)", () => {
+  // CODING_STANDARDS rule 13: the side is the one that held the text the
+  // mirror's change deleted. A diff of `abbc` and `abc` puts the deleted `b`
+  // second, inside the bold run's middle, so the side came out "before" and
+  // the caret sat at the end of the plain `a`.
+  it("s on a bold run's first character, beside the same character, leaves the caret in the bold run", async () => {
+    const { host } = open("<p>a<b>bbc</b></p>");
+    await keys("ls");
+    expect(blockTexts(host)).toEqual(["abc"]);
+    const sel = getSelection()!;
+    expect({ node: sel.focusNode, offset: sel.focusOffset }).toEqual({
+      node: host.querySelector("b")!.firstChild,
+      offset: 0,
+    });
+  });
+});
+
 describe("Replace mode", () => {
   it("R overwrites characters in place, inside the bold run they were in; Esc and u bring the old text back", async () => {
     const { host } = open("<p>the <b>quick</b> brown fox</p><p>jumps</p>");

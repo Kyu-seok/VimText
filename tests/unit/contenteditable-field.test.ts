@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
+import { ChangeSet } from "@codemirror/state";
 import { ContentEditableField } from "../../src/field/ContentEditableField";
 import {
   blockTexts,
@@ -233,6 +234,8 @@ describe("The Insert caret at a boundary between two runs (#63)", () => {
   const RUNS = "<p>ab<b>cdef</b>gh</p>";
   const bold = (host: HTMLElement) => host.querySelector("b")!.firstChild!;
   const caret = () => ({ node: getSelection()!.focusNode, offset: getSelection()!.focusOffset });
+  /** The mirror's change that deletes `from`–`to` of RUNS' text, as the Session hands it to the write. */
+  const cut = (from: number, to: number) => ChangeSet.of({ from, to }, "abcdefgh".length);
 
   /** The node and offset each `beforeinput` the host fires starts its target range at, as Slate reads it. */
   function targetStarts(host: HTMLElement): { node: Node; offset: number }[] {
@@ -260,14 +263,14 @@ describe("The Insert caret at a boundary between two runs (#63)", () => {
 
   it("after a deletion at a run's end it sits in that run", async () => {
     const { host, field } = fieldOn(RUNS);
-    await field.setValue("abcdgh"); // `cw` on `ef`
+    await field.setValue("abcdgh", cut(4, 6)); // `cw` on `ef`
     field.setSelection(4, 4, true);
     expect(caret()).toEqual({ node: bold(host), offset: 2 });
   });
 
   it("after a deletion at a run's start it sits in that run", async () => {
     const { host, field } = fieldOn(RUNS);
-    await field.setValue("abefgh"); // `cw` on `cd`
+    await field.setValue("abefgh", cut(2, 4)); // `cw` on `cd`
     field.setSelection(2, 2, true);
     expect(caret()).toEqual({ node: bold(host), offset: 0 });
   });
@@ -283,7 +286,7 @@ describe("The Insert caret at a boundary between two runs (#63)", () => {
   it("text typed while a deletion at a run's start settles is written in that run", async () => {
     const { host, field } = fieldOn(RUNS);
     const starts = targetStarts(host);
-    await field.setValue("abefgh"); // `cw` on `cd`, the caret not yet set
+    await field.setValue("abefgh", cut(2, 4)); // `cw` on `cd`, the caret not yet set
     await field.setValue("abXYefgh");
     expect(starts[1]).toEqual({ node: bold(host), offset: 0 });
   });
@@ -291,7 +294,7 @@ describe("The Insert caret at a boundary between two runs (#63)", () => {
   it("text typed while a deletion at a run's end settles is written in that run", async () => {
     const { host, field } = fieldOn(RUNS);
     const starts = targetStarts(host);
-    await field.setValue("abcdgh"); // `cw` on `ef`, the caret not yet set
+    await field.setValue("abcdgh", cut(4, 6)); // `cw` on `ef`, the caret not yet set
     await field.setValue("abcdXYgh");
     expect(starts[1]).toEqual({ node: bold(host), offset: 2 });
   });

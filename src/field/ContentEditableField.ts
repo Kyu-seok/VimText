@@ -1,3 +1,4 @@
+import type { ChangeSet } from "@codemirror/state";
 import type { Field, FieldSelection, WrappingStyle } from "./Field";
 import { diffHunks, diffText, type TextDiff } from "./diff";
 import { project, type DomPoint, type Projection, type Side } from "./projection";
@@ -85,6 +86,24 @@ function deletedSide(projection: Projection, from: number, to: number): Side | n
   return null;
 }
 
+/**
+ * Where the last of `changes` leaves the text it deleted, in the new text,
+ * and the side of that boundary that held it in `projection`, the text before
+ * them: read from the mirror's own changes (CODING_STANDARDS rule 13), since
+ * a diff puts a deletion beside the same characters wherever it likes (`s` on
+ * the first `b` of `a<b>bbc</b>` read as the second's, inside the run). None
+ * when that change inserts text, deletes none, or held no side.
+ */
+function lastDeletion(projection: Projection, changes: ChangeSet): { at: number; side: Side } | null {
+  if (changes.length !== projection.text.length) return null;
+  const found: { at: number; side: Side | null }[] = [];
+  changes.iterChanges((fromA, toA, fromB, _toB, inserted) => {
+    found.push({ at: fromB, side: inserted.length === 0 ? deletedSide(projection, fromA, toA) : null });
+  });
+  const last = found.at(-1);
+  return last?.side ? { at: last.at, side: last.side } : null;
+}
+
 /** How many removed Atoms a Field keeps for undo; older ones come back as nothing. */
 const REMOVED_ATOMS_KEPT = 200;
 
@@ -166,8 +185,6 @@ function breakAtLineEnd(
 export class ContentEditableField implements Field {
   private writing = false;
   private destroyed = false;
-  /** The last span of the write under way that deleted text and inserted none: where, and the side that held the text. */
-  private deletion: { at: number; side: Side } | null = null;
   /** When the host last changed (`performance.now()`): a span waits `WRITE_GAP_MS` from it. */
   private lastChangeAt = -Infinity;
   private readonly noteChange = () => {
@@ -248,15 +265,16 @@ export class ContentEditableField implements Field {
   }
 
   /** Resolves once the write has settled. One write at a time: the Session waits for one before the next. */
-  setValue(text: string): Promise<void> {
-    const old = project(this.element).text;
+  setValue(text: string, changes?: ChangeSet): Promise<void> {
+    const before = project(this.element);
+    const old = before.text;
     if (old === text) return Promise.resolve();
+    const deletion = changes ? lastDeletion(before, changes) : null;
     // Each changed span on its own, first to last (`diffHunks`): the text
     // after the k-th is the new text up to its end and the old text after it.
     const textAfterEachSpan = diffHunks(old, text).map((h) => text.slice(0, h.toNew) + old.slice(h.toOld));
     this.writing = true;
     this.held = null;
-    this.deletion = null;
     const write = async (): Promise<void> => {
       try {
         for (const target of textAfterEachSpan) await this.writeSpan(target);
@@ -267,7 +285,7 @@ export class ContentEditableField implements Field {
         if (!this.destroyed) {
           const projection = project(this.element);
           this.noteAtoms(projection);
-          this.caretSide = this.deletion && { ...this.deletion, text: projection.text };
+          this.caretSide = deletion && { ...deletion, text: projection.text };
         }
       }
     };
@@ -287,8 +305,6 @@ export class ContentEditableField implements Field {
     const span = breakAtLineEnd(old, keepAdjacentSpaces(old, diffText(old, text), text));
     const restored = this.takeRemovedAtoms(span.from, span.insert);
     this.keepRemovedAtoms(projection, span.from, span.to);
-    const side = deletedSide(projection, span.from, span.to);
-    this.deletion = !span.insert && side ? { at: span.from, side } : null;
     if (!span.insert.includes(ATOM_CHAR)) {
       await this.replace(span.from, span.to, span.insert, projection, this.sideAt(span.from, span.to, old));
     } else {
