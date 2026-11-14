@@ -3,6 +3,8 @@
  * This is the seam between the engine bridge and the DOM: the bridge only
  * ever talks to a Field, never to a textarea/input/contenteditable directly.
  */
+import type { ChangeSet } from "@codemirror/state";
+
 export interface FieldSelection {
   /** Offset where the selection started (the fixed end). */
   anchor: number;
@@ -19,9 +21,13 @@ export interface Field {
    * Writes text in a way the host page's framework notices (React, Vue, …).
    * A textarea or input writes synchronously; a contenteditable host returns a
    * promise that resolves once the write has settled (ADR 0008), and the
-   * caller makes no other write to it until then.
+   * caller makes no other write to it until then. `changes`, when the caller
+   * has them, are the mirror's own changes from the Field's text to `text`: a
+   * contenteditable Field reads from them which side of a boundary between
+   * runs held the text they deleted (owner decision on #63; CODING_STANDARDS
+   * rule 13), never from a diff of the texts.
    */
-  setValue(text: string): void | Promise<void>;
+  setValue(text: string, changes?: ChangeSet): void | Promise<void>;
   getSelection(): FieldSelection;
   /**
    * `insertCaret`: the selection is the Insert caret (Insert or Replace mode),
@@ -41,10 +47,10 @@ export interface Field {
   /**
    * Takes focus off the Field, leaving nothing in it highlighted. A Field
    * whose selection outlives its focus (a contenteditable host) leaves a caret
-   * at `caret`, or else at its selection's start, where focusing it again
-   * resumes; one whose selection stops showing on blur ignores `caret`.
+   * at `caret`, where focusing it again resumes; one whose selection stops
+   * showing on blur ignores `caret`.
    */
-  blur(caret?: number): void;
+  blur(caret: number): void;
   hasFocus(): boolean;
   /** Number of text lines that fit in the visible area (for Ctrl-d/u, zz, …). */
   visibleLineCount(): number;

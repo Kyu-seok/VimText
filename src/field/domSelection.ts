@@ -45,19 +45,3 @@ export function selectDom(host: Element, anchor: DomPoint, focus: DomPoint): voi
     return;
   sel.setBaseAndExtent(anchor.node, anchor.offset, focus.node, focus.offset);
 }
-
-/**
- * Collapses a selection inside `host` to a caret at its start, keeping it in
- * the host. Does nothing when the selection lies outside `host`.
- */
-export function collapseToStart(host: Element): void {
-  const sel = readDomSelection(host);
-  if (!sel) return;
-  const { anchor, focus } = sel;
-  if (anchor.node === focus.node && anchor.offset === focus.offset) return;
-  const range = document.createRange();
-  range.setStart(anchor.node, anchor.offset);
-  const focusFirst = range.comparePoint(focus.node, focus.offset) < 0;
-  const start = focusFirst ? focus : anchor;
-  selectDom(host, start, start);
-}

@@ -79,10 +79,12 @@ test("x r cw inside the bold run keep it bold; dw across its edge trims both sid
  * insertion to Chromium, typed or written, and Chromium's `insertText` at a
  * boundary between two text nodes takes the style before it wherever the
  * caret was set (tests/unit/chromium-facts.test.ts, "Marks at a write's
- * edges"). So the typed word is plain. Pinned as found: the decision's
- * deleted-text side is out of reach on an editor that lets Chromium type.
+ * edges"). So the typed word is plain. Pins an accepted limitation
+ * (DESIGN.md, "Accepted limitations", #63), not a wanted behaviour: the
+ * decision's deleted-text side is out of reach on an editor that lets
+ * Chromium type.
  */
-test("cw on the first word of the bold run types plain: Chromium types in the style before the run (#63)", async ({
+test("accepted limitation: cw on the first word of the bold run types plain, as Chromium types in the style before the run (#63)", async ({
   page,
 }) => {
   await page.keyboard.type("wcw");
@@ -309,20 +311,23 @@ test.describe("a formatting shortcut pressed while a write is being applied (#72
     "e",
   ];
 
-  test("accepted limitation: Cmd+B pressed back to back after G A Enter applies to nothing; the line is typed plain", async ({
+  test("accepted limitation: Cmd+B pressed back to back after G A Enter keeps the line's text; its formatting depends on timing", async ({
     page,
   }) => {
-    // Pins an accepted limitation (DESIGN.md, "Accepted limitations", #72), not
-    // a wanted behaviour. The keys land while the caret move's write is still
-    // being applied: the characters go into the mirror and land with the merged
-    // write as plain text, while Cmd+B reaches Quill at a moment when nothing
-    // typed is there yet, so `two` is not bold. On a quiet machine every key
-    // lands before the first piece of the write does; on a heavily loaded one
-    // the write can land in pieces and a Cmd+B between two of them applies at
-    // Quill's caret as it then stands (seen: the whole line bold), which this
-    // test does not cover.
+    // An accepted limitation (DESIGN.md, "Accepted limitations", #72), not a
+    // wanted behaviour, and an e2e that accepts more than one outcome
+    // (CODING_STANDARDS rule 7). The keys land while the caret move's write is
+    // still being applied: the characters go into the mirror and land with the
+    // merged write, while Cmd+B is not held and reaches Quill whenever it is
+    // pressed. Where it lands depends on timing: on a quiet machine before
+    // anything typed is there, so the line is plain; under the pre-push load
+    // (five repeats on four workers) also `one <b>two</b> three` and
+    // `<b>one two three</b>`. So this asserts only what holds in every
+    // outcome, that the text is kept. The working case, Cmd+B once the write
+    // has landed, is pinned deterministically by "Cmd+B pressed once the write
+    // has landed bolds what is typed after it" below.
     for (const k of ["G", "A", "Enter", ...KEYS, "Escape"]) await page.keyboard.press(k);
-    await expect.poll(async () => (await quillDoc(page)).slice(5)).toEqual(["last line", "one two three"]);
+    await expect.poll(() => modelText(page)).toEqual([...ORIGINAL, "one two three"]);
   });
 
   test("Cmd+B pressed once the write has landed bolds what is typed after it", async ({ page }) => {

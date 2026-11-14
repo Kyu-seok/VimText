@@ -250,6 +250,17 @@ export class Session {
     }
   }
 
+  /**
+   * The mirror's own changes from `before`, the Field's text, to `text`, the
+   * mirror's (CODING_STANDARDS rule 13): the agreed point's, when `before` is
+   * the text agreed there and they make `text` of it. None otherwise.
+   */
+  private changesFrom(before: string, text: string): ChangeSet | undefined {
+    const since = this.agreed.since;
+    if (!since || this.lastText !== before || since.length !== before.length) return undefined;
+    return since.apply(Text.of(before.split("\n"))).toString() === text ? since : undefined;
+  }
+
   private get nativeInsert(): boolean {
     return this.mirror.vim.insertMode && !this.mirror.cm.state.overwrite;
   }
@@ -716,7 +727,7 @@ export class Session {
     const before = this.field.getValue();
     if (text !== before) {
       const writtenAt = this.here();
-      const write = this.field.setValue(text);
+      const write = this.field.setValue(text, this.changesFrom(before, text));
       if (write) {
         const settled = () => this.writeSettled(before, text, writtenAt);
         this.pendingWrite = write.then(settled, (err: unknown) => {
