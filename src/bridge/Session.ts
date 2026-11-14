@@ -134,6 +134,7 @@ export class Session {
   readonly mirror: Mirror;
   readonly status: StatusLine;
   private readonly stopInput: () => void;
+  private readonly stopRefusingBreaks: () => void;
   /** Set when the command that entered Insert also changed text (cw, o, s…): the typed text joins its undo step. */
   private joinNextInsert = false;
   private firstInsertSync = true;
@@ -204,6 +205,9 @@ export class Session {
       this.scheduleRender();
     });
     this.stopInput = field.onInput(this.onFieldInput);
+    // Key Policy row 6 passes a Single-line Field's Enter in Normal to the
+    // page; the browser's own break it would then make is refused (#51).
+    this.stopRefusingBreaks = field.refuseNativeBreaks?.(() => !this.mirror.vim.insertMode) ?? (() => {});
     this.runVimrc(config);
     this.status.show();
     this.status.setMode(this.mode);
@@ -924,6 +928,7 @@ export class Session {
     this.mirror.cm.off("vim-mode-change", this.onModeChange);
     this.mirror.cm.off("dialog", this.onDialogChange);
     this.stopInput();
+    this.stopRefusingBreaks();
     this.mirror.destroy();
     this.status.destroy();
   }

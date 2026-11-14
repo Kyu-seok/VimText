@@ -38,6 +38,13 @@ export interface Field {
   visibleLineCount(): number;
   /** Fires on native user edits (typing, paste, native undo). Not on setValue(). */
   onInput(handler: () => void): () => void;
+  /**
+   * Cancels the browser's own line break in a Single-line contenteditable
+   * Field while `when()` holds (#51, DESIGN.md Key Policy row 6): a trusted
+   * `insertParagraph`/`insertLineBreak` the page did not cancel. Returns the
+   * function that stops it. Absent on Fields where the browser inserts none.
+   */
+  refuseNativeBreaks?(when: () => boolean): () => void;
   /** Styles the mirror should copy so its line wrapping matches this Field. */
   wrappingStyle(): WrappingStyle;
   isConnected(): boolean;

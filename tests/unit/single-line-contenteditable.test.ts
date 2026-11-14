@@ -1,8 +1,9 @@
 import { describe, it, expect, afterEach } from "vitest";
+import { userEvent } from "@vitest/browser/context";
 import { resolveField } from "../../src/field/resolve";
 import { Session } from "../../src/bridge/Session";
 import type { Field } from "../../src/field/Field";
-import { blockTexts, caretAt, editableHost } from "./contenteditable";
+import { blockTexts, caretAt, editableHost, inputLog } from "./contenteditable";
 import { settledKeyDriver } from "./keys";
 import { Sessions } from "../../src/content/Sessions";
 import { hostCount, keydown as keydownOn, settle, statusText } from "./dom";
@@ -85,6 +86,58 @@ describe('Single-line rules on an aria-multiline="false" host', () => {
     expect(blockTexts(host)).toEqual(["hello worldhello world"]);
     await keys("u");
     expect(blockTexts(host)).toEqual(["hello world"]);
+  });
+});
+
+/**
+ * The browser's own edit for an Enter the page leaves alone (#51). The Session
+ * here has no document listener, so a trusted Enter reaches the browser as a
+ * row-6 Pass-through does; `userEvent` presses it through Playwright.
+ */
+describe("the browser's line break on a Single-line host", () => {
+  it("outside Insert mode it is cancelled: w Enter leaves the text, x then deletes w", async () => {
+    const host = open(SINGLE_LINE);
+    await keys("w");
+    await userEvent.keyboard("{Enter}");
+    expect(blockTexts(host)).toEqual(["hello world"]);
+    await keys("x");
+    expect(blockTexts(host)).toEqual(["hello orld"]);
+  });
+
+  it("on a host inside an open shadow root it is cancelled too", async () => {
+    const shadowHost = document.body.appendChild(document.createElement("div"));
+    const root = shadowHost.attachShadow({ mode: "open" });
+    const host = editableHost("<p>hello world</p>", { ...SINGLE_LINE, parent: root });
+    host.focus();
+    caretAt(host, 0);
+    field = resolveField(host)!.create();
+    session = new Session(field, { vimrc: "" });
+    await keys("w");
+    await userEvent.keyboard("{Enter}");
+    expect(blockTexts(host)).toEqual(["hello world"]);
+  });
+
+  it.each(["i", "R"])("after %s (Insert, Replace) it stays the browser's", async (key) => {
+    const host = open(SINGLE_LINE);
+    const log = inputLog(host);
+    await keys(key);
+    await userEvent.keyboard("{Enter}");
+    expect(log).toContain("input:insertParagraph");
+  });
+
+  it("on a multi-line host it stays the browser's", async () => {
+    const host = open();
+    const log = inputLog(host);
+    await userEvent.keyboard("{Enter}");
+    expect(log).toContain("input:insertParagraph");
+  });
+
+  it("once the Session is destroyed it stays the browser's", async () => {
+    const host = open(SINGLE_LINE);
+    const log = inputLog(host);
+    session!.destroy();
+    await userEvent.keyboard("{Enter}");
+    expect(log).toContain("input:insertParagraph");
   });
 });
 

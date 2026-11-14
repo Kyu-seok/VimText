@@ -45,8 +45,14 @@
       <!-- prettier-ignore -->
       <div id="body" contenteditable="true" role="textbox"><p>hello world</p></div>
     </form>
+    <!-- A single-line host whose page does not handle Enter (#51): Chrome's own default for Enter would insert a paragraph. The page logs each edit's inputType. -->
+    <!-- prettier-ignore -->
+    <div id="bare" contenteditable="true" role="textbox" aria-multiline="false"><p>hello world</p></div>
     <div id="log"></div>
     <script>
+      document.getElementById("bare").addEventListener("input", (e) => {
+        document.getElementById("log").textContent += "input:" + e.inputType + "\n";
+      });
       document.getElementById("title").addEventListener("keydown", (e) => {
         if (e.key !== "Enter" || e.defaultPrevented) return;
         e.preventDefault();
