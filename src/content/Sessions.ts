@@ -1,5 +1,6 @@
 import type { Field } from "../field/Field";
 import { resolveField, type ResolvedField } from "../field/resolve";
+import { isWriteKey } from "../field/editingCommands";
 import { Session, isActivationKey } from "../bridge/Session";
 import { policyFor, type Settings, type SitePolicy } from "../settings/settings";
 import type { Plugin } from "../plugins/Plugin";
@@ -200,6 +201,8 @@ export class Sessions {
   }
 
   private onKeydown = (e: KeyboardEvent): void => {
+    // A line break a write offers as Shift+Enter (#70) is VimText's own write, not the person's key.
+    if (isWriteKey(e)) return;
     // Any key on a Field with a Session may change Session State; the engine
     // handles it synchronously inside this listener, so a snapshot queued now
     // sees the result. Keys inside the command line are handled by its own

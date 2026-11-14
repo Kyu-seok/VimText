@@ -6,6 +6,7 @@ import { project } from "../../src/field/projection";
 import {
   activeHost,
   blockTexts,
+  breaksOnShiftEnter,
   editableHost,
   caretAt,
   inputLog,
@@ -114,6 +115,31 @@ describe("Activation on a contenteditable host", () => {
     keydownOn(root, "x");
     await expect.poll(() => b.innerText).toBe("eta");
     expect(a.innerText).toBe("alpha");
+  });
+
+  it("on a Notion-like root, the Shift+Enter keydown a write offers for a line break is not taken as the person's key (#70)", async () => {
+    // The block makes a line break only on that keydown, as Notion does. The
+    // keydown passes the document's capture listener while `o`'s write is
+    // pending, in Insert: fed to the Session as the person's Enter, `o` and
+    // the `x` typed on its line did not land as pressed.
+    const port = controlledPort();
+    const sessions = new Sessions(document, port.port, location.origin);
+    cleanups.push(() => sessions.destroy());
+    port.arrive(settingsFor(null));
+    await settle();
+    const root = editableHost(
+      '<div id="a" contenteditable="true">alpha</div><div id="b" contenteditable="true" style="white-space:break-spaces">one\ntwo</div>',
+    );
+    const b = document.getElementById("b")!;
+    const keysSeen = breaksOnShiftEnter(root);
+    root.focus();
+    caretAt(b.firstChild!, 0);
+    for (const k of ["Escape", "o", "x", "Escape"]) keydownOn(root, k);
+    await expect.poll(() => b.textContent).toBe("one\nx\ntwo");
+    await new Promise((r) => setTimeout(r, 200));
+    expect(b.textContent).toBe("one\nx\ntwo");
+    expect(keysSeen.filter((k) => k === "Shift+Enter")).toEqual(["Shift+Enter"]);
+    expect(statusText()).toContain("NORMAL");
   });
 
   describe("on a Notion-like root, the caret leaving a block and coming back in each mode (#69)", () => {

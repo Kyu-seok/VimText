@@ -249,18 +249,16 @@ test.describe("Notion page: blocks marked contenteditable inside one editable ro
     await notRefused(page);
   });
 
-  test("burst: A, Enter, text and Esc back to back keep the text, the break kept or refused (#68)", async ({
+  test("burst: A, Enter, text and Esc back to back keep the text on the line below (#68, #70)", async ({
     page,
   }) => {
     await burst(page, ["G", "A", "Enter", "f", "a", "s", "t", "Escape"]);
-    // Mostly the Enter is written and refused; under load it is sometimes the
-    // person's own key, splitting the block. The refused path is pinned in
-    // async-write.test.ts.
+    // Mostly the Enter is written, its break taken as Shift+Enter (#70); under
+    // load it is sometimes the person's own key, splitting the block. Both
+    // render the same lines.
     const page_ = ["Add icon Add cover", "Scratch", "alpha beta gamma", "line one", "line two"];
-    await linesOneOf(page, "#notion", [
-      [...page_, "line threefast"],
-      [...page_, "line three", "fast"],
-    ]);
+    await expect.poll(() => lines(page, "#notion")).toEqual([...page_, "line three", "fast"]);
+    await notRefused(page);
     expect(await page.locator("#n-one").innerText()).toBe("alpha beta gamma");
   });
 
@@ -277,19 +275,36 @@ test.describe("Notion page: blocks marked contenteditable inside one editable ro
     expect(await page.locator("#n-one").innerText()).toBe("alpha beta gamma");
   });
 
-  test("a refused u of J and a refused o keep no text no one typed (#73)", async ({ page }) => {
-    const JOINED = "line one line two\nline three";
-    await page.keyboard.type("kkkJ");
-    await expect.poll(() => page.locator("#n-two").innerText()).toBe(JOINED);
+  // Notion takes a line break VimText writes inside a block only as a
+  // Shift+Enter keydown, offered after the refused paragraph break (#70).
+  test("u of J brings the line break back (#70)", async ({ page }) => {
+    await page.keyboard.type("J");
+    await expect.poll(() => lines(page, "#n-two")).toEqual(["line one line two", "line three"]);
     await page.keyboard.type("u");
-    await expect.poll(() => statusText(page)).toContain(REFUSED);
-    expect(await page.locator("#n-two").innerText()).toBe(JOINED);
-    // A key typed once the refused `o` has settled is the person's own, typed
-    // into the page; one typed while it is pending is unit-tested
-    // (async-write.test.ts, "a refused o drops the line it opened").
-    await page.keyboard.type("o");
-    await expect.poll(() => statusText(page)).toContain(REFUSED);
+    await expect.poll(() => lines(page, "#n-two")).toEqual(["line one", "line two", "line three"]);
+    await notRefused(page);
+  });
+
+  test("o then text opens a line below in the block (#70)", async ({ page }) => {
+    await page.keyboard.type("onew");
     await page.keyboard.press("Escape");
-    expect(await page.locator("#n-two").innerText()).toBe(JOINED);
+    await expect.poll(() => lines(page, "#n-two")).toEqual(["line one", "new", "line two", "line three"]);
+    await notRefused(page);
+    expect(await page.locator("#n-one").innerText()).toBe("alpha beta gamma");
+  });
+
+  test("O then text opens a line above in the block (#70)", async ({ page }) => {
+    await page.keyboard.type("jOnew");
+    await page.keyboard.press("Escape");
+    await expect.poll(() => lines(page, "#n-two")).toEqual(["line one", "new", "line two", "line three"]);
+    await notRefused(page);
+  });
+
+  test("a linewise p puts the line below in the block (#70)", async ({ page }) => {
+    await page.keyboard.type("yyjp");
+    await expect
+      .poll(() => lines(page, "#n-two"))
+      .toEqual(["line one", "line two", "line one", "line three"]);
+    await notRefused(page);
   });
 });

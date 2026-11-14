@@ -327,6 +327,50 @@ describe("Selection and focus", () => {
   });
 });
 
+describe("A line break offered as Shift+Enter", () => {
+  /** A focused block holding `text` under `white-space: break-spaces`, as a Notion block is. */
+  function breakSpaces(text: string): HTMLElement {
+    const el = host(text);
+    el.style.whiteSpace = "break-spaces";
+    el.style.minHeight = "0";
+    return el;
+  }
+
+  it("a lone \\n ending the block renders no line: the block is as tall as without it", () => {
+    const el = breakSpaces("one\ntwo");
+    const height = el.getBoundingClientRect().height;
+    el.textContent = "one\ntwo\n";
+    expect(el.getBoundingClientRect().height).toBe(height);
+    el.textContent = "one\ntwo\n\n";
+    expect(el.getBoundingClientRect().height).toBeGreaterThan(height);
+  });
+
+  it("Chromium's own line break at the block's end writes two \\n, the caret between them", () => {
+    const el = breakSpaces("one\ntwo");
+    caretAt(el.firstChild!, 7);
+    document.execCommand("insertLineBreak");
+    expect(el.innerHTML).toBe("one\ntwo\n\n");
+    const beforeCaret = document.createRange();
+    beforeCaret.setStart(el, 0);
+    beforeCaret.setEnd(getSelection()!.anchorNode!, getSelection()!.anchorOffset);
+    expect(beforeCaret.toString()).toBe("one\ntwo\n");
+  });
+
+  it("a synthetic Shift+Enter keydown on the block changes nothing by itself", () => {
+    const el = breakSpaces("one\ntwo");
+    caretAt(el.firstChild!, 3);
+    const key = new KeyboardEvent("keydown", {
+      key: "Enter",
+      code: "Enter",
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    el.dispatchEvent(key);
+    expect(el.innerHTML).toBe("one\ntwo");
+  });
+});
+
 describe("Enter on a Single-line host", () => {
   it("a trusted Enter over a one-character selection fires a cancelable insertParagraph beforeinput that replaces the selection", async () => {
     const el = host("<p>hello world</p>", { attrs: { "aria-multiline": "false" } });
