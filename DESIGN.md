@@ -446,11 +446,14 @@ it is outside the gate, so PNG churn never fails `npm run check`.
   exception); the shortcut is not held, so it reaches the page when nothing typed is there yet.
   The text is kept. Under heavy load the write can land in pieces, and a shortcut pressed
   between two of them applies at the editor's caret as it then stands, so the format can land
-  on the wrong text instead (seen on Quill: the whole line bold). Holding the shortcut too would widen rule 4 and need a per-site list of
-  formatting keys, and beeping would cross rule 4 as well; both cost more than a race only
-  typing that fast hits. Pinned by tests/e2e/quill.spec.ts, "accepted limitation: Cmd+B pressed
-  back to back after G A Enter applies to nothing; the line is typed plain"; "Cmd+B pressed once
-  the write has landed bolds what is typed after it" shows the shortcut once the write is in.
+  on the wrong text instead (seen on Quill: the whole line bold). Holding the shortcut too would
+  widen rule 4 and need a per-site list of formatting keys, and beeping would cross rule 4 as
+  well; both cost more than a race only typing that fast hits. Where the shortcut lands depends
+  on timing, so no test pins the unformatted outcome: tests/e2e/quill.spec.ts, "accepted
+  limitation: Cmd+B pressed back to back after G A Enter keeps the line's text; its formatting
+  depends on timing", pins only that the text is kept (under the pre-push load it ends plain,
+  `one <b>two</b> three` or all bold); "Cmd+B pressed once the write has landed bolds what is
+  typed after it" pins the shortcut once the write is in.
 
 ## Milestones
 
