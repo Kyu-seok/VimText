@@ -425,6 +425,8 @@ it is outside the gate, so PNG churn never fails `npm run check`.
   Chromium's insertion at a boundary between two text nodes takes the style before it wherever
   the caret is, so the Insert caret's side reaches only an editor that types into the leaf of
   the selection (Slate). The end of a run and the no-deletion cases agree with Chromium's rule.
+  Pinned by tests/e2e/quill.spec.ts, "accepted limitation: cw on the first word of the bold run
+  types plain, as Chromium types in the style before the run (#63)".
 - contenteditable (M4): `u` restores the text, not always its markup or marks. An undone line
   merge can leave the text in another block element, a character put back at the start of a
   bold run is plain, and a `plaintext-only` host keeps the `<br>` a merge left. An Atom comes

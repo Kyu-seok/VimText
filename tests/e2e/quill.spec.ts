@@ -79,10 +79,12 @@ test("x r cw inside the bold run keep it bold; dw across its edge trims both sid
  * insertion to Chromium, typed or written, and Chromium's `insertText` at a
  * boundary between two text nodes takes the style before it wherever the
  * caret was set (tests/unit/chromium-facts.test.ts, "Marks at a write's
- * edges"). So the typed word is plain. Pinned as found: the decision's
- * deleted-text side is out of reach on an editor that lets Chromium type.
+ * edges"). So the typed word is plain. Pins an accepted limitation
+ * (DESIGN.md, "Accepted limitations", #63), not a wanted behaviour: the
+ * decision's deleted-text side is out of reach on an editor that lets
+ * Chromium type.
  */
-test("cw on the first word of the bold run types plain: Chromium types in the style before the run (#63)", async ({
+test("accepted limitation: cw on the first word of the bold run types plain, as Chromium types in the style before the run (#63)", async ({
   page,
 }) => {
   await page.keyboard.type("wcw");
