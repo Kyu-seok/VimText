@@ -31,7 +31,7 @@ if (at.length) {
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
         permissionDecision: "ask",
-        permissionDecisionReason: `This discards uncommitted changes to ${at.join(", ")}. Commit or stash what should stay first.`,
+        permissionDecisionReason: `This discards uncommitted changes to ${at.join(", ")}. Commit what should stay first, or save it with git diff.`,
       },
     }),
   );
