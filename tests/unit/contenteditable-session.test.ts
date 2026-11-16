@@ -11,7 +11,7 @@ import {
   caretAt,
   inputLog,
   isCaretIn,
-  selectedText,
+  cursorChar,
   THREE_LINES,
   typeNatively,
 } from "./contenteditable";
@@ -240,7 +240,10 @@ describe("motions across lines", () => {
         if (key === "Enter") drive.keydown("Enter");
         else drive.keys(key);
       }
-      expect(ce.field.getSelection(), `after ${key}`).toEqual(taField.getSelection());
+      // The textarea selects the Cursor's character; the contenteditable has a caret before it (ADR 0009).
+      const t = taField.getSelection();
+      const at = Math.min(t.anchor, t.head);
+      expect(ce.field.getSelection(), `after ${key}`).toEqual({ anchor: at, head: at });
     }
   });
 });
@@ -358,13 +361,13 @@ describe("the page's edits", () => {
 });
 
 describe("the Normal cursor", () => {
-  it("is the native selection of the character under it", async () => {
+  it("is a caret before the character under it (ADR 0009)", async () => {
     open();
-    expect(selectedText()).toBe("t");
+    expect(cursorChar()).toBe("t");
     await keys("w");
-    expect(selectedText()).toBe("q");
+    expect(cursorChar()).toBe("q");
     await keys("j");
-    expect(selectedText()).toBe("s");
+    expect(cursorChar()).toBe("s");
   });
 
   it("is a collapsed caret on an empty block", async () => {
@@ -391,6 +394,24 @@ describe("the Insert caret after a deletion at a boundary between two runs (#63)
   });
 });
 
+describe("the page's caret while VimText draws the Cursor (ADR 0009)", () => {
+  // A block merge under the caret-hiding stylesheet wraps the moved text in a
+  // <span> (tests/unit/chromium-facts.test.ts, "The caret-hiding stylesheet
+  // under editing"), so the stylesheet is lifted while a write runs.
+  it("J merges the blocks with no markup of the stylesheet's making", async () => {
+    const { host } = open("<p>one</p><p>two</p>");
+    await keys("J");
+    expect(host.innerHTML).toBe("<p>one two</p>");
+  });
+
+  it("is hidden again once the write has settled", async () => {
+    const { host } = open("<p>one</p><p>two</p>");
+    expect(getComputedStyle(host).caretColor).toBe("rgba(0, 0, 0, 0)");
+    await keys("J");
+    expect(getComputedStyle(host).caretColor).toBe("rgba(0, 0, 0, 0)");
+  });
+});
+
 describe("Replace mode", () => {
   it("R overwrites characters in place, inside the bold run they were in; Esc and u bring the old text back", async () => {
     const { host } = open("<p>the <b>quick</b> brown fox</p><p>jumps</p>");
@@ -409,7 +430,7 @@ describe("Enter", () => {
     open();
     const e = await keydown("Enter");
     expect(e.defaultPrevented).toBe(true);
-    expect(selectedText()).toBe("j");
+    expect(cursorChar()).toBe("j");
   });
 
   it("with Cmd or Ctrl passes through to the page", async () => {

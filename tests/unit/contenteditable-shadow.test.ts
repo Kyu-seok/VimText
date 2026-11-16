@@ -4,6 +4,7 @@ import {
   activeHost,
   blockTexts,
   editableHost,
+  cursorChar,
   selectedText,
   selectionOf,
   THREE_LINES,
@@ -44,13 +45,13 @@ function open(html = THREE_LINES) {
 }
 
 describe("a contenteditable host in an open shadow root", () => {
-  it("the Normal cursor is the selection of the character under it, inside the shadow tree", async () => {
+  it("the Normal cursor is a caret before the character under it, inside the shadow tree", async () => {
     const { root } = open();
-    expect(selectedText(root)).toBe("t");
+    expect(cursorChar(root)).toBe("t");
     await keys("w");
-    expect(selectedText(root)).toBe("q");
+    expect(cursorChar(root)).toBe("q");
     await keys("j");
-    expect(selectedText(root)).toBe("s");
+    expect(cursorChar(root)).toBe("s");
   });
 
   it("reads a caret the page put inside the shadow tree", async () => {

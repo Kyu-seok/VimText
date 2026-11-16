@@ -10,7 +10,7 @@ import {
   editableHost,
   inputLog,
   keydownLog,
-  selectedText,
+  cursorChar,
 } from "./contenteditable";
 import { keyDriver, settledKeyDriver } from "./keys";
 import { statusText } from "./dom";
@@ -67,7 +67,7 @@ describe("Keys pressed while a write is pending", () => {
     await session.settled();
     expect(blockTexts(host)).toEqual(["def", "second"]);
     expect(inputs(log)).toEqual(["input:deleteContentBackward", "input:deleteContentBackward"]);
-    expect(selectedText()).toBe("d");
+    expect(cursorChar()).toBe("d");
   });
 
   it("a Visual delete pressed meanwhile applies after the write", async () => {
@@ -76,7 +76,7 @@ describe("Keys pressed while a write is pending", () => {
     await session.settled();
     expect(blockTexts(host)).toEqual(["def", "second"]);
     expect(session.mode).toBe("normal");
-    expect(selectedText()).toBe("d");
+    expect(cursorChar()).toBe("d");
   });
 
   it("text typed in Insert meanwhile lands where the engine's cursor is, not where the Field's caret was", async () => {
@@ -170,7 +170,7 @@ describe("Keys pressed while a write is pending", () => {
     keys("xll");
     await session.settled();
     expect(blockTexts(host)).toEqual(["bcdef"]);
-    expect(selectedText()).toBe("d");
+    expect(cursorChar()).toBe("d");
   });
 });
 
@@ -184,7 +184,7 @@ describe("A write judged once it has settled", () => {
     await session.settled();
     expect(blockTexts(host)).toEqual(["abLOCKcd"]);
     expect(statusText()).toContain(REFUSED);
-    expect(selectedText()).toBe("L");
+    expect(cursorChar()).toBe("L");
   });
 
   it("a Controlled Field rewrite a microtask after the write is followed, joined to that change's undo step", async () => {

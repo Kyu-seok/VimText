@@ -14,6 +14,7 @@ import {
   type Pauses,
 } from "./editingCommands";
 import { ATOM_CHAR, atomText } from "./atoms";
+import { cursorBoxAt } from "./cursorBox";
 
 /**
  * An Atom a write or the page's own editing removed, kept so an undo that
@@ -617,6 +618,11 @@ export class ContentEditableField implements Field {
     if (!stale) return;
     selectDom(this.element, projection.toDom(held.anchor, held.side), projection.toDom(held.head, held.side));
     settleEditor(this.element);
+  }
+
+  /** The box the Normal-mode Cursor is drawn over at `offset` (ADR 0009; `cursorBoxAt`). */
+  cursorBox(offset: number): DOMRect | null {
+    return cursorBoxAt(this.element, project(this.element), offset);
   }
 
   /**

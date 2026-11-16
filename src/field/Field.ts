@@ -43,6 +43,15 @@ export interface Field {
    * the browser's own.
    */
   selectionSettling?(): boolean;
+  /**
+   * The box, in the frame's viewport, VimText draws the Normal-mode Cursor
+   * over when the Cursor is on offset `offset` (ADR 0009): the character's,
+   * an Atom's whole box, at a line's end a box one `0` wide. Present only on
+   * Fields whose selection outside Insert and Visual is a caret collapsed
+   * before the Cursor's character (a contenteditable Field's); a textarea or
+   * input selects the character instead. Null when nothing is laid out there.
+   */
+  cursorBox?(offset: number): DOMRect | null;
   focus(): void;
   /**
    * Takes focus off the Field, leaving nothing in it highlighted. A Field

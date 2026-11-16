@@ -1,5 +1,6 @@
 import type { Field } from "../field/Field";
 import type { Mode } from "../engine/mode";
+import { DRAWN_CURSOR_CSS, DrawnCursor } from "./DrawnCursor";
 
 const CSS = `
 :host { all: initial; }
@@ -25,18 +26,20 @@ const CSS = `
   overflow: hidden;
 }
 .mirror .cm-editor { outline: none; }
-`;
+${DRAWN_CURSOR_CSS}`;
 
 /**
  * The strip VimText shows at the bottom edge of an activated Field: mode,
  * pending keys, recording indicator, the command line for : / ?, and messages.
  * The engine owns the content of `statusbar`; this class owns placement and
- * also hosts the hidden mirror in the same shadow root.
+ * also hosts the hidden mirror and, on a contenteditable Field, the drawn
+ * Cursor (ADR 0009) in the same shadow root.
  */
 export class StatusLine {
   readonly host: HTMLElement;
   readonly statusbar: HTMLElement;
   readonly mirrorContainer: HTMLElement;
+  readonly cursor: DrawnCursor;
   private readonly bar: HTMLElement;
   private readonly root: ShadowRoot;
   private visible = false;
@@ -56,6 +59,7 @@ export class StatusLine {
     this.mirrorContainer = document.createElement("div");
     this.mirrorContainer.className = "mirror";
     this.root.append(style, wrap, this.mirrorContainer);
+    this.cursor = new DrawnCursor(this.root, field);
 
     // Keystrokes typed into the command line must not reach the page's own
     // shortcut handlers.
@@ -111,6 +115,7 @@ export class StatusLine {
   destroy(): void {
     window.removeEventListener("scroll", this.reposition, { capture: true });
     window.removeEventListener("resize", this.reposition);
+    this.cursor.destroy();
     this.host.remove();
   }
 }

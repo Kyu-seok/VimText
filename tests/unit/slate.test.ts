@@ -123,7 +123,7 @@ describe("Slate puts a stale selection back over a cursor move", () => {
     });
     await new Promise((r) => setTimeout(r, 250)); // every throttled handler and render has run
     const lastLine = "the quick brown fox\na heading\nfirst item\nsecond item\n".length;
-    expect(current!.field!.getSelection()).toEqual({ anchor: lastLine, head: lastLine + 1 });
+    expect(current!.field!.getSelection()).toEqual({ anchor: lastLine, head: lastLine });
     await keys("i");
     await new Promise((r) => setTimeout(r, 150));
     // A real keystroke's `beforeinput`: Slate inserts at the selection it flushes from the DOM.

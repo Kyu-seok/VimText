@@ -8,6 +8,8 @@
 //   #editor              the editing host (contenteditable Field under test)
 //   window.modelText()   Lexical's own text, one line per block (a list item
 //                        is a block), a decorator as U+FFFC
+//   window.modelSelection() Lexical's own range selection, anchor and focus as
+//                        { key, offset, type }, null when it has none
 //   window.lexicalDoc()  the same lines with Lexical's formats: bold as
 //                        <b>…</b>, a block kind as a prefix ("h1:", "quote:",
 //                        "bullet:")
@@ -15,7 +17,9 @@ import {
   $createParagraphNode,
   $createTextNode,
   $getRoot,
+  $getSelection,
   $isDecoratorNode,
+  $isRangeSelection,
   $isElementNode,
   $isTextNode,
   createEditor,
@@ -185,5 +189,12 @@ function lines(): Line[] {
 
 Object.assign(window, {
   modelText: () => lines().map((l) => l.text),
+  modelSelection: () =>
+    editor.getEditorState().read(() => {
+      const s = $getSelection();
+      if (!$isRangeSelection(s)) return null;
+      const point = (p: typeof s.anchor) => ({ key: p.key, offset: p.offset, type: p.type });
+      return { anchor: point(s.anchor), focus: point(s.focus) };
+    }),
   lexicalDoc: () => lines().map((l) => (l.block ? `${l.block}:${l.marked}` : l.marked)),
 });

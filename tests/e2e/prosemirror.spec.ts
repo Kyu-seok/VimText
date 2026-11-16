@@ -1,4 +1,13 @@
-import { test, expect, ready, activateAtStart, modelText, selectedText, statusText } from "./extension";
+import {
+  test,
+  expect,
+  ready,
+  activateAtStart,
+  modelText,
+  modelSelection,
+  cursorChar,
+  statusText,
+} from "./extension";
 import type { Page } from "@playwright/test";
 
 /**
@@ -34,7 +43,7 @@ test("x dw cw inside a bold run keep it bold; across a mark boundary the rest ke
   await expect.poll(() => pmDoc(page)).toEqual(ORIGINAL);
   await page.keyboard.type("wx");
   await expect.poll(async () => (await pmDoc(page))[0]).toBe("the <b>uick brown</b> fox");
-  await expect.poll(() => selectedText(page)).toBe("u");
+  await expect.poll(() => cursorChar(page)).toBe("u");
   await page.keyboard.type("wcw");
   await page.keyboard.type("lazy");
   await page.keyboard.press("Escape");
@@ -129,7 +138,7 @@ test("an input rule's rewrite syncs into the mirror and undoes with the change t
   // The Normal cursor shows once the write has settled and its rewrite has
   // been judged (ADR 0008); for a key pressed before that, the rewrite joins
   // that key's undo step instead of the change that provoked it.
-  await expect.poll(() => selectedText(page)).not.toBe("");
+  await expect.poll(() => cursorChar(page)).not.toBeNull();
   await page.keyboard.type("$x");
   await expect.poll(async () => (await pmDoc(page))[3]).toBe("wait— her");
   await page.keyboard.type("u");
@@ -143,7 +152,7 @@ test(":q leaves ProseMirror with nothing highlighted and its document unchanged;
 }) => {
   const host = page.locator(HOST);
   await page.keyboard.type("l");
-  await expect.poll(() => selectedText(page)).toBe("h");
+  await expect.poll(() => cursorChar(page)).toBe("h");
   await page.keyboard.type(":q");
   await page.keyboard.press("Enter");
   await expect(host).not.toBeFocused();
@@ -154,6 +163,8 @@ test(":q leaves ProseMirror with nothing highlighted and its document unchanged;
   expect(await pmDoc(page)).toEqual(ORIGINAL);
   await host.focus();
   await expect.poll(() => statusText(page)).toContain("NORMAL");
+  // ProseMirror's own caret is before the `h` (position 2), where :q left it (#76).
+  await expect.poll(() => modelSelection(page)).toEqual({ anchor: 2, head: 2 });
   await page.keyboard.type("x");
   await expect.poll(async () => (await pmDoc(page))[0]).toBe("te <b>quick brown</b> fox");
 });

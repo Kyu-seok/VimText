@@ -64,6 +64,39 @@ export function selectedText(root?: ShadowRoot): string {
   return (root ? selectionOf(root) : getSelection()!).toString();
 }
 
+/**
+ * The character just after a collapsed native selection: the Normal-mode
+ * Cursor's character, the selection being a caret before it (ADR 0009). ""
+ * when the caret ends its line (an empty block, before a `<br>` or a block
+ * boundary), null when the selection is not collapsed. With `root`, the
+ * selection inside that open shadow root. The twin of the e2e `cursorChar`.
+ */
+export function cursorChar(root?: ShadowRoot): string | null {
+  const sel = root ? selectionOf(root) : getSelection()!;
+  if (!sel.isCollapsed || !sel.anchorNode) return null;
+  let node: Node | null = sel.anchorNode;
+  const offset = sel.anchorOffset;
+  if (node instanceof Text && offset < node.data.length) return node.data[offset]!;
+  const endsLine = (n: Node) =>
+    n instanceof HTMLBRElement ||
+    (n instanceof HTMLElement && !getComputedStyle(n).display.startsWith("inline"));
+  /** The node after `n`'s subtree in document order, or null past a line's end. */
+  const after = (n: Node | null): Node | null => {
+    while (n && !n.nextSibling) {
+      n = n.parentNode;
+      if (!n || endsLine(n)) return null;
+    }
+    return n?.nextSibling ?? null;
+  };
+  node = !(node instanceof Text) && offset < node.childNodes.length ? node.childNodes[offset]! : after(node);
+  while (node) {
+    if (endsLine(node)) return "";
+    if (node instanceof Text && node.data.length) return node.data[0]!;
+    node = node.firstChild ?? after(node);
+  }
+  return "";
+}
+
 /** Whether the native selection is a collapsed caret inside `block`: the cursor on an empty line. */
 export function isCaretIn(block: Element): boolean {
   const sel = getSelection()!;

@@ -1,0 +1,45 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>VimText fixture: the drawn Cursor</title>
+    <style>
+      body {
+        font-family: system-ui;
+        margin: 40px;
+      }
+      #scroller {
+        height: 120px;
+        overflow: auto;
+        border: 1px solid #888;
+      }
+      #ce {
+        width: 200px;
+        padding: 4px;
+        font:
+          14px/20px Menlo,
+          monospace;
+        outline: none;
+      }
+      #ce p {
+        margin: 0;
+      }
+      .mention {
+        background: #dde8ff;
+        padding: 0 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>VimText fixture: the drawn Cursor</h1>
+    <!--
+      A contenteditable inside an inner scroller (#76, ADR 0009): an Atom (a
+      non-editable mention chip), an empty block, a line narrow enough to wrap
+      softly at a space, and enough lines below to scroll. No whitespace
+      between tags (whitespace is a projection rule of its own), hence the
+      prettier-ignore.
+    -->
+    <!-- prettier-ignore -->
+    <div id="scroller"><div id="ce" contenteditable="true"><p>hi <span class="mention" contenteditable="false">@alice</span> ok</p><p><br></p><p>aaaaaaaaaaaaaaaaaaaa bbbb</p><p>line 4</p><p>line 5</p><p>line 6</p><p>line 7</p><p>line 8</p><p>line 9</p><p>line 10</p></div></div>
+  </body>
+</html>

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { userEvent } from "@vitest/browser/context";
+import { page, userEvent } from "@vitest/browser/context";
 import { caretAt, editableHost, inputLog, selectionOf } from "./contenteditable";
 
 /**
@@ -444,5 +444,180 @@ describe("Enter on a Single-line host", () => {
     expect(el.innerHTML).toBe("<p>hello world</p>");
     const sel = getSelection()!;
     expect([sel.anchorNode, sel.anchorOffset, sel.focusNode, sel.focusOffset]).toEqual([text, 6, text, 7]);
+  });
+});
+
+describe("Measuring the drawn Cursor", () => {
+  it("a selection inside a textarea is no document Range over its text: the document's range is collapsed beside the textarea, though toString reads the selected text", () => {
+    const ta = document.createElement("textarea");
+    ta.value = "hello";
+    document.body.appendChild(ta);
+    cleanup.push(() => ta.remove());
+    ta.focus();
+    ta.setSelectionRange(0, 1);
+    const range = getSelection()!.getRangeAt(0);
+    expect(range.collapsed).toBe(true);
+    expect(range.startContainer).toBe(document.body);
+    expect(range.toString()).toBe("");
+    expect(getSelection()!.toString()).toBe("h");
+  });
+
+  it("a Range over a tab in pre-wrap text has one client rect, the tab's whole advance", () => {
+    const el = host("<p>a\tb</p>");
+    el.style.whiteSpace = "pre-wrap";
+    el.style.font = "14px/20px monospace";
+    el.style.tabSize = "4";
+    const text = el.querySelector("p")!.firstChild!;
+    const range = document.createRange();
+    range.setStart(text, 0);
+    range.setEnd(text, 1);
+    const a = range.getClientRects()[0]!.width;
+    range.setStart(text, 1);
+    range.setEnd(text, 2);
+    const rects = [...range.getClientRects()];
+    expect(rects.length).toBe(1);
+    expect(rects[0]!.width).toBeCloseTo(3 * a, 0);
+  });
+
+  it("a Range over a space at a soft wrap has only zero-width rects, one at each line's edge", () => {
+    const el = host("<p>aaaa bbbb</p>");
+    el.style.width = "40px";
+    el.style.font = "14px/20px monospace";
+    const text = el.querySelector("p")!.firstChild!;
+    const range = document.createRange();
+    range.setStart(text, 4);
+    range.setEnd(text, 5);
+    const rects = [...range.getClientRects()];
+    expect(rects.map((r) => r.width)).toEqual([0, 0]);
+    expect(rects[1]!.top).toBeGreaterThan(rects[0]!.top);
+    // The letter before it ends the first line where the space's first rect stands.
+    range.setStart(text, 3);
+    range.setEnd(text, 4);
+    expect(range.getClientRects()[0]!.right).toBeCloseTo(rects[0]!.left, 0);
+  });
+
+  it("a collapsed Range in an empty block has no client rects; its placeholder <br> has the line's", () => {
+    const el = host("<p>x</p><p><br></p>");
+    const empty = el.querySelectorAll("p")[1]!;
+    const range = document.createRange();
+    range.setStart(empty, 0);
+    expect(range.getClientRects().length).toBe(0);
+    range.selectNode(empty.firstChild!);
+    const br = range.getClientRects()[0]!;
+    expect(br.height).toBeGreaterThan(0);
+    expect(br.top).toBeGreaterThanOrEqual(empty.getBoundingClientRect().top);
+  });
+});
+
+describe("The caret-hiding stylesheet under editing", () => {
+  function adopt(rule: string): void {
+    const sheet = new CSSStyleSheet();
+    sheet.replaceSync(rule);
+    document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+    cleanup.push(
+      () => (document.adoptedStyleSheets = document.adoptedStyleSheets.filter((s) => s !== sheet)),
+    );
+  }
+
+  function merge(el: HTMLElement): void {
+    const [a, b] = el.querySelectorAll("p");
+    select(a!.firstChild!, 3, b!.firstChild!, 0);
+    document.execCommand("delete");
+  }
+
+  it("without it, a block merge moves the second block's text in bare", () => {
+    const el = host("<p>one</p><p>two</p>");
+    merge(el);
+    expect(el.innerHTML).toBe("<p>onetwo</p>");
+  });
+
+  it("with `:focus, :focus *` caret-color adopted, a block merge wraps the moved text in a <span>", () => {
+    adopt(":focus, :focus * { caret-color: transparent !important; }");
+    const el = host("<p>one</p><p>two</p>");
+    merge(el);
+    expect(el.innerHTML).toBe("<p>one<span>two</span></p>");
+  });
+
+  it("with `:focus` alone, the merge writes the caret-color into the moved text's style", () => {
+    adopt(":focus { caret-color: transparent !important; }");
+    const el = host("<p>one</p><p>two</p>");
+    merge(el);
+    expect(el.innerHTML).toBe('<p>one<span style="caret-color: transparent;">two</span></p>');
+  });
+});
+
+describe("Inverting the drawn Cursor", () => {
+  /**
+   * A 20 px box fixed over a black glyph-like bar a quarter of its width, inside `host` when given,
+   * styled `css`, on a page whose only background is `rootBackground` on the
+   * root element; resolves to the mean brightness (0–255) Chromium painted in
+   * the box. The test runs in an iframe whose canvas is transparent, the
+   * parent page showing through it: `"none"` there stands for a top-level page
+   * with no background of its own, painted only by the browser's default
+   * canvas colour, which nothing in the page blends with
+   * (tests/e2e/drawn-cursor.spec.ts, "on a plain page", shows the same).
+   */
+  async function painted(
+    css: string,
+    opts: { host?: string; rootBackground?: string } = {},
+  ): Promise<number> {
+    document.body.style.background = "none";
+    document.documentElement.style.background = opts.rootBackground ?? "none";
+    const ink = document.createElement("div");
+    ink.style.cssText = "position:fixed;left:205px;top:200px;width:5px;height:20px;background:#000";
+    const host = document.createElement("div");
+    if (opts.host) host.style.cssText = opts.host;
+    const box = document.createElement("div");
+    box.style.cssText = `position:fixed;left:200px;top:200px;width:20px;height:20px;z-index:10;${css}`;
+    host.append(box);
+    document.body.append(ink, host);
+    cleanup.push(() => {
+      ink.remove();
+      host.remove();
+      document.body.style.background = "";
+      document.documentElement.style.background = "";
+    });
+    for (let i = 0; i < 2; i++) await new Promise(requestAnimationFrame);
+    const base64 = await page.screenshot({ element: box, save: false });
+    const img = new Image();
+    img.src = `data:image/png;base64,${base64}`;
+    await img.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext("2d")!;
+    ctx.drawImage(img, 0, 0);
+    const data = ctx.getImageData(0, 0, img.width, img.height).data;
+    let sum = 0;
+    for (let i = 0; i < data.length; i += 4) sum += (data[i]! + data[i + 1]! + data[i + 2]!) / 3;
+    return sum / (data.length / 4);
+  }
+
+  /** A quarter of the box is the black glyph: shown as is, the box is mostly white; inverted, mostly black. */
+  const asIs = (mean: number) => mean > 170 && mean < 215;
+  const inverted = (mean: number) => mean > 40 && mean < 100;
+  const DIFFERENCE = "background:#fff;mix-blend-mode:difference";
+  const INVERT = "backdrop-filter:invert(1)";
+
+  it("with no style the box shows what is beneath it: a white page around a black glyph", async () => {
+    expect(asIs(await painted("", { rootBackground: "#fff" }))).toBe(true);
+  });
+
+  it("a white difference box blends with a background the page paints: the white turns black, the glyph white", async () => {
+    expect(inverted(await painted(DIFFERENCE, { rootBackground: "#fff" }))).toBe(true);
+  });
+
+  it("with no background the page paints, a white difference box has nothing to blend with: white, glyph and all", async () => {
+    expect(await painted(DIFFERENCE)).toBeGreaterThan(250);
+  });
+
+  it("inside an element with isolation: isolate, as Notion makes every element, a white difference box has nothing to blend with", async () => {
+    expect(await painted(DIFFERENCE, { host: "isolation:isolate", rootBackground: "#fff" })).toBeGreaterThan(
+      250,
+    );
+  });
+
+  it("a backdrop-filter: invert(1) box inverts the page's background and the glyph", async () => {
+    expect(inverted(await painted(INVERT, { rootBackground: "#fff" }))).toBe(true);
   });
 });

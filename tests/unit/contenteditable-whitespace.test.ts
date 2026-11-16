@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { activeHost, selectedText, typeNatively } from "./contenteditable";
+import { activeHost, cursorChar, typeNatively } from "./contenteditable";
 import { settledKeyDriver } from "./keys";
 
 /**
@@ -28,7 +28,7 @@ describe("editing inside a pre line", () => {
   it("x and cw change the characters at the cursor on the line the \\n starts", async () => {
     const host = open("<pre>if (a) {\n  b(c);\n}</pre>");
     await keys("jw");
-    expect(selectedText()).toBe("b");
+    expect(cursorChar()).toBe("b");
     await keys("x");
     expect(host.textContent).toBe("if (a) {\n  (c);\n}");
     await keys("$x");
@@ -56,7 +56,7 @@ describe("editing inside a table cell", () => {
   it("w crosses the tab into the next cell; x and cw edit that cell only", async () => {
     const host = open(TABLE);
     await keys("jw");
-    expect(selectedText()).toBe("b");
+    expect(cursorChar()).toBe("b");
     await keys("x");
     expect(cells(host)).toEqual(["a1", "b1", "a2", " two"]);
     await keys("wcw");
@@ -75,7 +75,7 @@ describe("editing after collapsed whitespace", () => {
   it("an edit after a collapsed run lands on the character the cursor shows", async () => {
     const host = open("<div>one   two \n three</div>");
     await keys("w");
-    expect(selectedText()).toBe("t");
+    expect(cursorChar()).toBe("t");
     await keys("x");
     expect(host.innerText).toBe("one wo three");
     await keys("wx");
@@ -92,7 +92,7 @@ describe("editing after collapsed whitespace", () => {
     const host = open("<div>one   two</div>");
     await keys("3l");
     // The selection's text is what renders: one space for the run.
-    expect(selectedText()).toBe(" ");
+    expect(cursorChar()).toBe(" ");
     await keys("x");
     expect(host.textContent).toBe("onetwo");
   });

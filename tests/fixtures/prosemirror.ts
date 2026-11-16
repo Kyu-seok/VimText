@@ -7,6 +7,8 @@
 //                          (describeDoc), not from the DOM
 //   window.modelText()     ProseMirror's own text, one line per textblock
 //                          (modelLines), as every rich-editor fixture has it
+//   window.modelSelection() ProseMirror's own selection, { anchor, head } in
+//                          document positions, as every rich-editor fixture has it
 import { mountProseMirror, describeDoc, modelLines } from "./prosemirror-editor";
 
 const source = document.getElementById("source") as HTMLTemplateElement;
@@ -14,4 +16,5 @@ const view = mountProseMirror(document.getElementById("editor")!, source.innerHT
 Object.assign(window, {
   pmDoc: () => describeDoc(view.state.doc),
   modelText: () => modelLines(view.state.doc),
+  modelSelection: () => ({ anchor: view.state.selection.anchor, head: view.state.selection.head }),
 });

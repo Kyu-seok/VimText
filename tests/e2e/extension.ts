@@ -129,6 +129,18 @@ export function modelText(page: Page | Frame): Promise<string[]> {
 }
 
 /**
+ * The page editor's own selection, read through the fixture's
+ * `window.modelSelection()` from the editor's model, in that editor's own
+ * terms (ProseMirror `{ anchor, head }` positions, Slate's `editor.selection`,
+ * Quill's `{ index, length }`, Lexical's anchor and focus `{ key, offset, type }`).
+ * The read that shows an editor holding a selection other than the DOM's,
+ * which only a debugging session would otherwise find (#76's `:q` regression).
+ */
+export function modelSelection(page: Page | Frame): Promise<unknown> {
+  return page.evaluate(() => (window as unknown as { modelSelection(): unknown }).modelSelection());
+}
+
+/**
  * The text the native selection covers in that page or frame: a Normal-mode
  * cursor's character. With `shadowHost`, the selection inside that element's
  * open shadow root, read through Chromium's `ShadowRoot.getSelection`: the
@@ -142,6 +154,79 @@ export function selectedText(page: Page | Frame, shadowHost?: string): Promise<s
     };
     return root.getSelection().toString();
   }, shadowHost);
+}
+
+/**
+ * The character just after a collapsed native selection, read from the DOM in
+ * that page or frame: the Normal-mode Cursor's character on a contenteditable
+ * Field, whose selection there is a caret before it (ADR 0009). "" when the
+ * caret ends its line (an empty block, before a `<br>` or a block boundary),
+ * null when the selection is not collapsed. With `shadowHost`, the selection
+ * inside that element's open shadow root, as for `selectedText`.
+ */
+export function cursorChar(page: Page | Frame, shadowHost?: string): Promise<string | null> {
+  return page.evaluate((hostSelector) => {
+    const sel = hostSelector
+      ? (
+          document.querySelector(hostSelector)!.shadowRoot as ShadowRoot & { getSelection(): Selection }
+        ).getSelection()
+      : document.getSelection()!;
+    if (!sel.isCollapsed || !sel.anchorNode) return null;
+    let node: Node | null = sel.anchorNode;
+    const offset = sel.anchorOffset;
+    if (node instanceof Text && offset < node.data.length) return node.data[offset]!;
+    const endsLine = (n: Node) =>
+      n instanceof HTMLBRElement ||
+      (n instanceof HTMLElement && !getComputedStyle(n).display.startsWith("inline"));
+    /** The node after `n`'s subtree in document order, or null past a line's end. */
+    const after = (n: Node | null): Node | null => {
+      while (n && !n.nextSibling) {
+        n = n.parentNode;
+        if (!n || endsLine(n)) return null;
+      }
+      return n?.nextSibling ?? null;
+    };
+    node =
+      !(node instanceof Text) && offset < node.childNodes.length ? node.childNodes[offset]! : after(node);
+    while (node) {
+      if (endsLine(node)) return "";
+      if (node instanceof Text && node.data.length) return node.data[0]!;
+      node = node.firstChild ?? after(node);
+    }
+    return "";
+  }, shadowHost);
+}
+
+/** A rect as a test compares it: rounded to the pixel. */
+export interface Box {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * The Cursor VimText draws on a contenteditable Field (ADR 0009), as the user
+ * sees it: its box in the frame's viewport and its shape, null when none is
+ * drawn. Like `statusText`, a sanctioned read of the Status Line host
+ * (CODING_STANDARDS rule 6): it returns only what the user sees.
+ */
+export function drawnCursor(page: Page | Frame): Promise<(Box & { shape: string }) | null> {
+  return page.evaluate(() => {
+    for (const host of document.querySelectorAll("vimtext-status")) {
+      const el = host.shadowRoot?.querySelector(".cursor") as HTMLElement | null;
+      if (!el || el.style.display === "none") continue;
+      const r = el.getBoundingClientRect();
+      return {
+        shape: el.dataset.shape ?? "",
+        left: Math.round(r.left),
+        top: Math.round(r.top),
+        width: Math.round(r.width),
+        height: Math.round(r.height),
+      };
+    }
+    return null;
+  });
 }
 
 /** How many Status Line hosts VimText has on the page; one per live Session. */

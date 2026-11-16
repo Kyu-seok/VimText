@@ -6,6 +6,7 @@ import {
   activateAtStart,
   blockTexts,
   hostCount,
+  cursorChar,
   selectedText,
 } from "./extension";
 
@@ -28,15 +29,15 @@ test("Esc Activates on the host in the shadow root; motions move the Normal curs
 }) => {
   await activateAtStart(page, "#ce");
   await expect(page.locator("#log")).toBeEmpty();
-  await expect.poll(() => selectedText(page, "#editor")).toBe("t");
+  await expect.poll(() => cursorChar(page, "#editor")).toBe("t");
   await page.keyboard.type("ww");
-  await expect.poll(() => selectedText(page, "#editor")).toBe("b"); // into the bold run
+  await expect.poll(() => cursorChar(page, "#editor")).toBe("b"); // into the bold run
   await page.keyboard.type("j$");
-  await expect.poll(() => selectedText(page, "#editor")).toBe("g");
+  await expect.poll(() => cursorChar(page, "#editor")).toBe("g");
   await page.keyboard.type("G0");
-  await expect.poll(() => selectedText(page, "#editor")).toBe("l");
+  await expect.poll(() => cursorChar(page, "#editor")).toBe("l");
   await page.keyboard.type("gg");
-  await expect.poll(() => selectedText(page, "#editor")).toBe("t");
+  await expect.poll(() => cursorChar(page, "#editor")).toBe("t");
 });
 
 test("Visual selects inside the shadow tree", async ({ page }) => {
@@ -90,7 +91,7 @@ test(":q leaves the host with nothing highlighted inside the shadow tree; refocu
   const ce = page.locator("#ce");
   await activateAtStart(page, "#ce");
   await page.keyboard.type("l");
-  await expect.poll(() => selectedText(page, "#editor")).toBe("h");
+  await expect.poll(() => cursorChar(page, "#editor")).toBe("h");
   await page.keyboard.type(":q");
   await page.keyboard.press("Enter");
   await expect(ce).not.toBeFocused();

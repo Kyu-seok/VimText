@@ -1,4 +1,4 @@
-import { test, expect, statusText, ready, activateAtStart, blockTexts, selectedText } from "./extension";
+import { test, expect, statusText, ready, activateAtStart, blockTexts, cursorChar } from "./extension";
 import type { Page } from "@playwright/test";
 
 /**
@@ -23,7 +23,7 @@ test("x on the locked span is refused: the text stays, the cursor stays, the Sta
   await page.keyboard.type("ll");
   await page.keyboard.type("x");
   await expect.poll(() => blockTexts(page, "#ce")).toEqual(ORIGINAL);
-  await expect.poll(() => selectedText(page)).toBe("L");
+  await expect.poll(() => cursorChar(page)).toBe("L");
   await expect.poll(() => statusText(page)).toContain(REFUSED);
 });
 
@@ -35,7 +35,7 @@ test("the next key works, an accepted edit beside the refused one lands, and u u
   await page.keyboard.type("lx");
   await expect.poll(() => blockTexts(page, "#ce")).toEqual(["bLOCKcd", "next line"]);
   await page.keyboard.type("l");
-  await expect.poll(() => selectedText(page)).toBe("O");
+  await expect.poll(() => cursorChar(page)).toBe("O");
   await page.keyboard.type("u");
   await expect.poll(() => blockTexts(page, "#ce")).toEqual(ORIGINAL);
   await page.keyboard.type("$x");

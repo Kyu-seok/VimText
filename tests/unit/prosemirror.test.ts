@@ -3,7 +3,7 @@ import type { EditorView } from "prosemirror-view";
 import { Session } from "../../src/bridge/Session";
 import { ContentEditableField } from "../../src/field/ContentEditableField";
 import { mountProseMirror, describeDoc } from "../fixtures/prosemirror-editor";
-import { caretAt, selectedText, typeNatively } from "./contenteditable";
+import { caretAt, cursorChar, typeNatively } from "./contenteditable";
 import { keydown as dispatchKey, settle } from "./dom";
 import { Sessions } from "../../src/content/Sessions";
 import { controlledPort, settingsFor } from "./settings-port";
@@ -70,7 +70,7 @@ describe("Normal-mode edits keep ProseMirror's marks", () => {
     await keys("wx");
     expect(doc()).toEqual(["the <b>uick brown</b> fox", "second line"]);
     expect(current!.field.getValue()).toBe("the uick brown fox\nsecond line");
-    expect(selectedText()).toBe("u");
+    expect(cursorChar()).toBe("u");
   });
 
   it("dw and cw inside a bold run keep the rest bold", async () => {

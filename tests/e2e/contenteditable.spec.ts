@@ -5,7 +5,7 @@ import {
   ready,
   activateAtStart,
   blockTexts,
-  selectedText,
+  cursorChar,
   fixtureOrigin,
 } from "./extension";
 import type { ContentEditableOption } from "./contenteditable-option";
@@ -47,24 +47,24 @@ test("is inert until Esc, then Activates on the host with NORMAL", async ({ page
   await expect.poll(() => blockTexts(page, "#ce")).toEqual(ORIGINAL);
 });
 
-test("j k w $ gg G move across blocks and <br> lines; the cursor is the native selection", async ({
+test("j k w $ gg G move across blocks and <br> lines; the cursor is a caret before its character (ADR 0009)", async ({
   page,
 }) => {
   await activateAtStart(page, "#ce");
-  await expect.poll(() => selectedText(page)).toBe("t");
+  await expect.poll(() => cursorChar(page)).toBe("t");
   await page.keyboard.type("ww");
-  await expect.poll(() => selectedText(page)).toBe("b"); // into the bold run
+  await expect.poll(() => cursorChar(page)).toBe("b"); // into the bold run
   await page.keyboard.type("j");
-  await expect.poll(() => selectedText(page)).toBe(" "); // "jumps over the", column 10
+  await expect.poll(() => cursorChar(page)).toBe(" "); // "jumps over the", column 10
   await page.keyboard.type("j$");
-  await expect.poll(() => selectedText(page)).toBe("e"); // "third line", before the <br>
+  await expect.poll(() => cursorChar(page)).toBe("e"); // "third line", before the <br>
   await page.keyboard.type("j0");
-  await expect.poll(() => selectedText(page)).toBe("f"); // "fourth line", after the <br>
+  await expect.poll(() => cursorChar(page)).toBe("f"); // "fourth line", after the <br>
   await page.keyboard.type("G");
-  await expect.poll(() => selectedText(page)).toBe("l");
+  await expect.poll(() => cursorChar(page)).toBe("l");
   await page.keyboard.type("k");
-  // The empty block: a collapsed caret inside it.
-  await expect.poll(() => selectedText(page)).toBe("");
+  // The empty block: the caret inside it.
+  await expect.poll(() => cursorChar(page)).toBe("");
   expect(
     await page.evaluate(() => {
       const sel = document.getSelection()!;
@@ -72,7 +72,7 @@ test("j k w $ gg G move across blocks and <br> lines; the cursor is the native s
     }),
   ).toBe(true);
   await page.keyboard.type("gg");
-  await expect.poll(() => selectedText(page)).toBe("t");
+  await expect.poll(() => cursorChar(page)).toBe("t");
 });
 
 test("x dw cw dd J edit through editing commands: the page sees only editing input events", async ({
@@ -169,7 +169,7 @@ test("typing in Insert re-projects; an outside DOM change is picked up on the ne
   await expect.poll(async () => (await blockTexts(page, "#ce"))[0]).toBe("the quick brown fox!");
   // The cursor lands once the `x` write has settled (ADR 0008): a page change
   // during a write is judged with it, and wins over keys pressed meanwhile.
-  await expect.poll(() => selectedText(page)).toBe("!");
+  await expect.poll(() => cursorChar(page)).toBe("!");
   await page.evaluate(
     () => (document.querySelector("#ce")!.children[1]!.textContent = "changed by the page"),
   );
@@ -180,7 +180,7 @@ test("typing in Insert re-projects; an outside DOM change is picked up on the ne
 test("Enter in Normal is the Vim motion; Cmd/Ctrl+Enter reach the page", async ({ page }) => {
   await activateAtStart(page, "#ce");
   await page.keyboard.press("Enter");
-  await expect.poll(() => selectedText(page)).toBe("j");
+  await expect.poll(() => cursorChar(page)).toBe("j");
   await expect.poll(() => blockTexts(page, "#ce")).toEqual(ORIGINAL);
   await expect(page.locator("#log")).not.toContainText("page-enter");
   await page.keyboard.press("Meta+Enter");
@@ -203,7 +203,7 @@ test(":q leaves the host with nothing highlighted; refocus resumes Normal on the
   const ce = page.locator("#ce");
   await activateAtStart(page, "#ce");
   await page.keyboard.type("l");
-  await expect.poll(() => selectedText(page)).toBe("h");
+  await expect.poll(() => cursorChar(page)).toBe("h");
   await page.keyboard.type(":q");
   await page.keyboard.press("Enter");
   await expect(ce).not.toBeFocused();
