@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { userEvent } from "@vitest/browser/context";
+import { page, userEvent } from "@vitest/browser/context";
 import { caretAt, editableHost, inputLog, selectionOf } from "./contenteditable";
 
 /**
@@ -543,5 +543,81 @@ describe("The caret-hiding stylesheet under editing", () => {
     const el = host("<p>one</p><p>two</p>");
     merge(el);
     expect(el.innerHTML).toBe('<p>one<span style="caret-color: transparent;">two</span></p>');
+  });
+});
+
+describe("Inverting the drawn Cursor", () => {
+  /**
+   * A 20 px box fixed over a black glyph-like bar a quarter of its width, inside `host` when given,
+   * styled `css`, on a page whose only background is `rootBackground` on the
+   * root element; resolves to the mean brightness (0–255) Chromium painted in
+   * the box. The test runs in an iframe whose canvas is transparent, the
+   * parent page showing through it: `"none"` there stands for a top-level page
+   * with no background of its own, painted only by the browser's default
+   * canvas colour, which nothing in the page blends with
+   * (tests/e2e/drawn-cursor.spec.ts, "on a plain page", shows the same).
+   */
+  async function painted(
+    css: string,
+    opts: { host?: string; rootBackground?: string } = {},
+  ): Promise<number> {
+    document.body.style.background = "none";
+    document.documentElement.style.background = opts.rootBackground ?? "none";
+    const ink = document.createElement("div");
+    ink.style.cssText = "position:fixed;left:205px;top:200px;width:5px;height:20px;background:#000";
+    const host = document.createElement("div");
+    if (opts.host) host.style.cssText = opts.host;
+    const box = document.createElement("div");
+    box.style.cssText = `position:fixed;left:200px;top:200px;width:20px;height:20px;z-index:10;${css}`;
+    host.append(box);
+    document.body.append(ink, host);
+    cleanup.push(() => {
+      ink.remove();
+      host.remove();
+      document.body.style.background = "";
+      document.documentElement.style.background = "";
+    });
+    for (let i = 0; i < 2; i++) await new Promise(requestAnimationFrame);
+    const base64 = await page.screenshot({ element: box, save: false });
+    const img = new Image();
+    img.src = `data:image/png;base64,${base64}`;
+    await img.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext("2d")!;
+    ctx.drawImage(img, 0, 0);
+    const data = ctx.getImageData(0, 0, img.width, img.height).data;
+    let sum = 0;
+    for (let i = 0; i < data.length; i += 4) sum += (data[i]! + data[i + 1]! + data[i + 2]!) / 3;
+    return sum / (data.length / 4);
+  }
+
+  /** A quarter of the box is the black glyph: shown as is, the box is mostly white; inverted, mostly black. */
+  const asIs = (mean: number) => mean > 170 && mean < 215;
+  const inverted = (mean: number) => mean > 40 && mean < 100;
+  const DIFFERENCE = "background:#fff;mix-blend-mode:difference";
+  const INVERT = "backdrop-filter:invert(1)";
+
+  it("with no style the box shows what is beneath it: a white page around a black glyph", async () => {
+    expect(asIs(await painted("", { rootBackground: "#fff" }))).toBe(true);
+  });
+
+  it("a white difference box blends with a background the page paints: the white turns black, the glyph white", async () => {
+    expect(inverted(await painted(DIFFERENCE, { rootBackground: "#fff" }))).toBe(true);
+  });
+
+  it("with no background the page paints, a white difference box has nothing to blend with: white, glyph and all", async () => {
+    expect(await painted(DIFFERENCE)).toBeGreaterThan(250);
+  });
+
+  it("inside an element with isolation: isolate, as Notion makes every element, a white difference box has nothing to blend with", async () => {
+    expect(await painted(DIFFERENCE, { host: "isolation:isolate", rootBackground: "#fff" })).toBeGreaterThan(
+      250,
+    );
+  });
+
+  it("a backdrop-filter: invert(1) box inverts the page's background and the glyph", async () => {
+    expect(inverted(await painted(INVERT, { rootBackground: "#fff" }))).toBe(true);
   });
 });

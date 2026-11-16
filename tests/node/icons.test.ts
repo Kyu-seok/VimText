@@ -3,8 +3,8 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { inflateSync } from "node:zlib";
 import { repoPath } from "./repo";
+import { decodePng } from "../png";
 
 /**
  * `npm run icons` (tools/make-icons.mjs) renders the manifest's icons from
@@ -24,44 +24,15 @@ function render(): string {
   return out;
 }
 
-/** An 8-bit RGBA, non-interlaced PNG's alpha channel, row by row. */
+/** An icon's alpha channel (tests/png.ts decodes it). */
 function alpha(png: Buffer): {
   width: number;
   height: number;
   colourType: number;
   at: (x: number, y: number) => number;
 } {
-  const width = png.readUInt32BE(16);
-  const height = png.readUInt32BE(20);
-  const colourType = png[25]!;
-  const idat: Buffer[] = [];
-  for (let at = 8; at < png.length;) {
-    const length = png.readUInt32BE(at);
-    if (png.toString("ascii", at + 4, at + 8) === "IDAT") idat.push(png.subarray(at + 8, at + 8 + length));
-    at += length + 12;
-  }
-  const raw = inflateSync(Buffer.concat(idat));
-  const stride = width * 4;
-  const rows: Buffer[] = [];
-  let previous = Buffer.alloc(stride);
-  for (let y = 0; y < height; y++) {
-    const filter = raw[y * (stride + 1)]!;
-    const line = Buffer.from(raw.subarray(y * (stride + 1) + 1, (y + 1) * (stride + 1)));
-    for (let i = 0; i < stride; i++) {
-      const a = i >= 4 ? line[i - 4]! : 0;
-      const b = previous[i]!;
-      const c = i >= 4 ? previous[i - 4]! : 0;
-      const p = a + b - c;
-      const pa = Math.abs(p - a),
-        pb = Math.abs(p - b),
-        pc = Math.abs(p - c);
-      const predictor = [0, a, b, (a + b) >> 1, pa <= pb && pa <= pc ? a : pb <= pc ? b : c][filter]!;
-      line[i] = (line[i]! + predictor) & 0xff;
-    }
-    rows.push(line);
-    previous = line;
-  }
-  return { width, height, colourType, at: (x, y) => rows[y]![x * 4 + 3]! };
+  const decoded = decodePng(png);
+  return { ...decoded, at: (x, y) => decoded.at(x, y)[3] };
 }
 
 describe("tools/make-icons.mjs", () => {

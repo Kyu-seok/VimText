@@ -17,7 +17,7 @@ const CARET_HIDDEN = ":focus, :focus * { caret-color: transparent !important; }"
 export const DRAWN_CURSOR_CSS = `
 .cursor {
   position: fixed; z-index: 2147483646; pointer-events: none;
-  background: #fff; mix-blend-mode: difference;
+  backdrop-filter: invert(1);
 }
 `;
 
@@ -76,7 +76,8 @@ function parentOf(el: Element): Element | null {
  * The Normal-mode Cursor VimText draws over a contenteditable Field (ADR 0009,
  * DESIGN.md "Cursor"), whose selection is then a collapsed caret: a steady
  * block over the Cursor's character, or a bar along its bottom in Replace,
- * inverting what is beneath and ignoring the mouse. It lives in the Field's
+ * inverting what is beneath (`backdrop-filter`, docs/engine-seams.md
+ * "Inverting the drawn Cursor") and ignoring the mouse. It lives in the Field's
  * Status Line host. While drawn it is measured again on every scroll (capture
  * phase) and resize, on a resize of the Field and on mutations inside it (one
  * measurement per animation frame), and clipped to the Field's visible part;

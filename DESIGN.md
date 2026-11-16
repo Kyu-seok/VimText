@@ -142,8 +142,10 @@ but only the primary range is highlighted. The Normal-mode Cursor depends on the
   a text control is no document Range, so no page toolbar reacts to it).
 - _contenteditable_ (ADR 0009, #71): the native selection is a caret collapsed before the
   Cursor's char, and VimText draws the Cursor in the Field's Status Line host: a steady block
-  over the char's rect, blended with `mix-blend-mode: difference` on the host so it inverts
-  the char beneath, ignoring the mouse. Normal and operator-pending draw the block, Replace a
+  over the char's rect, a `backdrop-filter: invert(1)` in the host so it inverts the char
+  and the page beneath, ignoring the mouse (#76: `mix-blend-mode: difference` inverts nothing
+  where the page paints no background of its own, nor on Notion, which gives every element
+  `isolation: isolate`, the host too; docs/engine-seams.md, "Inverting the drawn Cursor"). Normal and operator-pending draw the block, Replace a
   bar along the char's bottom; Insert, Visual and Command-line draw nothing, nor does a Field
   without focus. An Atom gets a block over its whole box; an empty line a one-char-wide block
   (the width of `0` in the Field's font) at the line's start; a char split by a soft wrap its

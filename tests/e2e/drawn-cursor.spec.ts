@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+import { decodePng } from "../png";
 import { test, expect, ready, activateAtStart, drawnCursor, statusText, type Box } from "./extension";
 
 /**
@@ -29,8 +30,9 @@ const FIXTURES: Fixture[] = [
   { name: "the Notion site-shape", url: "/site-shapes.html", host: "#n-two", nested: true },
 ];
 
-async function activate(page: Page, f: Fixture): Promise<void> {
+async function activate(page: Page, f: Fixture, pageStyle?: string): Promise<void> {
   await page.goto(f.url);
+  if (pageStyle) await page.addStyleTag({ content: pageStyle });
   await ready(page);
   if (!f.nested) return activateAtStart(page, f.host);
   await page.locator("#notion").focus();
@@ -269,5 +271,44 @@ test.describe("shapes and scrolling", () => {
     await expect.poll(() => drawnCursor(page)).toBeNull();
     await page.locator("#scroller").evaluate((el) => (el.scrollTop = 0));
     await expectBlockOnCaret(page, f);
+  });
+});
+
+test.describe("the block inverts what is beneath it", () => {
+  const f: Fixture = { name: "drawn-cursor", url: "/drawn-cursor.html", host: "#ce" };
+
+  /**
+   * The mean brightness (0–255) Chromium painted inside the drawn block, read
+   * from a screenshot of its box: dark where the block inverts the white page
+   * and the character's dark glyph, white where it is painted opaque.
+   */
+  async function brightnessUnderBlock(page: Page): Promise<number> {
+    const box = (await drawnCursor(page))!;
+    const png = decodePng(
+      await page.screenshot({ clip: { x: box.left, y: box.top, width: box.width, height: box.height } }),
+    );
+    let sum = 0;
+    for (let y = 0; y < png.height; y++)
+      for (let x = 0; x < png.width; x++) {
+        const [r, g, b] = png.at(x, y);
+        sum += (r + g + b) / 3;
+      }
+    return sum / (png.width * png.height);
+  }
+
+  test("on a plain page", async ({ page }) => {
+    await activate(page, f);
+    await expectBlockOnCaret(page, f);
+    expect(await brightnessUnderBlock(page)).toBeLessThan(128);
+  });
+
+  // Notion gives every element `isolation: isolate`, VimText's own host too: a
+  // page's rule for the host beats the shadow root's `:host`, and a host that
+  // is a stacking context left the block nothing to blend with, an opaque
+  // white box hiding the character (found live on Notion, #76).
+  test("on a page whose rules make every element its own stacking context", async ({ page }) => {
+    await activate(page, f, "* { isolation: isolate; }");
+    await expectBlockOnCaret(page, f);
+    expect(await brightnessUnderBlock(page)).toBeLessThan(128);
   });
 });
