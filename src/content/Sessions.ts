@@ -4,6 +4,7 @@ import { isWriteKey } from "../field/editingCommands";
 import { Session, isActivationKey } from "../bridge/Session";
 import { policyFor, type Settings, type SitePolicy } from "../settings/settings";
 import type { Plugin } from "../plugins/Plugin";
+import { isStatusHost } from "../ui/statusHost";
 import { SessionStateSync, type SessionStatePort } from "./SessionStateSync";
 
 /**
@@ -34,10 +35,6 @@ function deepActiveElement(doc: Document): Element | null {
   let el = doc.activeElement;
   while (el?.shadowRoot?.activeElement) el = el.shadowRoot.activeElement;
   return el;
-}
-
-function isStatusHost(node: Node): boolean {
-  return node instanceof Element && node.localName === "vimtext-status";
 }
 
 /** True when a record can affect a Session; our own Status Line hosts coming and going cannot. */

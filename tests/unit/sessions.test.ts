@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Sessions } from "../../src/content/Sessions";
+import { Session } from "../../src/bridge/Session";
 import { DEFAULT_SETTINGS } from "../../src/settings/settings";
-import { hostCount, keydown, settle, statusText } from "./dom";
+import { hostCount, keydown, keys, settle, statusText } from "./dom";
 import { controlledPort, settingsFor } from "./settings-port";
 
 /**
@@ -248,5 +249,43 @@ describe("Site keying", () => {
     port.arrive({ ...DEFAULT_SETTINGS, sites: { [location.origin]: "normal" } });
     await settle();
     expect(hostCount()).toBe(0);
+  });
+});
+
+describe("VimText's own command line is never a Field (#78)", () => {
+  // The `:` input lives in the Status Line host's shadow root; the document
+  // listeners follow `composedPath()` into it. Coverage here: a textarea in
+  // Normal mode opening the command line. The Esc that closes it depends on
+  // listener order, so it is e2e (tests/e2e/command-line.spec.ts): a textarea,
+  // a Single-line Field and a contenteditable, from Normal mode.
+  function commandLineInput(): HTMLInputElement {
+    return document.querySelector("vimtext-status")!.shadowRoot!.querySelector("input")!;
+  }
+
+  // Green on `main` too: the focus moving into the command line already blurs
+  // the Field's Session once (focusout, before the spy) and moves the caret
+  // Field there, so a key typed in it never switched Fields. It pins that no
+  // key typed there blurs the Session again, now that the input resolves to nothing.
+  it("typing in it does not call onBlur on the Field's Session", async () => {
+    port.arrive(settingsFor(null));
+    await settle();
+    ta.focus();
+    keydown(ta, "Escape");
+    keydown(ta, ":");
+    const onBlur = vi.spyOn(Session.prototype, "onBlur");
+    keys(commandLineInput(), "s/a/b");
+    expect(onBlur).not.toHaveBeenCalled();
+    expect(hostCount()).toBe(1);
+  });
+
+  it("on a 'normal' Site, its focus Activates nothing", async () => {
+    port.arrive(settingsFor("normal"));
+    await settle();
+    ta.focus();
+    expect(statusText()).toContain("NORMAL");
+    keydown(ta, ":");
+    const input = commandLineInput();
+    expect((input.getRootNode() as ShadowRoot).activeElement).toBe(input);
+    expect(hostCount()).toBe(1);
   });
 });

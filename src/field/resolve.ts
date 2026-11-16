@@ -2,6 +2,7 @@ import type { Field, TextControl } from "./Field";
 import { TextareaField } from "./TextareaField";
 import { ContentEditableField } from "./ContentEditableField";
 import { selectionFor } from "./domSelection";
+import { isStatusHost } from "../ui/statusHost";
 
 /**
  * An element that is a Field, and how to make its Field. `element` is the
@@ -83,6 +84,23 @@ function declaresSingleLine(host: HTMLElement): boolean {
 }
 
 /**
+ * True for a node in VimText's own UI: a Status Line host or anything in its
+ * shadow root, the `:` `/` `?` input and the hidden mirror's editor included.
+ * The document listeners follow `composedPath()` into that root, where the
+ * command line's input is a text control: resolved as a Field, Esc there
+ * Activated a second Session instead of closing the command line (#78).
+ */
+function inVimTextUi(target: EventTarget | null): boolean {
+  if (!(target instanceof Node)) return false;
+  for (let n: Node | null = target; n;) {
+    if (isStatusHost(n)) return true;
+    const root = n.getRootNode();
+    n = root instanceof ShadowRoot ? root.host : null;
+  }
+  return false;
+}
+
+/**
  * The one decision of whether an event target is a Field and which kind:
  * every entry point (focus, keydown, the lifecycle observer, the popup's Mode
  * lookup) asks this, so a new Field kind is one more branch here. Null when
@@ -90,6 +108,7 @@ function declaresSingleLine(host: HTMLElement): boolean {
  * (readonly, disabled, type changed): the lifecycle observer disposes on that.
  */
 export function resolveField(target: EventTarget | null): ResolvedField | null {
+  if (inVimTextUi(target)) return null;
   if (isTextControl(target)) {
     return {
       element: target,

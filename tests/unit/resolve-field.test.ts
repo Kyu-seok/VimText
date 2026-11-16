@@ -129,3 +129,15 @@ describe("resolveField on contenteditable", () => {
     expect(resolveField(host)).toBeNull();
   });
 });
+
+describe("resolveField on VimText's own UI (#78)", () => {
+  it("the command line's input inside a Status Line host is not a Field, nor is the host", () => {
+    const host = document.createElement("vimtext-status");
+    const input = document.createElement("input");
+    input.type = "text";
+    host.attachShadow({ mode: "open" }).appendChild(input);
+    document.body.appendChild(host);
+    expect(resolveField(input)).toBeNull();
+    expect(resolveField(host)).toBeNull();
+  });
+});

@@ -171,8 +171,8 @@ test.describe("on a plain contenteditable", () => {
     await expectBlockOnCaret(page, plain);
     await page.keyboard.press(":");
     await expect.poll(() => drawnCursor(page)).toBeNull();
-    // Backspace on the empty command line closes it and focuses the Field again.
-    await page.keyboard.press("Backspace");
+    // Esc closes the command line and focuses the Field again.
+    await page.keyboard.press("Escape");
     await expectBlockOnCaret(page, plain);
     await page.locator("#ce").evaluate((el) => (el as HTMLElement).blur());
     await expect.poll(() => drawnCursor(page)).toBeNull();
