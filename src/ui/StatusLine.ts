@@ -1,5 +1,6 @@
 import type { Field } from "../field/Field";
 import type { Mode } from "../engine/mode";
+import { STATUS_HOST_TAG } from "./statusHost";
 import { DRAWN_CURSOR_CSS, DrawnCursor } from "./DrawnCursor";
 
 const CSS = `
@@ -45,7 +46,7 @@ export class StatusLine {
   private visible = false;
 
   constructor(private readonly field: Field) {
-    this.host = document.createElement("vimtext-status");
+    this.host = document.createElement(STATUS_HOST_TAG);
     this.root = this.host.attachShadow({ mode: "open" });
     const style = document.createElement("style");
     style.textContent = CSS;
