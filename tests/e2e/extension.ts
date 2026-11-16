@@ -208,7 +208,8 @@ export interface Box {
 /**
  * The Cursor VimText draws on a contenteditable Field (ADR 0009), as the user
  * sees it: its box in the frame's viewport and its shape, null when none is
- * drawn. Like `statusText`, a read of the Status Line host the user sees.
+ * drawn. Like `statusText`, a sanctioned read of the Status Line host
+ * (CODING_STANDARDS rule 6): it returns only what the user sees.
  */
 export function drawnCursor(page: Page | Frame): Promise<(Box & { shape: string }) | null> {
   return page.evaluate(() => {
