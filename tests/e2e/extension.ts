@@ -129,6 +129,18 @@ export function modelText(page: Page | Frame): Promise<string[]> {
 }
 
 /**
+ * The page editor's own selection, read through the fixture's
+ * `window.modelSelection()` from the editor's model, in that editor's own
+ * terms (ProseMirror `{ anchor, head }` positions, Slate's `editor.selection`,
+ * Quill's `{ index, length }`, Lexical's anchor and focus `{ key, offset, type }`).
+ * The read that shows an editor holding a selection other than the DOM's,
+ * which only a debugging session would otherwise find (#76's `:q` regression).
+ */
+export function modelSelection(page: Page | Frame): Promise<unknown> {
+  return page.evaluate(() => (window as unknown as { modelSelection(): unknown }).modelSelection());
+}
+
+/**
  * The text the native selection covers in that page or frame: a Normal-mode
  * cursor's character. With `shadowHost`, the selection inside that element's
  * open shadow root, read through Chromium's `ShadowRoot.getSelection`: the

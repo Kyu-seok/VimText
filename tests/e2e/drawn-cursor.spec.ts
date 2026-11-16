@@ -70,6 +70,25 @@ function caretCharBox(page: Page, shadowHost?: string): Promise<Box | null> {
   }, shadowHost);
 }
 
+/**
+ * The mean brightness (0–255) Chromium painted inside the drawn block, read
+ * from a screenshot of its box: dark where the block inverts the white page
+ * and the character's dark glyph, white where it is painted opaque.
+ */
+async function brightnessUnderBlock(page: Page): Promise<number> {
+  const box = (await drawnCursor(page))!;
+  const png = decodePng(
+    await page.screenshot({ clip: { x: box.left, y: box.top, width: box.width, height: box.height } }),
+  );
+  let sum = 0;
+  for (let y = 0; y < png.height; y++)
+    for (let x = 0; x < png.width; x++) {
+      const [r, g, b] = png.at(x, y);
+      sum += (r + g + b) / 3;
+    }
+  return sum / (png.width * png.height);
+}
+
 /** Within a pixel: the block is placed from the same rect, rounded on its own. */
 function near(a: Box | null, b: Box | null): boolean {
   if (!a || !b) return false;
@@ -100,6 +119,8 @@ for (const f of FIXTURES) {
   }) => {
     await activate(page, f);
     await expectBlockOnCaret(page, f);
+    // Painted, not only placed: the character and the page beneath are inverted.
+    expect(await brightnessUnderBlock(page)).toBeLessThan(128);
     for (const key of ["l", "w", "j", "x"]) {
       await page.keyboard.type(key);
       await expectBlockOnCaret(page, f);
@@ -276,25 +297,6 @@ test.describe("shapes and scrolling", () => {
 
 test.describe("the block inverts what is beneath it", () => {
   const f: Fixture = { name: "drawn-cursor", url: "/drawn-cursor.html", host: "#ce" };
-
-  /**
-   * The mean brightness (0–255) Chromium painted inside the drawn block, read
-   * from a screenshot of its box: dark where the block inverts the white page
-   * and the character's dark glyph, white where it is painted opaque.
-   */
-  async function brightnessUnderBlock(page: Page): Promise<number> {
-    const box = (await drawnCursor(page))!;
-    const png = decodePng(
-      await page.screenshot({ clip: { x: box.left, y: box.top, width: box.width, height: box.height } }),
-    );
-    let sum = 0;
-    for (let y = 0; y < png.height; y++)
-      for (let x = 0; x < png.width; x++) {
-        const [r, g, b] = png.at(x, y);
-        sum += (r + g + b) / 3;
-      }
-    return sum / (png.width * png.height);
-  }
 
   test("on a plain page", async ({ page }) => {
     await activate(page, f);

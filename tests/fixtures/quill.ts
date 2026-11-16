@@ -6,6 +6,7 @@
 // What the e2e specs rely on:
 //   #editor .ql-editor   the editing host (contenteditable Field under test)
 //   window.modelText()   Quill's own text, one line per block, an embed as U+FFFC
+//   window.modelSelection() Quill's own selection, { index, length }, null when it has none
 //   window.quillDoc()    the same lines with Quill's formats: bold as <b>…</b>,
 //                        a block format as a prefix ("h1:", "bullet:")
 import Quill from "quill";
@@ -69,5 +70,6 @@ function lines(): Line[] {
 
 Object.assign(window, {
   modelText: () => lines().map((l) => l.text),
+  modelSelection: () => quill.getSelection(),
   quillDoc: () => lines().map((l) => (l.block ? `${l.block}:${l.marked}` : l.marked)),
 });

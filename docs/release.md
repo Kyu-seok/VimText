@@ -92,6 +92,9 @@ undo step of its own, so a `u` goes before it):
    compose window on it.
 6. Keys back to back: `G A`, Enter, a word, Esc with no pause between them. The word is kept.
    Reading the page between those keys hides a loss there (#68).
+7. In Normal, the character under the Cursor shows inverted (a dark block, the character light),
+   and a Normal move opens none of the site's selection toolbars (ADR 0009, #76). Zoom a
+   screenshot on it: an opaque box hiding the character is a finding.
 
 **Which editor, per site** (record the library if the DOM shows it):
 

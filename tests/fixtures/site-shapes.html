@@ -28,6 +28,15 @@
       .block {
         white-space: break-spaces;
       }
+      /*
+        Notion gives every element its own stacking context, VimText's Status
+        Line host included (a page's rule for that element beats its shadow
+        root's :host), which left a mix-blend-mode Cursor nothing to blend
+        with (#76). Page-wide, as on Notion.
+      */
+      * {
+        isolation: isolate;
+      }
     </style>
   </head>
   <body>

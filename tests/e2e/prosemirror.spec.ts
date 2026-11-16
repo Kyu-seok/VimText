@@ -1,4 +1,13 @@
-import { test, expect, ready, activateAtStart, modelText, cursorChar, statusText } from "./extension";
+import {
+  test,
+  expect,
+  ready,
+  activateAtStart,
+  modelText,
+  modelSelection,
+  cursorChar,
+  statusText,
+} from "./extension";
 import type { Page } from "@playwright/test";
 
 /**
@@ -154,6 +163,8 @@ test(":q leaves ProseMirror with nothing highlighted and its document unchanged;
   expect(await pmDoc(page)).toEqual(ORIGINAL);
   await host.focus();
   await expect.poll(() => statusText(page)).toContain("NORMAL");
+  // ProseMirror's own caret is before the `h` (position 2), where :q left it (#76).
+  await expect.poll(() => modelSelection(page)).toEqual({ anchor: 2, head: 2 });
   await page.keyboard.type("x");
   await expect.poll(async () => (await pmDoc(page))[0]).toBe("te <b>quick brown</b> fox");
 });

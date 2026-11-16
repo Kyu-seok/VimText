@@ -4,6 +4,8 @@
 //   #editor                the editing host (contenteditable Field under test)
 //   window.modelText()     Slate's own text, one line per block (a list item
 //                          is a block), read from its model, never the DOM
+//   window.modelSelection() Slate's own selection (`editor.selection`: anchor and
+//                          focus as { path, offset }), null when it has none
 //   window.slateDoc()      the same lines with Slate's marks: bold as
 //                          <b>…</b>, "h1:" before a heading, "li:" before a
 //                          list item
@@ -15,6 +17,7 @@ import { mountSlate, modelLines, describeDoc } from "./slate-editor";
 const { editor } = mountSlate(document.getElementById("place")!);
 Object.assign(window, {
   modelText: () => modelLines(editor),
+  modelSelection: () => editor.selection,
   slateDoc: () => describeDoc(editor),
   slateUndos: () => editor.history.undos.length,
   slateUndoAll: () => {
