@@ -288,6 +288,9 @@ access to session storage (`setAccessLevel`). Nothing else runs there.
   remembered key was pressed on it. This also catches an `autofocus` Field, which is
   focused before the content script runs, and a popup switch to "normal" while a Field is
   focused. A key pressed before the content script runs at all is lost.
+  One blur does not forget the remembered key (#79): the one the page makes in answer to
+  that very key, as Lexical does on Escape. Unless the policy is "off", the arrival then
+  Activates that Field and focuses it again, while nothing else has focus.
 - vimrc: a text box of ex commands (`map`, `noremap`, `set`, …) run through the engine on every
   Activation. The saved vimrc is the whole truth about user mappings: an Activation first clears
   every user mapping (engine mappings are global per frame), then binds each enabled Plugin's

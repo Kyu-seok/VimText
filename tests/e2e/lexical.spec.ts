@@ -282,3 +282,48 @@ test("Lexical cancels a synthetic deleteContent and does nothing; deleteContentB
   expect(await offer("deleteContentBackward")).toBe(true);
   await expect.poll(async () => (await modelText(page))[6]).toBe("line");
 });
+
+/**
+ * Lexical's rich-text blurs its editor on Escape (`KEY_ESCAPE_COMMAND` →
+ * `editor.blur()`). An Esc pressed before the settings arrive reaches the
+ * page, so the editor blurs, and the arrival then found no focused Field:
+ * VimText stayed inert and the editor blurred (#79, the pre-push editors
+ * run's "no NORMAL within 5 s"). The page presses the key itself here, in the
+ * microtask after the content script marks the document, which is before the
+ * storage read can have answered: a synthetic Esc, which Lexical and VimText
+ * both take as they take a person's (a trusted one in the same order is
+ * `tests/unit/chromium-facts.test.ts`, "A blur the page makes in answer to a
+ * key"). The `beforeEach` has already Activated the page this test reloads.
+ */
+test("an Esc pressed before settings arrive Activates although Lexical blurs on it (#79)", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    new MutationObserver((_records, observer) => {
+      observer.disconnect();
+      const host = document.querySelector<HTMLElement>("#editor")!;
+      host.focus();
+      document.getSelection()!.collapse(host, 0);
+      // Lexical blurs only while it holds a range selection, which it takes on `selectionchange`.
+      document.dispatchEvent(new Event("selectionchange"));
+      host.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "Escape",
+          code: "Escape",
+          keyCode: 27,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+      (window as unknown as { blurredOnEsc: boolean }).blurredOnEsc = document.activeElement !== host;
+    }).observe(document, { attributes: true, subtree: true, attributeFilter: ["data-vimtext"] });
+  });
+  await page.reload();
+  await ready(page);
+  // The key reached Lexical, so the settings had not arrived when it was pressed.
+  expect(await page.evaluate(() => (window as unknown as { blurredOnEsc: boolean }).blurredOnEsc)).toBe(true);
+  await expect.poll(() => statusText(page)).toContain("NORMAL");
+  expect(await page.evaluate(() => document.activeElement?.id)).toBe("editor");
+  await page.keyboard.type("x");
+  await expect.poll(async () => (await modelText(page))[0]).toBe("he quick brown fox");
+});

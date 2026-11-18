@@ -3,6 +3,7 @@ import { Sessions } from "../../src/content/Sessions";
 import { Session } from "../../src/bridge/Session";
 import { DEFAULT_SETTINGS } from "../../src/settings/settings";
 import { hostCount, keydown, keys, settle, statusText } from "./dom";
+import { caretAt, editableHost } from "./contenteditable";
 import { controlledPort, settingsFor } from "./settings-port";
 
 /**
@@ -14,7 +15,9 @@ import { controlledPort, settingsFor } from "./settings-port";
  * Coverage (CODING_STANDARDS rule 5): an arrival only ever Activates into
  * Normal; a Session already in another Mode is left alone. Placements: a
  * textarea, a Single-line Field and a Field inside an open shadow root, each
- * on both the remembered-key path and the "normal" path.
+ * on both the remembered-key path and the "normal" path. A remembered key whose
+ * Field the page blurred in answer to it (#79): those three and a
+ * contenteditable host.
  */
 
 let sessions: Sessions;
@@ -76,6 +79,111 @@ describe("Activation key before settings arrive", () => {
     ta.focus();
     keydown(ta, "Escape");
     other.focus();
+    port.arrive(settingsFor(null));
+    await settle();
+    expect(hostCount()).toBe(0);
+  });
+
+  // A page that blurs its editor on Escape, as Lexical's rich-text does
+  // (`KEY_ESCAPE_COMMAND` → `editor.blur()`): the blur comes from the remembered
+  // key itself, while it is still being dispatched (#79).
+  const blursOnEsc = (el: HTMLElement) =>
+    el.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") el.blur();
+    });
+
+  it("survives a blur the page makes in answer to the Esc itself: the Field is focused again in NORMAL", async () => {
+    blursOnEsc(ta);
+    ta.focus();
+    ta.setSelectionRange(0, 0);
+    keydown(ta, "Escape");
+    expect(document.activeElement).toBe(document.body);
+    port.arrive(settingsFor(null));
+    await settle();
+    expect(document.activeElement).toBe(ta);
+    expect(statusText()).toContain("NORMAL");
+    keydown(ta, "x");
+    expect(ta.value).toBe("he quick brown fox");
+  });
+
+  it("survives that blur on a Single-line Field", async () => {
+    const single = makeSingleLine();
+    blursOnEsc(single);
+    single.focus();
+    keydown(single, "Escape");
+    expect(document.activeElement).toBe(document.body);
+    port.arrive(settingsFor(null));
+    await settle();
+    expect(document.activeElement).toBe(single);
+    expect(statusText()).toContain("NORMAL");
+    keydown(single, "x");
+    expect(single.value).toBe("ello world");
+  });
+
+  it("survives that blur on a contenteditable host", async () => {
+    const host = editableHost("<p>one two</p>");
+    blursOnEsc(host);
+    host.focus();
+    caretAt(host.querySelector("p")!.firstChild!, 0);
+    keydown(host, "Escape");
+    expect(document.activeElement).toBe(document.body);
+    port.arrive(settingsFor(null));
+    await settle();
+    expect(document.activeElement).toBe(host);
+    expect(statusText()).toContain("NORMAL");
+  });
+
+  it("survives that blur on a Field inside an open shadow root", async () => {
+    const inner = makeShadowTextarea();
+    blursOnEsc(inner);
+    inner.focus();
+    keydown(inner, "Escape");
+    expect(document.activeElement).toBe(document.body);
+    port.arrive(settingsFor(null));
+    await settle();
+    expect(inner.getRootNode()).toHaveProperty("activeElement", inner);
+    expect(statusText()).toContain("NORMAL");
+  });
+
+  it("after that blur, 'off' leaves the Field blurred and inert", async () => {
+    blursOnEsc(ta);
+    ta.focus();
+    keydown(ta, "Escape");
+    port.arrive(settingsFor("off"));
+    await settle();
+    expect(document.activeElement).toBe(document.body);
+    expect(hostCount()).toBe(0);
+  });
+
+  it("after that blur, a focus the person moved elsewhere stands: neither Field Activates", async () => {
+    blursOnEsc(ta);
+    const other = makeTextarea();
+    ta.focus();
+    keydown(ta, "Escape");
+    other.focus();
+    port.arrive(settingsFor(null));
+    await settle();
+    expect(document.activeElement).toBe(other);
+    expect(hostCount()).toBe(0);
+  });
+
+  it("after that blur, a Field the page also hid takes no focus and is left inert", async () => {
+    blursOnEsc(ta);
+    ta.addEventListener("keydown", () => (ta.style.display = "none"));
+    ta.focus();
+    keydown(ta, "Escape");
+    port.arrive(settingsFor(null));
+    await settle();
+    expect(document.activeElement).toBe(document.body);
+    expect(hostCount()).toBe(0);
+    expect(sessions.observing).toBe(false);
+  });
+
+  it("after that blur, a Field that left the page is not brought back", async () => {
+    blursOnEsc(ta);
+    ta.focus();
+    keydown(ta, "Escape");
+    ta.remove();
     port.arrive(settingsFor(null));
     await settle();
     expect(hostCount()).toBe(0);
