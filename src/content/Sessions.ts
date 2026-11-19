@@ -70,7 +70,8 @@ const lifecycleOptions: MutationObserverInit = {
  *
  * The Site Policy is unknown until the port delivers settings: nothing
  * Activates, and an Activation key reaches the page but is remembered for its
- * Field. Every delivery, the first load and each later change alike, runs one
+ * Field, a blur the page makes in answer to that key included (`remembered`).
+ * Every delivery, the first load and each later change alike, runs one
  * handler: "off" disposes every Session; otherwise the focused Field is
  * reconciled against the policy.
  */
@@ -78,8 +79,19 @@ export class Sessions {
   /** Keyed by the Field's element, as `resolveField` names it. */
   private readonly sessions = new Map<HTMLElement, FieldSession>();
   private settings: Settings | null = null;
-  /** The Field an Activation key was pressed on while the policy was unknown; the last one only. */
-  private remembered: HTMLElement | null = null;
+  /**
+   * The Activation key pressed while the policy was unknown, the last one
+   * only: its Field, and its event, since a `focusout` during the event's
+   * dispatch is the page's answer to the key. `blurredByKey` is true when the
+   * page blurred the Field that way (Lexical's rich-text blurs its editor on
+   * Escape, #79). With the policy known the page would never have seen that
+   * key, so the arrival Activates the Field and focuses it again, as long as
+   * nothing else took focus meanwhile. Any other blur forgets the key.
+   * Covered by `tests/unit/sessions.test.ts`, "Activation key before settings
+   * arrive": a textarea, a Single-line Field, a contenteditable host and a
+   * Field inside an open shadow root; Lexical itself by `tests/e2e/lexical.spec.ts`.
+   */
+  private remembered: { field: HTMLElement; key: KeyboardEvent; blurredByKey: boolean } | null = null;
   private lifecycleObserver: MutationObserver | null = null;
   /**
    * The Field the caret was last seen in. A Field nested in an editable root
@@ -92,6 +104,13 @@ export class Sessions {
    */
   private caretField: HTMLElement | null = null;
   private readonly stateSync: SessionStateSync | null;
+  private announcePolicy: () => void = () => {};
+  /**
+   * Resolves once the first settings have arrived and been acted on: from then
+   * on an Activation key is taken at once, not remembered. The content entry
+   * marks the document on it, which the e2e helper `ready` waits for.
+   */
+  readonly policyKnown = new Promise<void>((resolve) => (this.announcePolicy = resolve));
   private readonly stopWatching: () => void;
 
   /**
@@ -142,7 +161,7 @@ export class Sessions {
   private activate(resolved: ResolvedField): void {
     const el = resolved.element;
     if (this.sessions.has(el)) return;
-    if (this.remembered === el) this.remembered = null;
+    if (this.remembered?.field === el) this.remembered = null;
     const field = resolved.create();
     const session = new Session(field, {
       vimrc: this.settings?.vimrc ?? "",
@@ -182,19 +201,34 @@ export class Sessions {
     else this.reconcile(policy);
     // The arrival has decided what the remembered key was; a later change must not Activate from it.
     this.remembered = null;
+    this.announcePolicy();
   };
 
   /**
    * Brings the focused Field in line with a policy that just arrived: "normal"
    * Activates it, "insert" Activates it only if the remembered Activation key
    * was pressed on it. Never in a document without focus (a background tab or
-   * frame), so a Field there is left alone.
+   * frame), so a Field there is left alone. A remembered Field the page
+   * blurred in answer to the key is focused again, while nothing else has
+   * focus.
    */
   private reconcile(policy: "insert" | "normal"): void {
     if (!this.document.hasFocus()) return;
-    const resolved = resolveField(deepActiveElement(this.document));
+    const active = deepActiveElement(this.document);
+    const blurred = this.remembered?.blurredByKey ? this.remembered.field : null;
+    if (blurred?.isConnected && (active === null || active === this.document.body)) {
+      const resolved = resolveField(blurred);
+      if (resolved?.element !== blurred) return;
+      this.activate(resolved);
+      const field = this.sessions.get(blurred)?.field;
+      field?.focus();
+      // A Field the page also hid on that key takes no focus: it is left as the page left it.
+      if (!field?.hasFocus()) this.dispose(blurred);
+      return;
+    }
+    const resolved = resolveField(active);
     if (!resolved || this.sessions.has(resolved.element)) return;
-    if (policy === "normal" || resolved.element === this.remembered) this.activate(resolved);
+    if (policy === "normal" || resolved.element === this.remembered?.field) this.activate(resolved);
   }
 
   private onKeydown = (e: KeyboardEvent): void => {
@@ -218,7 +252,7 @@ export class Sessions {
     if (policy === null) {
       // Unknown policy: the page sees the key as it would on an "off" site,
       // and the arrival decides whether it was an Activation.
-      this.remembered = resolved.element;
+      this.remembered = { field: resolved.element, key: e, blurredByKey: false };
       return;
     }
     if (policy === "off") return;
@@ -256,7 +290,11 @@ export class Sessions {
     if (!resolved) return;
     this.sessions.get(resolved.element)?.session.onBlur();
     if (this.caretField === resolved.element) this.caretField = null;
-    if (this.remembered === resolved.element) this.remembered = null;
+    if (this.remembered?.field === resolved.element) {
+      // Still being dispatched: a listener of the key itself took the focus away.
+      if (this.remembered.key.eventPhase !== Event.NONE) this.remembered.blurredByKey = true;
+      else this.remembered = null;
+    }
   };
 
   // Disposal is prompt (ADR 0003): a Session ends when its Field leaves the

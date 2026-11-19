@@ -621,3 +621,50 @@ describe("Inverting the drawn Cursor", () => {
     expect(inverted(await painted(INVERT, { rootBackground: "#fff" }))).toBe(true);
   });
 });
+
+describe("A blur the page makes in answer to a key", () => {
+  /** The key's `eventPhase` as a document `focusout` listener reads it, and once its dispatch is over. */
+  async function phases(press: (el: HTMLElement) => Promise<void> | void) {
+    const el = host("<p>one</p>");
+    let key: KeyboardEvent | null = null;
+    let duringFocusout: number | null = null;
+    const onKey = (e: KeyboardEvent) => void (key = e);
+    const onFocusout = () => void (duringFocusout = key?.eventPhase ?? null);
+    document.addEventListener("keydown", onKey, { capture: true });
+    document.addEventListener("focusout", onFocusout);
+    cleanup.push(() => {
+      document.removeEventListener("keydown", onKey, { capture: true });
+      document.removeEventListener("focusout", onFocusout);
+    });
+    el.addEventListener("keydown", () => el.blur());
+    await press(el);
+    return {
+      duringFocusout,
+      after: key!.eventPhase,
+      trusted: key!.isTrusted,
+      active: document.activeElement,
+    };
+  }
+
+  it("a focusout fired by a keydown listener's blur() finds that keydown still in dispatch; afterwards its eventPhase is NONE", async () => {
+    const seen = await phases(() => userEvent.keyboard("{Escape}"));
+    expect(seen).toEqual({
+      duringFocusout: Event.AT_TARGET,
+      after: Event.NONE,
+      trusted: true,
+      active: document.body,
+    });
+  });
+
+  it("the same for a synthetic keydown, as a unit test dispatches one", async () => {
+    const seen = await phases((el) => {
+      el.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    });
+    expect(seen).toEqual({
+      duringFocusout: Event.AT_TARGET,
+      after: Event.NONE,
+      trusted: false,
+      active: document.body,
+    });
+  });
+});

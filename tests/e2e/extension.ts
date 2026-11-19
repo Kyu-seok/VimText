@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
+import { loadavg } from "node:os";
 
 const dist = resolve("dist");
 
@@ -17,7 +18,8 @@ export { fixtureOrigin };
  * are what a persistent context opens with anyway.
  */
 export const test = base.extend<{ context: BrowserContext; page: Page }>({
-  context: async ({ viewport, deviceScaleFactor }, use) => {
+  context: async ({ viewport, deviceScaleFactor }, use, testInfo) => {
+    const launching = Date.now();
     const userDataDir = mkdtempSync(resolve(tmpdir(), "vimtext-"));
     const context = await chromium.launchPersistentContext(userDataDir, {
       channel: "chromium",
@@ -25,6 +27,12 @@ export const test = base.extend<{ context: BrowserContext; page: Page }>({
       args: [`--disable-extensions-except=${dist}`, `--load-extension=${dist}`],
       viewport,
       deviceScaleFactor,
+    });
+    // Printed with a failure: the launch counts against the test's timeout, and on a stalled
+    // machine it alone took 20 to 30 s in every worker at once (#79, #83). A failure that
+    // shows a slow launch or a load average far above the core count may be the machine's.
+    await testInfo.attach("machine", {
+      body: `browser launch ${Date.now() - launching} ms, load average ${loadavg()[0]!.toFixed(1)}`,
     });
     await use(context);
     await context.close();
@@ -63,11 +71,16 @@ export async function setSettings(context: BrowserContext, settings: object): Pr
 }
 
 /**
- * Resolves once the content script has run in `where` (a page or a frame): it
- * marks its document on load, so no spec guesses how long `document_idle` takes.
+ * Resolves once the content script has run in `where` (a page or a frame) and
+ * its settings have arrived: it marks its document for each, so no spec
+ * guesses how long `document_idle` and the storage read take. Before the
+ * settings arrive an Esc is only remembered and the keys typed after it are
+ * the page's, which a spec that types right after Esc read as a flake (#79:
+ * `cwslow` typed into the textarea). The window itself is tested on purpose in
+ * `tests/unit/sessions.test.ts` and `lexical.spec.ts` (#79).
  */
 export async function ready(where: Page | Frame): Promise<void> {
-  await where.waitForSelector("html[data-vimtext]", { state: "attached" });
+  await where.waitForSelector('html[data-vimtext="ready"]', { state: "attached" });
 }
 
 /** The Status Line host VimText injects next to an activated Field, in that page or frame. */
@@ -107,7 +120,6 @@ export async function activateAtStart(page: Page, selector = "#in"): Promise<voi
     else el.ownerDocument.getSelection()!.collapse(el, 0);
   });
   await page.keyboard.press("Escape");
-  // An Esc before the settings load arrive Activates when they do (Sessions).
   await base.expect.poll(() => statusText(page)).toContain("NORMAL");
 }
 
