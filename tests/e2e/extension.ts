@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
+import { loadavg } from "node:os";
 
 const dist = resolve("dist");
 
@@ -17,7 +18,8 @@ export { fixtureOrigin };
  * are what a persistent context opens with anyway.
  */
 export const test = base.extend<{ context: BrowserContext; page: Page }>({
-  context: async ({ viewport, deviceScaleFactor }, use) => {
+  context: async ({ viewport, deviceScaleFactor }, use, testInfo) => {
+    const launching = Date.now();
     const userDataDir = mkdtempSync(resolve(tmpdir(), "vimtext-"));
     const context = await chromium.launchPersistentContext(userDataDir, {
       channel: "chromium",
@@ -25,6 +27,12 @@ export const test = base.extend<{ context: BrowserContext; page: Page }>({
       args: [`--disable-extensions-except=${dist}`, `--load-extension=${dist}`],
       viewport,
       deviceScaleFactor,
+    });
+    // Printed with a failure: the launch counts against the test's timeout, and on a stalled
+    // machine it alone took 20 to 30 s in every worker at once (#79, #83). A failure that
+    // shows a slow launch or a load average far above the core count may be the machine's.
+    await testInfo.attach("machine", {
+      body: `browser launch ${Date.now() - launching} ms, load average ${loadavg()[0]!.toFixed(1)}`,
     });
     await use(context);
     await context.close();
