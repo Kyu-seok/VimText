@@ -71,11 +71,16 @@ export async function setSettings(context: BrowserContext, settings: object): Pr
 }
 
 /**
- * Resolves once the content script has run in `where` (a page or a frame): it
- * marks its document on load, so no spec guesses how long `document_idle` takes.
+ * Resolves once the content script has run in `where` (a page or a frame) and
+ * its settings have arrived: it marks its document for each, so no spec
+ * guesses how long `document_idle` and the storage read take. Before the
+ * settings arrive an Esc is only remembered and the keys typed after it are
+ * the page's, which a spec that types right after Esc read as a flake (#79:
+ * `cwslow` typed into the textarea). The window itself is tested on purpose in
+ * `tests/unit/sessions.test.ts` and `lexical.spec.ts` (#79).
  */
 export async function ready(where: Page | Frame): Promise<void> {
-  await where.waitForSelector("html[data-vimtext]", { state: "attached" });
+  await where.waitForSelector('html[data-vimtext="ready"]', { state: "attached" });
 }
 
 /** The Status Line host VimText injects next to an activated Field, in that page or frame. */
@@ -115,7 +120,6 @@ export async function activateAtStart(page: Page, selector = "#in"): Promise<voi
     else el.ownerDocument.getSelection()!.collapse(el, 0);
   });
   await page.keyboard.press("Escape");
-  // An Esc before the settings load arrive Activates when they do (Sessions).
   await base.expect.poll(() => statusText(page)).toContain("NORMAL");
 }
 

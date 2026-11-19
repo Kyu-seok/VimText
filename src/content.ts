@@ -12,9 +12,12 @@ const sessions = new Sessions(
   { load: loadSessionState, save: saveSessionState, watch: watchSessionState },
   { surround, targets },
 );
-// Marks this document as attended, per frame; the e2e helper `ready` waits for it
-// instead of guessing when `document_idle` has passed.
+// Marks this document as attended, per frame, and again once the settings have arrived:
+// the e2e helper `ready` waits for the second mark instead of guessing when `document_idle`
+// has passed and the storage read has answered. Until then an Activation key is only
+// remembered and the keys after it are the page's (DESIGN.md "Settings").
 document.documentElement.setAttribute("data-vimtext", "");
+void sessions.policyKnown.then(() => document.documentElement.setAttribute("data-vimtext", "ready"));
 
 chrome.runtime.onMessage.addListener((msg: { type?: string }, _sender, sendResponse) => {
   if (msg?.type === "vimtext:status") {

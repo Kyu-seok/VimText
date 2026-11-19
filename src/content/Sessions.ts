@@ -104,6 +104,13 @@ export class Sessions {
    */
   private caretField: HTMLElement | null = null;
   private readonly stateSync: SessionStateSync | null;
+  private announcePolicy: () => void = () => {};
+  /**
+   * Resolves once the first settings have arrived and been acted on: from then
+   * on an Activation key is taken at once, not remembered. The content entry
+   * marks the document on it, which the e2e helper `ready` waits for.
+   */
+  readonly policyKnown = new Promise<void>((resolve) => (this.announcePolicy = resolve));
   private readonly stopWatching: () => void;
 
   /**
@@ -194,6 +201,7 @@ export class Sessions {
     else this.reconcile(policy);
     // The arrival has decided what the remembered key was; a later change must not Activate from it.
     this.remembered = null;
+    this.announcePolicy();
   };
 
   /**

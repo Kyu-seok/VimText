@@ -239,6 +239,18 @@ describe("Activation key before settings arrive", () => {
   });
 });
 
+describe("policyKnown", () => {
+  it("resolves once the first settings have arrived, not before", async () => {
+    let known = false;
+    void sessions.policyKnown.then(() => (known = true));
+    await settle();
+    expect(known).toBe(false);
+    port.arrive(settingsFor("off"));
+    await settle();
+    expect(known).toBe(true);
+  });
+});
+
 describe("Settings arrival on a focused Field without an Activation key", () => {
   it("'normal' Activates it", async () => {
     ta.focus();
