@@ -1,6 +1,5 @@
 import type { Page } from "@playwright/test";
-import { decodePng } from "../png";
-import { test, expect, ready, activateAtStart, drawnCursor } from "./extension";
+import { test, expect, ready, activateAtStart, brightness, drawnCursor } from "./extension";
 
 /**
  * A Field inside a top-layer element (a modal dialog, an open popover) keeps a
@@ -10,18 +9,6 @@ import { test, expect, ready, activateAtStart, drawnCursor } from "./extension";
  * (CODING_STANDARDS rule 14). Coverage: Normal and the command line, on a
  * textarea and a contenteditable.
  */
-
-/** The mean brightness (0–255) Chromium painted in a box of the viewport. */
-async function brightness(page: Page, x: number, y: number, width: number, height: number): Promise<number> {
-  const png = decodePng(await page.screenshot({ clip: { x, y, width, height } }));
-  let sum = 0;
-  for (let py = 0; py < png.height; py++)
-    for (let px = 0; px < png.width; px++) {
-      const [r, g, b] = png.at(px, py);
-      sum += (r + g + b) / 3;
-    }
-  return sum / (png.width * png.height);
-}
 
 /** A point 30px in from the Field's left edge, 8px below its bottom edge: inside a Status Line under it. */
 function underField(page: Page, selector: string): Promise<{ x: number; y: number }> {
@@ -38,7 +25,7 @@ async function expectStatusLineShown(page: Page, selector: string): Promise<void
     "vimtext-status",
   );
   // The bar's background (#1f2430) between its letters, against the white dialog or popover.
-  expect(await brightness(page, at.x - 28, at.y - 4, 4, 8)).toBeLessThan(60);
+  expect(await brightness(page, { left: at.x - 28, top: at.y - 4, width: 4, height: 8 })).toBeLessThan(60);
 }
 
 for (const layer of ["dialog", "popover"]) {
@@ -59,7 +46,7 @@ for (const layer of ["dialog", "popover"]) {
     await expect.poll(async () => (await drawnCursor(page))?.shape).toBe("block");
     const block = (await drawnCursor(page))!;
     // Painted, not only placed: the block inverts the white page and the dark glyph.
-    expect(await brightness(page, block.left, block.top, block.width, block.height)).toBeLessThan(128);
+    expect(await brightness(page, block)).toBeLessThan(128);
     await page.keyboard.type("w");
     await expect.poll(async () => (await drawnCursor(page))!.left).toBeGreaterThan(block.left);
   });
@@ -90,6 +77,7 @@ test("the Status Line is raised again when the page opens a popover over it whil
       return page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.localName, at);
     })
     .toBe("vimtext-status");
+  await expectStatusLineShown(page, "#popover-ta");
   await page.keyboard.type("x");
   await expect(page.locator("#popover-ta")).toHaveValue("he quick brown fox");
 });

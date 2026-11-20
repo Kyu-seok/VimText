@@ -1,6 +1,14 @@
 import type { Page } from "@playwright/test";
-import { decodePng } from "../png";
-import { test, expect, ready, activateAtStart, drawnCursor, statusText, type Box } from "./extension";
+import {
+  test,
+  expect,
+  ready,
+  activateAtStart,
+  brightness,
+  drawnCursor,
+  statusText,
+  type Box,
+} from "./extension";
 
 /**
  * On a contenteditable Field VimText draws the Normal-mode Cursor itself and
@@ -71,22 +79,12 @@ function caretCharBox(page: Page, shadowHost?: string): Promise<Box | null> {
 }
 
 /**
- * The mean brightness (0–255) Chromium painted inside the drawn block, read
- * from a screenshot of its box: dark where the block inverts the white page
- * and the character's dark glyph, white where it is painted opaque.
+ * The mean brightness (0–255) Chromium painted inside the drawn block: dark
+ * where the block inverts the white page and the character's dark glyph,
+ * white where it is painted opaque.
  */
 async function brightnessUnderBlock(page: Page): Promise<number> {
-  const box = (await drawnCursor(page))!;
-  const png = decodePng(
-    await page.screenshot({ clip: { x: box.left, y: box.top, width: box.width, height: box.height } }),
-  );
-  let sum = 0;
-  for (let y = 0; y < png.height; y++)
-    for (let x = 0; x < png.width; x++) {
-      const [r, g, b] = png.at(x, y);
-      sum += (r + g + b) / 3;
-    }
-  return sum / (png.width * png.height);
+  return brightness(page, (await drawnCursor(page))!);
 }
 
 /** Within a pixel: the block is placed from the same rect, rounded on its own. */

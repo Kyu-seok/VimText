@@ -6,6 +6,7 @@ import { DRAWN_CURSOR_CSS, DrawnCursor } from "./DrawnCursor";
 const CSS = `
 :host { all: initial !important; }
 :host([hidden]) { display: none !important; }
+:host::backdrop { display: none !important; }
 .host { position: fixed; z-index: 2147483647; pointer-events: none; }
 .bar {
   pointer-events: auto;
@@ -104,45 +105,38 @@ export class StatusLine {
   hide(): void {
     this.visible = false;
     this.host.hidden = true;
-    this.lower();
+    this.host.removeAttribute("popover");
   }
 
   /**
    * Puts the host where it paints over its Field (DESIGN.md "Status Line",
    * docs/engine-seams.md "Top layer"; #77). No z-index paints over the top
    * layer, so for a Field inside a top-layer element (a modal dialog, an open
-   * popover, a fullscreen element) the host is a manual popover, shown after
-   * that element and so above it. It is a child of that element too: a modal
-   * dialog makes everything outside it inert, the command line included.
-   * Anywhere else the host is a plain child of the root element.
+   * popover, a fullscreen element) the host is a manual popover, shown anew
+   * each time and so above everything shown before it. It is a child of that
+   * element too: a modal dialog makes everything outside it inert, the
+   * command line included. Anywhere else the host is a plain child of the
+   * root element.
    */
   private place(): void {
     const el = this.field.element;
     const layer = topLayerAncestor(flatParent(el));
     const parent = layer ?? document.documentElement ?? document.body;
-    // Moving a showing popover hides it.
+    this.host.removeAttribute("popover");
     if (this.host.parentNode !== parent) parent.appendChild(this.host);
-    if (!layer && !el.matches(IN_TOP_LAYER)) return this.lower();
-    if (!this.visible || this.host.matches(":popover-open")) return;
+    if (!this.visible || !(layer || el.matches(IN_TOP_LAYER))) return;
     this.host.popover = "manual";
     this.host.showPopover();
   }
 
-  /** Takes the host out of the top layer; the next `place` shows it over whatever opened meanwhile. */
-  private lower(): void {
-    this.host.removeAttribute("popover");
-  }
-
   /**
    * The page opened a top-layer element, over the host if the host was there
-   * already: raise it again. Not while the command line has focus, which
-   * hiding the popover would hand back to the Field; the next `show` raises it.
+   * already: raise it again. One this listener never hears of (opened inside
+   * a shadow root) is raised over by the `show` of the Field's next focus.
    */
   private onToggle = (e: Event): void => {
-    if (!this.visible || e.target === this.host || (e as ToggleEvent).newState !== "open") return;
-    if (this.root.activeElement) return;
-    this.lower();
-    this.place();
+    if (!this.visible || e.target === this.host) return;
+    if (e.target instanceof Element && e.target.matches(IN_TOP_LAYER)) this.place();
   };
 
   /**

@@ -17,11 +17,11 @@ let ta: HTMLTextAreaElement;
 let field: TextareaField;
 let session: Session;
 
-function mount(position: string): void {
+function mount(position: string, parent: Node = document.body): void {
   ta = document.createElement("textarea");
   ta.value = "the quick brown fox";
   ta.style.cssText = `position:fixed; left:0; width:300px; height:60px; margin:0; font:14px/1.4 monospace; ${position}`;
-  document.body.appendChild(ta);
+  parent.appendChild(ta);
   ta.focus();
   field = new TextareaField(ta);
   session = new Session(field, { vimrc: "" });
@@ -116,11 +116,9 @@ describe("Status Line in the top layer", () => {
     return el;
   }
 
-  function mountIn(parent: HTMLElement): void {
-    mount("top:20px");
-    parent.appendChild(ta);
-    ta.focus();
-    session.onFocus();
+  /** A Field Activated inside `parent`, already in the top layer. */
+  function mountIn(parent: Node): void {
+    mount("top:20px", parent);
   }
 
   const BOX = "position:fixed; left:0; top:0; margin:0; width:400px; height:300px; padding:0; border:0";
@@ -175,6 +173,51 @@ describe("Status Line in the top layer", () => {
     await toggled();
     expect(hitAt(8)?.localName).toBe("vimtext-status");
     expect(document.activeElement).toBe(ta);
+  });
+
+  it("is raised over a popover the page opens while the command line has focus, and the command line keeps it", async () => {
+    const popover = layer(`<div popover="manual" style="${BOX}"></div>`);
+    popover.showPopover();
+    mountIn(popover);
+    keyDriver(() => session).keys(":");
+    const over = layer(`<div popover="manual" style="${BOX}"></div>`);
+    over.showPopover();
+    await toggled();
+    for (let i = 0; i < 2; i++) await new Promise(requestAnimationFrame);
+    expect(hitAt(8)?.localName).toBe("vimtext-status");
+    expect(session.mode).toBe("command-line");
+    expect(session.status.statusbar.querySelector("input")).toBe(
+      session.status.host.shadowRoot!.activeElement,
+    );
+  });
+
+  it("is raised over a popover whose opening it never saw, when its Field takes focus again", () => {
+    const popover = layer(`<div popover="manual" style="${BOX}"></div>`);
+    popover.showPopover();
+    mountIn(popover);
+    const outer = layer(`<div></div>`);
+    outer.attachShadow({ mode: "open" }).innerHTML = `<div popover="manual" style="${BOX}"></div>`;
+    (outer.shadowRoot!.firstElementChild as HTMLElement).showPopover();
+    expect(hitAt(8)).toBe(outer);
+    session.onFocus();
+    expect(hitAt(8)?.localName).toBe("vimtext-status");
+  });
+
+  it("shows over a modal dialog for a Field inside an open shadow root in it", () => {
+    const dialog = layer(`<dialog style="${BOX}"><div></div></dialog>`) as HTMLDialogElement;
+    dialog.showModal();
+    mountIn(dialog.firstElementChild!.attachShadow({ mode: "open" }));
+    expect(hitAt(8)?.localName).toBe("vimtext-status");
+  });
+
+  it("shows over a modal dialog for a Field slotted into a shadow root's dialog", () => {
+    const outer = layer(`<div></div>`);
+    outer.attachShadow({ mode: "open" }).innerHTML = `<dialog style="${BOX}"><slot></slot></dialog>`;
+    (outer.shadowRoot!.firstElementChild as HTMLDialogElement).showModal();
+    mountIn(outer);
+    // The host is in the shadow root, beside the slot: hit testing from the document stops at the root's host.
+    const r = ta.getBoundingClientRect();
+    expect(outer.shadowRoot!.elementFromPoint(r.left + 20, r.bottom + 8)?.localName).toBe("vimtext-status");
   });
 
   it("follows its Field into a dialog opened around it after Activation", () => {

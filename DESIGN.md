@@ -133,9 +133,11 @@ the host becomes a child of that element, shown as a `popover="manual"` element,
 raised again when the page opens another top-layer element while the Field keeps focus.
 Inside the element because a modal dialog makes everything outside it inert, the command
 line included. A Field outside the top layer keeps its host a plain child of the root
-element. Not seen, so not raised over: a popover opened inside a shadow root (its `toggle`
-event does not leave the root), or anything opened while the command line has focus,
-until the Field is focused again. Fullscreen is covered by the same rule and has no test.
+element. Not seen, so not raised over until the Field is focused again: a popover opened
+inside a shadow root (its `toggle` event does not leave the root). Fullscreen is covered by the same rule and has no test.
+A Field that is itself the top-layer element (an editable `<dialog>`) cannot hold the
+host: it stays under the root element as a popover, painted over the Field, and under a
+modal one its command line takes no focus.
 
 **Frames.** The content script runs in every frame; each frame owns its Fields, Sessions
 and Status Lines, and a Field is Activated only by keys and focus inside its own frame.

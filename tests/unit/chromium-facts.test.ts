@@ -790,6 +790,24 @@ describe("Top layer", () => {
     expect(getComputedStyle(important).borderTopWidth).toBe("0px");
   });
 
+  it("a page's ::backdrop rule paints behind a popover, and the shadow root's `:host::backdrop { display: none !important }` removes it", async () => {
+    const style = mount(`<style>::backdrop { background: #000; }</style>`);
+    expect(style.isConnected).toBe(true);
+    const probe = mount(`<div style="position:fixed; left:300px; top:300px; width:20px; height:20px"></div>`);
+    const plain = shadowStrip(document.body, ":host { all: initial !important; }");
+    plain.popover = "manual";
+    plain.showPopover();
+    expect(await brightness(probe)).toBeLessThan(40);
+    plain.remove();
+    const guarded = shadowStrip(
+      document.body,
+      ":host { all: initial !important; } :host::backdrop { display: none !important; }",
+    );
+    guarded.popover = "manual";
+    guarded.showPopover();
+    expect(await brightness(probe)).toBeGreaterThan(250);
+  });
+
   it("a popover shown later paints over an earlier one; hiding and showing the earlier one again raises it", () => {
     const first = mount(`<div popover="manual" style="${STRIP}"></div>`);
     const second = mount(`<div popover="manual" style="${STRIP}"></div>`);
@@ -838,6 +856,53 @@ describe("Top layer", () => {
     await new Promise((r) => setTimeout(r, 50));
     expect(seen).toEqual(["div:open", "dialog:open"]);
     dialog.close();
+  });
+
+  it("a toggle event does not leave a shadow root: a document capture listener never sees a popover opened inside one", async () => {
+    const seen: EventTarget[] = [];
+    const on = (e: Event) => seen.push(e.target!);
+    document.addEventListener("toggle", on, true);
+    cleanup.push(() => document.removeEventListener("toggle", on, true));
+    const outer = mount(`<div></div>`);
+    outer.attachShadow({ mode: "open" }).innerHTML = `<div popover="manual"></div>`;
+    (outer.shadowRoot!.firstElementChild as HTMLElement).showPopover();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(seen).toEqual([]);
+  });
+
+  it("taking a popover out of the top layer and showing it again in the same task leaves focus on the input in its shadow tree", async () => {
+    const before = mount<HTMLInputElement>(`<input>`);
+    before.focus();
+    const host = shadowStrip(document.body, ":host { all: initial !important; }");
+    host.popover = "manual";
+    host.showPopover();
+    const input = host.shadowRoot!.querySelector("input")!;
+    input.focus();
+    host.removeAttribute("popover");
+    host.popover = "manual";
+    host.showPopover();
+    for (let i = 0; i < 2; i++) await new Promise(requestAnimationFrame);
+    expect(host.shadowRoot!.activeElement).toBe(input);
+    expect(document.activeElement).toBe(host);
+  });
+
+  it("moving a showing popover to another parent hides it", () => {
+    const popover = mount(`<div popover="manual"></div>`);
+    const elsewhere = mount(`<div></div>`);
+    popover.showPopover();
+    elsewhere.appendChild(popover);
+    expect(popover.matches(":popover-open")).toBe(false);
+  });
+
+  it("`:host { all: initial !important }` beats the host's inline display, and a `:host([hidden])` rule beside it hides the host", () => {
+    const host = shadowStrip(
+      document.body,
+      ":host { all: initial !important; } :host([hidden]) { display: none !important; }",
+    );
+    host.style.display = "none";
+    expect(getComputedStyle(host).display).toBe("inline");
+    host.hidden = true;
+    expect(getComputedStyle(host).display).toBe("none");
   });
 
   it(":modal matches a dialog shown modally, :popover-open an open popover, and neither a dialog shown with show()", () => {
