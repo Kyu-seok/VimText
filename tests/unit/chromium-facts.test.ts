@@ -399,6 +399,33 @@ describe("Focus", () => {
     el.focus();
     expect(seen).toEqual({ collapsed: true, inHost: true, offset: 0 });
   });
+
+  /** A wrapper holding a focused input, inside an open shadow root, as the command line's prompt is. */
+  function promptInShadow(): { wrapper: HTMLElement; input: HTMLInputElement; root: ShadowRoot } {
+    const el = document.createElement("x-prompt");
+    const root = el.attachShadow({ mode: "open" });
+    root.innerHTML = `<div><input></div>`;
+    document.body.appendChild(el);
+    cleanup.push(() => el.remove());
+    const input = root.querySelector("input")!;
+    input.focus();
+    return { wrapper: root.querySelector("div")!, input, root };
+  }
+
+  it("with focus on an input in an open shadow root, document.activeElement is the shadow host, which the input's wrapper does not contain; the shadow root's own activeElement is the input (#90)", () => {
+    const { wrapper, input, root } = promptInShadow();
+    expect(document.activeElement).toBe(root.host);
+    expect(wrapper.contains(document.activeElement)).toBe(false);
+    expect(root.activeElement).toBe(input);
+    expect(wrapper.contains(root.activeElement)).toBe(true);
+  });
+
+  it("replacing the wrapper of a focused input leaves focus on <body> (#90)", () => {
+    const { wrapper, root } = promptInShadow();
+    wrapper.replaceWith(document.createElement("div"));
+    expect(root.activeElement).toBe(null);
+    expect(document.activeElement).toBe(document.body);
+  });
 });
 
 describe("A line break offered as Shift+Enter", () => {

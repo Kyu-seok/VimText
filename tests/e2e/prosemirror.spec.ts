@@ -178,3 +178,20 @@ test("Esc in the command line leaves the Cursor where it was (#88)", async ({ pa
   await page.keyboard.press("x");
   await expect.poll(async () => (await modelText(page))[0]).toBe("the uick brown fox");
 });
+
+// A notice that replaces the command line gives the editor focus back (#90).
+for (const { line, notice } of [
+  { line: "/zzz", notice: "No match found" },
+  { line: ":w", notice: "nothing to write" },
+]) {
+  test(`Enter on ${line} shows its notice and leaves the Cursor where it was (#90)`, async ({ page }) => {
+    await page.keyboard.press("w");
+    await page.keyboard.press(line[0]!);
+    await expect.poll(() => statusText(page)).toContain(line[0]!);
+    await page.keyboard.type(line.slice(1));
+    await page.keyboard.press("Enter");
+    await expect.poll(() => statusText(page)).toContain(notice);
+    await page.keyboard.press("x");
+    await expect.poll(async () => (await modelText(page))[0]).toBe("the uick brown fox");
+  });
+}

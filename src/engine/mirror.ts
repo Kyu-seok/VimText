@@ -128,12 +128,33 @@ export class Mirror {
     // and must record Insert-mode Backspace/Delete from the real Field.
     cm.focus = () => opts.focus();
     cm.getInputField = () => opts.inputField;
+    this.focusAfterNotice();
 
     this.noteAtomReads();
 
     cm.state.statusbar = opts.statusbar;
     this.plugin.updateStatus();
     this.applyStyle(opts.style);
+  }
+
+  /**
+   * A notice that replaces the command line hands focus back, as the adapter
+   * means to: its `showDialog` looks for `document.activeElement` inside the
+   * prompt, and the prompt's input is in the Status Line's shadow root, where
+   * the document's active element is the host. So the check is made here, in
+   * the prompt's own tree (docs/engine-seams.md, "Focus"; #90).
+   */
+  private focusAfterNotice(): void {
+    const cm = this.cm;
+    const openNotification = cm.openNotification.bind(cm);
+    cm.openNotification = (template, options) => {
+      const prompt = cm.state.dialog;
+      const tree = prompt?.getRootNode() as Document | ShadowRoot | undefined;
+      const held = !!prompt && prompt.contains(tree?.activeElement ?? null);
+      const close = openNotification(template, options);
+      if (held) cm.focus();
+      return close;
+    };
   }
 
   /**

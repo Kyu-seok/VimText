@@ -678,10 +678,10 @@ export class ContentEditableField implements Field {
 
   /**
    * Selects the caret again after selecting it in a blurred host focused the
-   * host (`:wq`: the notice took the command line's place without
-   * re-focusing the Field): the focus event fired during that call, and the
-   * Session's focus handler drew the Normal cursor over the caret
-   * (docs/engine-seams.md, "Leaving a contenteditable Field").
+   * host: the focus event fired during that call, and the Session's focus
+   * handler drew the Normal cursor over the caret (docs/engine-seams.md,
+   * "Leaving a contenteditable Field"). `:wq` came here until its notice
+   * gave the Field focus back (#90).
    */
   private selectCaretOverFocusRender(caret: number): void {
     this.selectCaret(caret);
