@@ -30,7 +30,7 @@ export function summarize(report, now = Date.now()) {
     const took = ((duration ?? 0) / 60_000).toFixed(1);
     const workers = report.config?.workers;
     lines.push(
-      `run started ${ago} min ago (${startTime}), took ${took} min${workers ? ` on ${workers} workers` : ""}`,
+      `run started ${ago} min ago (${startTime}), took ${took} min${workers ? ` on ${workers} worker${workers === 1 ? "" : "s"}` : ""}`,
     );
   }
   lines.push(`${expected} passed, ${unexpected} failed, ${flaky} flaky, ${skipped} skipped`);

@@ -77,4 +77,8 @@ it("says first when the run it reports started, how long it took and on how many
     "run started 15 min ago (2026-11-20T12:20:42.738Z), took 2.1 min on 4 workers",
     "235 passed, 0 failed, 0 flaky, 0 skipped",
   ]);
+  // The gate's run: one worker.
+  expect(summarize({ ...report, config: { workers: 1 } }, Date.parse("2026-11-20T12:36:10Z"))[0]).toBe(
+    "run started 15 min ago (2026-11-20T12:20:42.738Z), took 2.1 min on 1 worker",
+  );
 });
