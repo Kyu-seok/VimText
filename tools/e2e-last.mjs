@@ -3,21 +3,37 @@
 // line (browser launch time, load average and free memory, tests/e2e/extension.ts).
 //
 //   npm run e2e:last
+//   node tools/e2e-last.mjs --clear    (the gate's first step: removes the report)
 //
 // The run's terminal output is often cut (`| tail`) or scrolled away; the JSON reporter in
 // playwright.config.ts writes test-results/last-run-report.json at the end of every run, the
 // gate's, `npm run test:e2e:editors`' and pre-push's included. Retro of #77: one repeated
 // editor run had 12 of 215 tests not passing under a load average near 50, and the two test
 // names its last three lines showed were all that was kept.
-import { existsSync, readFileSync } from "node:fs";
+//
+// The first line says which run the report is of: when it started, how long it took and on
+// how many workers (the gate runs one, the editors' repeated run four). Implementing #88, a
+// gate that stopped at the unit tests left the report of the `red-on-main` run before it, and
+// its 13 failures read as the gate's. So the gate removes the report before it starts: one
+// that never reaches e2e leaves none.
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const REPORT = "test-results/last-run-report.json";
 
-/** The lines to print for a Playwright JSON report. */
-export function summarize(report) {
-  const { expected = 0, unexpected = 0, flaky = 0, skipped = 0 } = report.stats ?? {};
-  const lines = [`${expected} passed, ${unexpected} failed, ${flaky} flaky, ${skipped} skipped`];
+/** The lines to print for a Playwright JSON report, read at `now` (ms since the epoch). */
+export function summarize(report, now = Date.now()) {
+  const { expected = 0, unexpected = 0, flaky = 0, skipped = 0, startTime, duration } = report.stats ?? {};
+  const lines = [];
+  if (startTime) {
+    const ago = Math.round((now - Date.parse(startTime)) / 60_000);
+    const took = ((duration ?? 0) / 60_000).toFixed(1);
+    const workers = report.config?.workers;
+    lines.push(
+      `run started ${ago} min ago (${startTime}), took ${took} min${workers ? ` on ${workers} workers` : ""}`,
+    );
+  }
+  lines.push(`${expected} passed, ${unexpected} failed, ${flaky} flaky, ${skipped} skipped`);
   const visit = (suite, file) => {
     for (const spec of suite.specs ?? []) {
       for (const test of spec.tests ?? []) {
@@ -42,6 +58,10 @@ export function summarize(report) {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  if (process.argv.includes("--clear")) {
+    rmSync(REPORT, { force: true });
+    process.exit(0);
+  }
   if (!existsSync(REPORT)) {
     console.error(`e2e:last: no ${REPORT}; run an e2e command first`);
     process.exit(2);
