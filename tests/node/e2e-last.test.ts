@@ -60,3 +60,25 @@ it("names a failed and a flaky test with each attempt's error and machine line, 
     "  attempt 2: passed",
   ]);
 });
+
+it("says first when the run it reports started, how long it took and on how many workers", () => {
+  const report = {
+    config: { workers: 4 },
+    stats: {
+      startTime: "2026-11-20T12:20:42.738Z",
+      duration: 125652.4,
+      expected: 235,
+      unexpected: 0,
+      flaky: 0,
+      skipped: 0,
+    },
+  };
+  expect(summarize(report, Date.parse("2026-11-20T12:36:10Z"))).toEqual([
+    "run started 15 min ago (2026-11-20T12:20:42.738Z), took 2.1 min on 4 workers",
+    "235 passed, 0 failed, 0 flaky, 0 skipped",
+  ]);
+  // The gate's run: one worker.
+  expect(summarize({ ...report, config: { workers: 1 } }, Date.parse("2026-11-20T12:36:10Z"))[0]).toBe(
+    "run started 15 min ago (2026-11-20T12:20:42.738Z), took 2.1 min on 1 worker",
+  );
+});
