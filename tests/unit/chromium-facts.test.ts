@@ -383,6 +383,24 @@ describe("Leaving a contenteditable Field", () => {
   });
 });
 
+describe("Focus", () => {
+  it("the focus event of focus() on a blurred host fires during the call, the caret already at the host's start (#88)", () => {
+    const el = host("<p>hello</p>");
+    caretAt(el.querySelector("p")!.firstChild!, 3);
+    const input = document.createElement("input");
+    document.body.appendChild(input);
+    cleanup.push(() => input.remove());
+    input.focus();
+    let seen: { collapsed: boolean; inHost: boolean; offset: number } | null = null;
+    el.addEventListener("focusin", () => {
+      const sel = getSelection()!;
+      seen = { collapsed: sel.isCollapsed, inHost: el.contains(sel.anchorNode), offset: sel.anchorOffset };
+    });
+    el.focus();
+    expect(seen).toEqual({ collapsed: true, inHost: true, offset: 0 });
+  });
+});
+
 describe("A line break offered as Shift+Enter", () => {
   /** A focused block holding `text` under `white-space: break-spaces`, as a Notion block is. */
   function breakSpaces(text: string): HTMLElement {

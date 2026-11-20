@@ -20,7 +20,6 @@ const fields = [
     name: "textarea",
     url: "/textarea.html",
     selector: "#ta",
-    focused: (page: Page) => page.evaluate(() => document.activeElement?.id === "ta"),
     firstLine: async (page: Page) => (await page.locator("#ta").inputValue()).split("\n")[0],
     afterX: "he quick brown fox",
     afterWX: "the uick brown fox",
@@ -30,7 +29,6 @@ const fields = [
     name: "Single-line Field",
     url: "/single-line.html",
     selector: "#in",
-    focused: (page: Page) => page.evaluate(() => document.activeElement?.id === "in"),
     firstLine: (page: Page) => page.locator("#in").inputValue(),
     afterX: "ello world",
     afterWX: "hello orld",
@@ -40,13 +38,17 @@ const fields = [
     name: "contenteditable",
     url: "/contenteditable.html",
     selector: "#ce",
-    focused: (page: Page) => page.evaluate(() => document.activeElement?.id === "ce"),
     firstLine: async (page: Page) => (await blockTexts(page, "#ce"))[0],
     afterX: "he quick brown fox",
     afterWX: "the uick brown fox",
     afterVeX: "the  brown fox",
   },
 ];
+
+/** Whether the Field itself has focus again, not the command line or nothing. */
+function focused(page: Page, selector: string): Promise<boolean> {
+  return page.locator(selector).evaluate((el) => document.activeElement === el);
+}
 
 for (const field of fields) {
   for (const prompt of [":", "/", "?"]) {
@@ -103,7 +105,7 @@ for (const field of fields) {
       await page.keyboard.press(prompt);
       await expect.poll(() => statusText(page)).toContain(prompt);
       for (const key of closing.keys.slice(1)) await page.keyboard.press(key);
-      await expect.poll(() => field.focused(page)).toBe(true);
+      await expect.poll(() => focused(page, field.selector)).toBe(true);
       // `x` deletes the character `w` moved to, the second word's first.
       await page.keyboard.press("x");
       await expect.poll(() => field.firstLine(page)).toBe(field.afterWX);
@@ -127,9 +129,33 @@ for (const field of fields) {
     for (const key of ["w", "v", "e", ":"]) await page.keyboard.press(key);
     await expect.poll(() => statusText(page)).toContain(":");
     await page.keyboard.press("Escape");
-    await expect.poll(() => field.focused(page)).toBe(true);
+    await expect.poll(() => focused(page, field.selector)).toBe(true);
     // `x` deletes the second word, which `ve` selected.
     await page.keyboard.press("x");
     await expect.poll(() => field.firstLine(page)).toBe(field.afterVeX);
   });
 }
+
+/**
+ * The page may change the Field while the command line is open. The text is
+ * the Field's (CODING_STANDARDS rule 1), but the caret the engine's focus
+ * leaves at the host's start is still not the person's: the Cursor stays on
+ * its character (#88).
+ */
+test("contenteditable: Esc in the : command line leaves the Cursor where it was when the page changed the text meanwhile", async ({
+  page,
+}) => {
+  await page.goto("/contenteditable.html");
+  await ready(page);
+  await activateAtStart(page, "#ce");
+  await page.keyboard.press("w");
+  await page.keyboard.press(":");
+  await expect.poll(() => statusText(page)).toContain(":");
+  await page.locator("#ce").evaluate((el) => (el.lastElementChild!.textContent += "!"));
+  await page.keyboard.press("Escape");
+  await expect.poll(() => statusText(page)).toContain("NORMAL");
+  await page.keyboard.press("x");
+  await expect.poll(async () => (await blockTexts(page, "#ce"))[0]).toBe("the uick brown fox");
+  // The page's change stands.
+  expect((await blockTexts(page, "#ce")).at(-1)).toMatch(/!$/);
+});
