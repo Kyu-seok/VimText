@@ -31,6 +31,24 @@ function select(a: Node, ao: number, b: Node, bo: number): void {
   getSelection()!.setBaseAndExtent(a, ao, b, bo);
 }
 
+/** The mean brightness (0–255) of what Chromium painted in `el`'s box, read from a screenshot. */
+async function brightness(el: Element): Promise<number> {
+  for (let i = 0; i < 2; i++) await new Promise(requestAnimationFrame);
+  const base64 = await page.screenshot({ element: el, save: false });
+  const img = new Image();
+  img.src = `data:image/png;base64,${base64}`;
+  await img.decode();
+  const canvas = document.createElement("canvas");
+  canvas.width = img.width;
+  canvas.height = img.height;
+  const ctx = canvas.getContext("2d")!;
+  ctx.drawImage(img, 0, 0);
+  const data = ctx.getImageData(0, 0, img.width, img.height).data;
+  let sum = 0;
+  for (let i = 0; i < data.length; i += 4) sum += (data[i]! + data[i + 1]! + data[i + 2]!) / 3;
+  return sum / (data.length / 4);
+}
+
 describe("Editing commands and events", () => {
   it("an editing command fires input with its inputType and no beforeinput", () => {
     const el = host("<p>hello</p>");
@@ -577,20 +595,7 @@ describe("Inverting the drawn Cursor", () => {
       document.body.style.background = "";
       document.documentElement.style.background = "";
     });
-    for (let i = 0; i < 2; i++) await new Promise(requestAnimationFrame);
-    const base64 = await page.screenshot({ element: box, save: false });
-    const img = new Image();
-    img.src = `data:image/png;base64,${base64}`;
-    await img.decode();
-    const canvas = document.createElement("canvas");
-    canvas.width = img.width;
-    canvas.height = img.height;
-    const ctx = canvas.getContext("2d")!;
-    ctx.drawImage(img, 0, 0);
-    const data = ctx.getImageData(0, 0, img.width, img.height).data;
-    let sum = 0;
-    for (let i = 0; i < data.length; i += 4) sum += (data[i]! + data[i + 1]! + data[i + 2]!) / 3;
-    return sum / (data.length / 4);
+    return brightness(box);
   }
 
   /** A quarter of the box is the black glyph: shown as is, the box is mostly white; inverted, mostly black. */
@@ -666,5 +671,183 @@ describe("A blur the page makes in answer to a key", () => {
       trusted: false,
       active: document.body,
     });
+  });
+});
+
+describe("Top layer", () => {
+  /** `html` appended to the body, removed after the test. */
+  function mount<T extends HTMLElement>(html: string): T {
+    const box = document.createElement("div");
+    box.innerHTML = html;
+    const el = box.firstElementChild as T;
+    document.body.appendChild(el);
+    cleanup.push(() => el.remove());
+    return el;
+  }
+
+  const DIALOG = `<dialog style="position:fixed; left:0; top:0; margin:0; width:300px; height:200px; padding:0; border:0"><input id="in-dialog"></dialog>`;
+  const STRIP = `position:fixed; left:20px; top:100px; width:100px; height:20px; margin:0; padding:0; border:0; background:#000`;
+
+  /** A host whose shadow root holds a fixed strip and an input, as the Status Line host does. */
+  function shadowStrip(parent: Element, hostCss: string): HTMLElement {
+    const el = document.createElement("x-strip");
+    el.attachShadow({ mode: "open" }).innerHTML =
+      `<style>${hostCss}</style><div style="${STRIP}"><input style="width:50px"></div>`;
+    parent.appendChild(el);
+    cleanup.push(() => el.remove());
+    return el;
+  }
+
+  const topmost = (): Element | null => document.elementFromPoint(70, 110);
+
+  it("a fixed element with the maximum z-index paints under a modal dialog, and a manual popover shown after the dialog paints over it", async () => {
+    const dialog = mount<HTMLDialogElement>(DIALOG);
+    dialog.style.background = "#fff";
+    const fixed = mount(`<div style="${STRIP}; z-index:2147483647"></div>`);
+    dialog.showModal();
+    expect(await brightness(fixed)).toBeGreaterThan(250);
+    const popover = mount(`<div popover="manual" style="${STRIP}"></div>`);
+    popover.showPopover();
+    expect(await brightness(popover)).toBeLessThan(40);
+  });
+
+  it("hit testing skips that popover, inert outside the dialog, and finds one inside the dialog", () => {
+    const dialog = mount<HTMLDialogElement>(DIALOG);
+    dialog.showModal();
+    const outside = mount(`<div popover="manual" style="${STRIP}"></div>`);
+    outside.showPopover();
+    expect(topmost()).toBe(dialog);
+    dialog.appendChild(outside);
+    outside.showPopover();
+    expect(topmost()).toBe(outside);
+  });
+
+  it("a popover outside a modal dialog is inert: its input cannot be focused; inside the dialog it can", () => {
+    const dialog = mount<HTMLDialogElement>(DIALOG);
+    dialog.showModal();
+    const outside = mount(`<div popover="manual" style="${STRIP}"><input></div>`);
+    outside.showPopover();
+    outside.querySelector("input")!.focus();
+    expect(document.activeElement).not.toBe(outside.querySelector("input"));
+
+    const inside = document.createElement("div");
+    inside.popover = "manual";
+    inside.style.cssText = STRIP;
+    inside.innerHTML = "<input>";
+    dialog.appendChild(inside);
+    inside.showPopover();
+    inside.querySelector("input")!.focus();
+    expect(document.activeElement).toBe(inside.querySelector("input"));
+  });
+
+  it("a popover inside a transformed, clipping dialog is laid out against the viewport and is not clipped", () => {
+    const dialog = mount<HTMLDialogElement>(DIALOG);
+    dialog.style.transform = "translate(400px, 300px)";
+    dialog.style.overflow = "hidden";
+    dialog.showModal();
+    const host = shadowStrip(dialog, ":host { all: initial; }");
+    host.popover = "manual";
+    host.showPopover();
+    const strip = host.shadowRoot!.querySelector("div")!;
+    expect(strip.getBoundingClientRect().left).toBe(20);
+    expect(strip.getBoundingClientRect().top).toBe(100);
+    expect(topmost()).toBe(host);
+  });
+
+  it("without the popover, a fixed child of a transformed dialog is laid out against the dialog", () => {
+    const dialog = mount<HTMLDialogElement>(DIALOG);
+    dialog.style.transform = "translate(400px, 300px)";
+    dialog.showModal();
+    const host = shadowStrip(dialog, ":host { all: initial; }");
+    expect(host.shadowRoot!.querySelector("div")!.getBoundingClientRect().left).toBe(420);
+  });
+
+  it("a shadow root's `:host { all: initial }` beats the browser's popover box (border, padding, background, centring)", () => {
+    const host = shadowStrip(document.body, ":host { all: initial; }");
+    host.popover = "manual";
+    host.showPopover();
+    const cs = getComputedStyle(host);
+    expect([cs.borderTopWidth, cs.paddingTop, cs.backgroundColor, cs.overflow]).toEqual([
+      "0px",
+      "0px",
+      "rgba(0, 0, 0, 0)",
+      "visible",
+    ]);
+    expect(host.getBoundingClientRect().width).toBe(0);
+  });
+
+  it("a page rule on [popover] beats `:host { all: initial }` and loses to `:host { all: initial !important }`", () => {
+    const style = mount(`<style>[popover] { padding: 12px; border: 3px solid red; }</style>`);
+    expect(style.isConnected).toBe(true);
+    const plain = shadowStrip(document.body, ":host { all: initial; }");
+    plain.popover = "manual";
+    plain.showPopover();
+    expect(getComputedStyle(plain).paddingTop).toBe("12px");
+    const important = shadowStrip(document.body, ":host { all: initial !important; }");
+    important.popover = "manual";
+    important.showPopover();
+    expect(getComputedStyle(important).paddingTop).toBe("0px");
+    expect(getComputedStyle(important).borderTopWidth).toBe("0px");
+  });
+
+  it("a popover shown later paints over an earlier one; hiding and showing the earlier one again raises it", () => {
+    const first = mount(`<div popover="manual" style="${STRIP}"></div>`);
+    const second = mount(`<div popover="manual" style="${STRIP}"></div>`);
+    first.showPopover();
+    second.showPopover();
+    expect(topmost()).toBe(second);
+    first.hidePopover();
+    first.showPopover();
+    expect(topmost()).toBe(first);
+  });
+
+  it("showing a manual popover leaves an open auto popover open", () => {
+    const auto = mount(`<div popover="auto"></div>`);
+    const manual = mount(`<div popover="manual"></div>`);
+    auto.showPopover();
+    manual.showPopover();
+    expect(auto.matches(":popover-open")).toBe(true);
+  });
+
+  it("a click on a manual popover closes an open auto popover it is outside of, and not one it is inside", async () => {
+    const auto = mount(`<div popover="auto" style="${STRIP}; top:10px"></div>`);
+    const outside = mount(`<div popover="manual" style="${STRIP}; top:60px"></div>`);
+    auto.showPopover();
+    outside.showPopover();
+    const inside = document.createElement("div");
+    inside.popover = "manual";
+    inside.style.cssText = `${STRIP}; top:110px`;
+    auto.appendChild(inside);
+    inside.showPopover();
+    await userEvent.click(inside);
+    expect(auto.matches(":popover-open")).toBe(true);
+    await userEvent.click(outside);
+    expect(auto.matches(":popover-open")).toBe(false);
+  });
+
+  it("a popover opening and a dialog shown modally each fire a toggle event a document capture listener sees, in a later task", async () => {
+    const seen: string[] = [];
+    const on = (e: Event) => seen.push(`${(e.target as Element).localName}:${(e as ToggleEvent).newState}`);
+    document.addEventListener("toggle", on, true);
+    cleanup.push(() => document.removeEventListener("toggle", on, true));
+    const popover = mount(`<div popover="manual"></div>`);
+    const dialog = mount<HTMLDialogElement>(DIALOG);
+    popover.showPopover();
+    dialog.showModal();
+    expect(seen).toEqual([]);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(seen).toEqual(["div:open", "dialog:open"]);
+    dialog.close();
+  });
+
+  it(":modal matches a dialog shown modally, :popover-open an open popover, and neither a dialog shown with show()", () => {
+    const modal = mount<HTMLDialogElement>(DIALOG);
+    const plain = mount<HTMLDialogElement>(DIALOG);
+    const popover = mount(`<div popover="auto"></div>`);
+    modal.showModal();
+    plain.show();
+    popover.showPopover();
+    const inTopLayer = (el: Element) => el.matches(":modal, :popover-open, :fullscreen");
+    expect([inTopLayer(modal), inTopLayer(plain), inTopLayer(popover)]).toEqual([true, false, true]);
   });
 });

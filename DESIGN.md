@@ -126,7 +126,16 @@ answer) gets the strip pinned to the bottom edge of the viewport, spanning the F
 horizontal extent, for as long as the Field is on screen (M4, every Field type). Once the Field's
 bottom edge is in view the strip rides up with it, just below the Field, rather than
 floating over the page beneath. A Field in an iframe gets its Status Line in that frame's
-own document, never in the top page (no cross-frame rendering).
+own document, never in the top page (no cross-frame rendering). A Field inside a top-layer
+element (a modal `<dialog>`, an open popover, a fullscreen element) gets its Status Line
+host, and with it the drawn Cursor, in the top layer too, where no z-index reaches (#77):
+the host becomes a child of that element, shown as a `popover="manual"` element, and is
+raised again when the page opens another top-layer element while the Field keeps focus.
+Inside the element because a modal dialog makes everything outside it inert, the command
+line included. A Field outside the top layer keeps its host a plain child of the root
+element. Not seen, so not raised over: a popover opened inside a shadow root (its `toggle`
+event does not leave the root), or anything opened while the command line has focus,
+until the Field is focused again. Fullscreen is covered by the same rule and has no test.
 
 **Frames.** The content script runs in every frame; each frame owns its Fields, Sessions
 and Status Lines, and a Field is Activated only by keys and focus inside its own frame.

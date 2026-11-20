@@ -4,7 +4,8 @@ import { STATUS_HOST_TAG } from "./statusHost";
 import { DRAWN_CURSOR_CSS, DrawnCursor } from "./DrawnCursor";
 
 const CSS = `
-:host { all: initial; }
+:host { all: initial !important; }
+:host([hidden]) { display: none !important; }
 .host { position: fixed; z-index: 2147483647; pointer-events: none; }
 .bar {
   pointer-events: auto;
@@ -28,6 +29,21 @@ const CSS = `
 }
 .mirror .cm-editor { outline: none; }
 ${DRAWN_CURSOR_CSS}`;
+
+const IN_TOP_LAYER = ":modal, :popover-open, :fullscreen";
+
+/** `el`'s nearest inclusive ancestor in the top layer, through slots and shadow roots. */
+function topLayerAncestor(el: Element | null): Element | null {
+  for (let n = el; n; n = flatParent(n)) if (n.matches(IN_TOP_LAYER)) return n;
+  return null;
+}
+
+function flatParent(el: Element): Element | null {
+  if (el.assignedSlot) return el.assignedSlot;
+  if (el.parentElement) return el.parentElement;
+  const root = el.getRootNode();
+  return root instanceof ShadowRoot ? root.host : null;
+}
 
 /**
  * The strip VimText shows at the bottom edge of an activated Field: mode,
@@ -67,8 +83,9 @@ export class StatusLine {
     for (const type of ["keydown", "keypress", "keyup"]) {
       this.host.addEventListener(type, (e) => e.stopPropagation());
     }
-    (document.documentElement ?? document.body).appendChild(this.host);
     this.hide();
+    this.place();
+    document.addEventListener("toggle", this.onToggle, true);
     window.addEventListener("scroll", this.reposition, { capture: true, passive: true });
     window.addEventListener("resize", this.reposition, { passive: true });
   }
@@ -79,14 +96,54 @@ export class StatusLine {
 
   show(): void {
     this.visible = true;
-    this.host.style.display = "";
+    this.host.hidden = false;
+    this.place();
     this.reposition();
   }
 
   hide(): void {
     this.visible = false;
-    this.host.style.display = "none";
+    this.host.hidden = true;
+    this.lower();
   }
+
+  /**
+   * Puts the host where it paints over its Field (DESIGN.md "Status Line",
+   * docs/engine-seams.md "Top layer"; #77). No z-index paints over the top
+   * layer, so for a Field inside a top-layer element (a modal dialog, an open
+   * popover, a fullscreen element) the host is a manual popover, shown after
+   * that element and so above it. It is a child of that element too: a modal
+   * dialog makes everything outside it inert, the command line included.
+   * Anywhere else the host is a plain child of the root element.
+   */
+  private place(): void {
+    const el = this.field.element;
+    const layer = topLayerAncestor(flatParent(el));
+    const parent = layer ?? document.documentElement ?? document.body;
+    // Moving a showing popover hides it.
+    if (this.host.parentNode !== parent) parent.appendChild(this.host);
+    if (!layer && !el.matches(IN_TOP_LAYER)) return this.lower();
+    if (!this.visible || this.host.matches(":popover-open")) return;
+    this.host.popover = "manual";
+    this.host.showPopover();
+  }
+
+  /** Takes the host out of the top layer; the next `place` shows it over whatever opened meanwhile. */
+  private lower(): void {
+    this.host.removeAttribute("popover");
+  }
+
+  /**
+   * The page opened a top-layer element, over the host if the host was there
+   * already: raise it again. Not while the command line has focus, which
+   * hiding the popover would hand back to the Field; the next `show` raises it.
+   */
+  private onToggle = (e: Event): void => {
+    if (!this.visible || e.target === this.host || (e as ToggleEvent).newState !== "open") return;
+    if (this.root.activeElement) return;
+    this.lower();
+    this.place();
+  };
 
   /**
    * Below the Field when the strip fits in the viewport there, above it
@@ -116,6 +173,7 @@ export class StatusLine {
   destroy(): void {
     window.removeEventListener("scroll", this.reposition, { capture: true });
     window.removeEventListener("resize", this.reposition);
+    document.removeEventListener("toggle", this.onToggle, true);
     this.cursor.destroy();
     this.host.remove();
   }

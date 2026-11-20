@@ -9,12 +9,12 @@
 export function statusText(): string {
   const host = document.querySelector("vimtext-status") as HTMLElement | null;
   const bar = host?.shadowRoot?.querySelector(".bar");
-  return bar && host!.style.display !== "none" ? (bar.textContent ?? "") : "";
+  return bar && !host!.hidden ? (bar.textContent ?? "") : "";
 }
 
 /** Each Status Line on the page, whether it is shown: a page with several Fields (a Notion page's blocks) has one per Session. */
 export function shownStatusBars(): boolean[] {
-  return [...document.querySelectorAll<HTMLElement>("vimtext-status")].map((h) => h.style.display !== "none");
+  return [...document.querySelectorAll<HTMLElement>("vimtext-status")].map((h) => !h.hidden);
 }
 
 export function hostCount(): number {

@@ -88,7 +88,7 @@ export function statusText(page: Page | Frame): Promise<string> {
   return page.evaluate(() => {
     const host = document.querySelector("vimtext-status") as HTMLElement | null;
     const bar = host?.shadowRoot?.querySelector(".bar") as HTMLElement | null;
-    return bar && host!.style.display !== "none" ? (bar.textContent ?? "") : "";
+    return bar && !host!.hidden ? (bar.textContent ?? "") : "";
   });
 }
 
