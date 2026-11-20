@@ -1,4 +1,4 @@
-import { test, expect, ready, activateAtStart, modelText } from "./extension";
+import { test, expect, ready, activateAtStart, modelText, statusText } from "./extension";
 import type { Page } from "@playwright/test";
 
 /**
@@ -275,4 +275,14 @@ test("Slate cancels a synthetic deleteContent and does nothing; deleteContentBac
   expect((await modelText(page))[4]).toBe("last line");
   expect(await offer("deleteContentBackward")).toBe(true);
   await expect.poll(async () => (await modelText(page))[4]).toBe("line");
+});
+
+test("Esc in the command line leaves the Cursor where it was (#88)", async ({ page }) => {
+  await page.keyboard.press("w");
+  await page.keyboard.press(":");
+  await expect.poll(() => statusText(page)).toContain(":");
+  await page.keyboard.press("Escape");
+  await expect.poll(() => statusText(page)).toContain("NORMAL");
+  await page.keyboard.press("x");
+  await expect.poll(async () => (await modelText(page))[0]).toBe("the uick brown fox");
 });

@@ -168,3 +168,13 @@ test(":q leaves ProseMirror with nothing highlighted and its document unchanged;
   await page.keyboard.type("x");
   await expect.poll(async () => (await pmDoc(page))[0]).toBe("te <b>quick brown</b> fox");
 });
+
+test("Esc in the command line leaves the Cursor where it was (#88)", async ({ page }) => {
+  await page.keyboard.press("w");
+  await page.keyboard.press(":");
+  await expect.poll(() => statusText(page)).toContain(":");
+  await page.keyboard.press("Escape");
+  await expect.poll(() => statusText(page)).toContain("NORMAL");
+  await page.keyboard.press("x");
+  await expect.poll(async () => (await modelText(page))[0]).toBe("the uick brown fox");
+});

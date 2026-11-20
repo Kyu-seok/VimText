@@ -102,3 +102,17 @@ test(":q leaves the host with nothing highlighted inside the shadow tree; refocu
   await page.keyboard.type("x");
   await expect.poll(async () => (await blockTexts(page, "#ce"))[0]).toBe("te quick brown fox");
 });
+
+test("Esc in the command line leaves the Cursor where it was inside the shadow tree (#88)", async ({
+  page,
+}) => {
+  await activateAtStart(page, "#ce");
+  await page.keyboard.press("w");
+  await page.keyboard.press(":");
+  await expect.poll(() => statusText(page)).toContain(":");
+  await page.keyboard.press("Escape");
+  await expect.poll(() => statusText(page)).toContain("NORMAL");
+  await expect.poll(() => cursorChar(page, "#editor")).toBe("q");
+  await page.keyboard.press("x");
+  await expect.poll(async () => (await blockTexts(page, "#ce"))[0]).toBe("the uick brown fox");
+});

@@ -167,6 +167,11 @@ export class Session {
   private pendingWrite: Promise<void> | null = null;
   /** A render came due while a write was pending: it runs, merged, once that write settles. */
   private renderDue = false;
+  /**
+   * True while the engine itself focuses the Field, as its dialog closes: the
+   * selection that focus leaves in the Field is not the person's doing (#88).
+   */
+  private focusingForEngine = false;
   private readonly onDialog: (() => void) | undefined;
   /** The enabled Plugins, bound on every Activation and told when the Field loses focus. */
   private readonly plugins: readonly Plugin[];
@@ -186,7 +191,7 @@ export class Session {
     this.mirror = new Mirror({
       container: this.status.mirrorContainer,
       inputField: field.element,
-      focus: () => field.focus(),
+      focus: () => this.focusForEngine(),
       doc: field.getValue(),
       cursor: sel.head,
       style: field.wrappingStyle(),
@@ -625,7 +630,12 @@ export class Session {
 
     if (text !== doc) {
       const { start, endOld, endNew } = diffText(doc, text);
-      const head = Math.min(sel.head, text.length);
+      const changes = view.state.changes({ from: start, to: endOld, insert: text.slice(start, endNew) });
+      const newDoc = changes.apply(view.state.doc);
+      // The Field's caret is where the cursor goes, unless the engine's own
+      // focus left it there: then the cursor stays on its character (#88).
+      const kept = this.focusingForEngine;
+      const head = kept ? changes.mapPos(view.state.selection.main.head) : Math.min(sel.head, text.length);
       let userEvent = provoked ? "input.type.compose" : "input.type";
       if (insert) {
         // A provoked rewrite joins the engine change that provoked it (a Ctrl-r
@@ -634,17 +644,25 @@ export class Session {
         userEvent = opensStep ? "input.type.compose.start" : "input.type.compose";
         this.firstInsertSync = false;
       }
-      const changes = view.state.changes({ from: start, to: endOld, insert: text.slice(start, endNew) });
-      const newDoc = changes.apply(view.state.doc);
       view.dispatch({
         changes,
-        selection: EditorSelection.cursor(insert ? head : clipToLine(newDoc, head)),
+        // A Visual selection kept through that focus maps through the change by itself.
+        selection:
+          kept && this.mirror.vim.visualMode
+            ? undefined
+            : EditorSelection.cursor(insert ? head : clipToLine(newDoc, head)),
         userEvent,
       });
       this.agreeOn(this.here());
       return;
     }
 
+    // The engine's own focus of the Field, its command line closing: focusing
+    // a contenteditable host whose selection was elsewhere (in the command
+    // line) leaves a caret at its start, which is not a caret move by the
+    // person (#88; docs/engine-seams.md, "Focus"). The mirror keeps its cursor
+    // and the render on focus lands it; a textarea's focus moves nothing.
+    if (this.focusingForEngine) return;
     const main = view.state.selection.main;
     if (insert) {
       if (main.head !== sel.head || main.anchor !== sel.anchor) {
@@ -929,6 +947,20 @@ export class Session {
     return text === before ? null : { text, cursor };
   }
 
+  /**
+   * The engine wants focus back on the Field (its dialog closed). The Field's
+   * focus event fires inside the call, so the Session's `onFocus` runs with
+   * `focusingForEngine` set.
+   */
+  private focusForEngine(): void {
+    this.focusingForEngine = true;
+    try {
+      this.field.focus();
+    } finally {
+      this.focusingForEngine = false;
+    }
+  }
+
   onFocus(): void {
     if (this.destroyed) return;
     this.mirror.applyStyle(this.field.wrappingStyle());
@@ -955,19 +987,19 @@ export class Session {
   /** `:q` — done editing here. */
   leave(): void {
     // The engine re-focuses the Field when its dialog closes; blur after that.
-    // That focus puts a contenteditable's caret at its start (its selection
-    // was in the command line), so the cursor is read now (#65).
+    // The caret the Field is left with is the cursor's place as the ex
+    // command ran (#65).
     const { anchor, head } = this.renderedSelection();
     const caret = Math.min(anchor, head);
     queueMicrotask(() => {
       if (this.destroyed) return;
       this.noticeOutlivesBlur = !!this.mirror.dialog;
       this.field.blur(caret);
-      // On a Field whose Normal selection is a caret (ADR 0009): the re-focus
-      // moved the mirror to the host's start, and an editor that puts its own
-      // selection back (ProseMirror) left the Field's caret elsewhere, so the
-      // render's caret read back as the old one. The mirror goes back to the
-      // caret the Field is left with, the render state with it, and a focus
+      // On a Field whose Normal selection is a caret (ADR 0009): an editor
+      // that puts its own selection back on the re-focus (ProseMirror) left
+      // the Field's caret elsewhere, so the render's caret read back as the
+      // old one. The mirror goes to the caret the Field is left with (from
+      // Visual, the selection's start), the render state with it, and a focus
       // that finds the caret there resumes on it, not at the start (#76;
       // tests/e2e/prosemirror.spec.ts, ":q leaves ProseMirror …").
       if (this.field.cursorBox) {
