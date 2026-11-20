@@ -1,6 +1,6 @@
 // Prints what the last Playwright run left behind: its counts, and for every test that
 // failed or passed only on a retry, each attempt's status, first error line and `machine`
-// line (browser launch time and load average, tests/e2e/extension.ts).
+// line (browser launch time, load average and free memory, tests/e2e/extension.ts).
 //
 //   npm run e2e:last
 //

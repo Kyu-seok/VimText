@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
-import { loadavg } from "node:os";
+import { freemem, loadavg } from "node:os";
 
 const dist = resolve("dist");
 
@@ -32,8 +32,9 @@ export const test = base.extend<{ context: BrowserContext; page: Page }>({
     // Printed with a failure: the launch counts against the test's timeout, and on a stalled
     // machine it alone took 20 to 30 s in every worker at once (#79, #83). A failure that
     // shows a slow launch or a load average far above the core count may be the machine's.
+    // Free memory beside it: the stalls of #83 came with about 40 MB free and most of the swap in use.
     await testInfo.attach("machine", {
-      body: `browser launch ${Date.now() - launching} ms, load average ${loadavg()[0]!.toFixed(1)}`,
+      body: `browser launch ${Date.now() - launching} ms, load average ${loadavg()[0]!.toFixed(1)}, free memory ${Math.round(freemem() / 2 ** 20)} MB`,
     });
     await use(context);
     await context.close();

@@ -397,6 +397,9 @@ it is outside the gate, so PNG churn never fails `npm run check`.
 - Engine deviation: a user mapping whose prefix is itself a bound key (e.g. `nnoremap <Space>x dd`
   while `<Space>` is `l`) never fires; the engine takes the full match at once instead of waiting
   like Vim's `timeoutlen`. Map from an unbound prefix such as `\` instead. Upstream behaviour, not ours.
+- Engine deviation: Esc (or `Ctrl-c`, `Ctrl-[`) in the `:` command line opened from Visual mode closes it
+  and leaves a textarea or input Field in Visual, where Vim returns to Normal. Press Esc once more.
+  Upstream behaviour, not ours (#81).
 - `:%s` ends with the engine's "Found N matches" notice rather than Vim's "N substitutions on M lines".
 - Linewise paste on a Single-line Field concatenates (`yyp` on `ab` gives `abab`): the newline
   is stripped as the input itself would.
