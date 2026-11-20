@@ -10,7 +10,8 @@ import type { Page } from "@playwright/test";
  * Coverage (CODING_STANDARDS rule 5): a textarea, a Single-line Field and a
  * contenteditable; the command line opened from Normal mode with each prompt.
  * Insert and Replace mode type `:` as text, so they never open it. From Visual
- * mode, Esc closes the `:'<,'>` prompt and the engine stays in Visual
+ * mode, Esc closes the `:'<,'>` prompt and the engine stays in Visual on a
+ * textarea or Single-line Field
  * (`processEx`'s `onPromptKeyDown`, which Vim does not do): an engine semantic,
  * upstream's (CODING_STANDARDS rule 3), so not asserted here.
  */
