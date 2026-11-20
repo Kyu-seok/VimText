@@ -1,4 +1,13 @@
-import { test, expect, statusText, ready, activateAtStart, blockTexts, hostCount } from "./extension";
+import {
+  test,
+  expect,
+  statusText,
+  ready,
+  activateAtStart,
+  blockTexts,
+  hostCount,
+  submitForNotice,
+} from "./extension";
 import type { Page } from "@playwright/test";
 
 /**
@@ -25,6 +34,7 @@ const fields = [
     afterWX: "the uick brown fox",
     afterVeX: "the  brown fox",
     afterVeExX: "the quic brown fox",
+    afterWInsert: "the Zquick brown fox",
   },
   {
     name: "Single-line Field",
@@ -35,6 +45,7 @@ const fields = [
     afterWX: "hello orld",
     afterVeX: "hello ",
     afterVeExX: "hello worl",
+    afterWInsert: "hello Zworld",
   },
   {
     name: "contenteditable",
@@ -45,6 +56,7 @@ const fields = [
     afterWX: "the uick brown fox",
     afterVeX: "the  brown fox",
     afterVeExX: "the quic brown fox",
+    afterWInsert: "the Zquick brown fox",
   },
 ];
 
@@ -126,9 +138,11 @@ for (const field of fields) {
  * Field and a contenteditable, for a search that finds nothing in each
  * direction, an unknown ex command, VimText's own `:w` notice, a `:s` and a
  * `:set` that fail, and a listing that waits for a key (`:registers`); Visual
- * mode below. A contenteditable inside an open shadow root and the four rich
- * editors: their own specs. `:wq` and `:x`, which leave the Field blurred
- * behind their notice: `textarea.spec.ts` and `contenteditable.spec.ts`.
+ * mode, and Insert and Replace mode through `Ctrl-o`, below. A contenteditable
+ * inside an open shadow root and the four rich editors: their own specs.
+ * `:wq` and `:x`, which leave the Field blurred behind their notice:
+ * `textarea.spec.ts`, `single-line.spec.ts` and `contenteditable.spec.ts`, and
+ * `:wq` in each rich editor's spec.
  */
 const notices = [
   { line: "/zzz", notice: "No match found" },
@@ -149,11 +163,7 @@ for (const field of fields) {
       await ready(page);
       await activateAtStart(page, field.selector);
       await page.keyboard.press("w");
-      await page.keyboard.press(line[0]!);
-      await expect.poll(() => statusText(page)).toContain(line[0]!);
-      await page.keyboard.type(line.slice(1));
-      await page.keyboard.press("Enter");
-      await expect.poll(() => statusText(page)).toContain(notice);
+      await submitForNotice(page, line, notice);
       await expect.poll(() => focused(page, field.selector)).toBe(true);
       // `x` deletes the character `w` moved to, the second word's first.
       await page.keyboard.press("x");
@@ -198,15 +208,42 @@ for (const field of fields) {
     await page.goto(field.url);
     await ready(page);
     await activateAtStart(page, field.selector);
-    for (const key of ["w", "v", "e", ":"]) await page.keyboard.press(key);
-    await expect.poll(() => statusText(page)).toContain(":");
-    await page.keyboard.type("bogus");
-    await page.keyboard.press("Enter");
-    await expect.poll(() => statusText(page)).toContain("Not an editor command");
+    for (const key of ["w", "v", "e"]) await page.keyboard.press(key);
+    await submitForNotice(page, ":bogus", "Not an editor command");
     await expect.poll(() => focused(page, field.selector)).toBe(true);
     await page.keyboard.press("x");
     await expect.poll(() => field.firstLine(page)).toBe(field.afterVeExX);
   });
+}
+
+/**
+ * From Insert and Replace mode `Ctrl-o` runs one Normal command, the command
+ * line included (#90): the Field has focus again and the next character typed
+ * goes in at the Cursor. The engine comes back in Insert mode from both: from
+ * Replace too, with or without a command line (its semantics,
+ * CODING_STANDARDS rule 3), so the typed character is inserted in each.
+ */
+for (const field of fields) {
+  for (const mode of [
+    { name: "Insert", key: "i", status: "INSERT" },
+    { name: "Replace", key: "R", status: "REPLACE" },
+  ]) {
+    test(`${field.name}: Enter on an unknown ex command after Ctrl-o in ${mode.name} mode leaves the Field focused`, async ({
+      page,
+    }) => {
+      await page.goto(field.url);
+      await ready(page);
+      await activateAtStart(page, field.selector);
+      await page.keyboard.press("w");
+      await page.keyboard.press(mode.key);
+      await expect.poll(() => statusText(page)).toContain(mode.status);
+      await page.keyboard.press("Control+o");
+      await submitForNotice(page, ":bogus", "Not an editor command");
+      await expect.poll(() => focused(page, field.selector)).toBe(true);
+      await page.keyboard.type("Z");
+      await expect.poll(() => field.firstLine(page)).toBe(field.afterWInsert);
+    });
+  }
 }
 
 /**

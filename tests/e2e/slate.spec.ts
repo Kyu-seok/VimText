@@ -1,4 +1,13 @@
-import { test, expect, ready, activateAtStart, modelText, statusText } from "./extension";
+import {
+  test,
+  expect,
+  ready,
+  activateAtStart,
+  modelText,
+  statusText,
+  submitForNotice,
+  noticeLines,
+} from "./extension";
 import type { Page } from "@playwright/test";
 
 /**
@@ -287,19 +296,26 @@ test("Esc in the command line leaves the Cursor where it was (#88)", async ({ pa
   await expect.poll(async () => (await modelText(page))[0]).toBe("the uick brown fox");
 });
 
-// A notice that replaces the command line gives the editor focus back (#90).
-for (const { line, notice } of [
-  { line: "/zzz", notice: "No match found" },
-  { line: ":w", notice: "nothing to write" },
-]) {
+// A command line whose Enter ends in a notice leaves the editor focused (#90).
+for (const { line, notice } of noticeLines) {
   test(`Enter on ${line} shows its notice and leaves the Cursor where it was (#90)`, async ({ page }) => {
     await page.keyboard.press("w");
-    await page.keyboard.press(line[0]!);
-    await expect.poll(() => statusText(page)).toContain(line[0]!);
-    await page.keyboard.type(line.slice(1));
-    await page.keyboard.press("Enter");
-    await expect.poll(() => statusText(page)).toContain(notice);
+    await submitForNotice(page, line, notice);
+    await expect(page.locator(HOST)).toBeFocused();
     await page.keyboard.press("x");
     await expect.poll(async () => (await modelText(page))[0]).toBe("the uick brown fox");
   });
 }
+
+// `:wq` blurs a host its `:w` notice has just given focus back to (#90), as `:q` does.
+test(":wq leaves the editor blurred behind its notice, a caret for its selection and its text unchanged (#90)", async ({
+  page,
+}) => {
+  const before = await modelText(page);
+  await page.keyboard.press("l");
+  await submitForNotice(page, ":wq", "nothing to write");
+  await expect(page.locator(HOST)).not.toBeFocused();
+  await expect.poll(() => page.evaluate(() => document.getSelection()!.isCollapsed)).toBe(true);
+  expect(await modelText(page)).toEqual(before);
+  await expect.poll(() => statusText(page), { timeout: 5000 }).toBe("");
+});

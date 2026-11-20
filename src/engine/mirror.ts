@@ -148,11 +148,12 @@ export class Mirror {
     const cm = this.cm;
     const openNotification = cm.openNotification.bind(cm);
     cm.openNotification = (template, options) => {
-      const prompt = cm.state.dialog;
-      const tree = prompt?.getRootNode() as Document | ShadowRoot | undefined;
-      const held = !!prompt && prompt.contains(tree?.activeElement ?? null);
+      // The dialog the notice is about to replace: the prompt, or an earlier notice.
+      const replaced = cm.state.dialog;
+      const tree = replaced?.getRootNode() as Partial<DocumentOrShadowRoot> | undefined;
+      const hadFocus = !!replaced && replaced.contains(tree?.activeElement ?? null);
       const close = openNotification(template, options);
-      if (held) cm.focus();
+      if (hadFocus) cm.focus();
       return close;
     };
   }
