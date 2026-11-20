@@ -17,7 +17,9 @@ export default defineConfig<ContentEditableOption>({
   retries: 1,
   failOnFlakyTests: true,
   workers: 1,
-  reporter: "list",
+  // The JSON report is the run's record once the terminal output is gone:
+  // `npm run e2e:last` prints its failed and flaky tests (tools/e2e-last.mjs).
+  reporter: [["list"], ["json", { outputFile: "test-results/last-run-report.json" }]],
   use: { baseURL: `http://localhost:${port}`, trace: "on-first-retry" },
   webServer: {
     command: `node tools/serve.mjs tests/fixtures ${port}`,

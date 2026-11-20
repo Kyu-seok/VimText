@@ -16,6 +16,7 @@
     "test:e2e:editors": "npm run build && playwright test --project=e2e tests/e2e/slate.spec.ts tests/e2e/lexical.spec.ts tests/e2e/quill.spec.ts tests/e2e/prosemirror.spec.ts --repeat-each=5 --workers=4",
     "red-on-main": "node tools/red-on-main.mjs",
     "flake": "node tools/flake.mjs",
+    "e2e:last": "node tools/e2e-last.mjs",
     "screenshots": "npm run build && playwright test --config playwright.screenshots.config.ts",
     "dogfood:demos": "node tools/dogfood-demos.mjs",
     "package": "node tools/package.mjs",
