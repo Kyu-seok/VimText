@@ -8,6 +8,7 @@ import { loadavg } from "node:os";
 const dist = resolve("dist");
 
 import { fixtureOrigin } from "./fixture-port";
+import { decodePng } from "../png";
 
 export { fixtureOrigin };
 
@@ -88,7 +89,7 @@ export function statusText(page: Page | Frame): Promise<string> {
   return page.evaluate(() => {
     const host = document.querySelector("vimtext-status") as HTMLElement | null;
     const bar = host?.shadowRoot?.querySelector(".bar") as HTMLElement | null;
-    return bar && host!.style.display !== "none" ? (bar.textContent ?? "") : "";
+    return bar && !host!.hidden ? (bar.textContent ?? "") : "";
   });
 }
 
@@ -239,6 +240,20 @@ export function drawnCursor(page: Page | Frame): Promise<(Box & { shape: string 
     }
     return null;
   });
+}
+
+/** The mean brightness (0–255) of what Chromium painted in `box` of the viewport, read from a screenshot (CODING_STANDARDS rule 14). */
+export async function brightness(page: Page, box: Box): Promise<number> {
+  const png = decodePng(
+    await page.screenshot({ clip: { x: box.left, y: box.top, width: box.width, height: box.height } }),
+  );
+  let sum = 0;
+  for (let y = 0; y < png.height; y++)
+    for (let x = 0; x < png.width; x++) {
+      const [r, g, b] = png.at(x, y);
+      sum += (r + g + b) / 3;
+    }
+  return sum / (png.width * png.height);
 }
 
 /** How many Status Line hosts VimText has on the page; one per live Session. */

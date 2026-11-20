@@ -1,0 +1,89 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>VimText fixture: Fields in the top layer</title>
+    <style>
+      body {
+        font-family: system-ui;
+        margin: 40px;
+        background: #fff;
+      }
+      /* Centred the way many sites do it: the transform makes the dialog the
+         containing block of its fixed descendants, and it clips them. */
+      dialog {
+        position: fixed;
+        inset: auto;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        margin: 0;
+        width: 420px;
+        overflow: hidden;
+        background: #fff;
+        border: 1px solid #888;
+        padding: 12px 12px 4px;
+      }
+      [popover] {
+        inset: auto;
+        left: 60px;
+        top: 80px;
+        margin: 0;
+        width: 420px;
+        background: #fff;
+        border: 1px solid #888;
+        padding: 12px 12px 40px;
+      }
+      textarea {
+        display: block;
+        width: 380px;
+        height: 60px;
+        margin: 0 0 30px;
+        font:
+          14px/1.4 Menlo,
+          monospace;
+      }
+      [contenteditable] {
+        width: 380px;
+        padding: 4px;
+        border: 1px solid #888;
+        font:
+          14px/20px Menlo,
+          monospace;
+        outline: none;
+      }
+      [contenteditable] p {
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>VimText fixture: Fields in the top layer</h1>
+    <!--
+      A textarea and a contenteditable inside a modal <dialog>, and the same
+      inside a popover (#77). The page opens them from the query string:
+      ?open=dialog or ?open=popover. A textarea outside both stays in the page.
+      The dialog's last Field ends 4px above the dialog's clipping edge, so a
+      Status Line clipped by the dialog would not show.
+    -->
+    <textarea id="page-ta">the quick brown fox</textarea>
+    <dialog id="dialog">
+      <textarea id="dialog-ta">the quick brown fox</textarea>
+      <!-- prettier-ignore -->
+      <div id="dialog-ce" contenteditable="true"><p>the quick brown fox</p><p>jumps over</p></div>
+    </dialog>
+    <div id="popover" popover="auto">
+      <textarea id="popover-ta">the quick brown fox</textarea>
+      <!-- prettier-ignore -->
+      <div id="popover-ce" contenteditable="true"><p>the quick brown fox</p><p>jumps over</p></div>
+    </div>
+    <div id="toast" popover="manual" style="left: 0; top: 0; width: 100vw; height: 100vh; opacity: 0.5">
+      toast
+    </div>
+    <script>
+      const open = new URLSearchParams(location.search).get("open");
+      if (open === "dialog") document.getElementById("dialog").showModal();
+      if (open === "popover") document.getElementById("popover").showPopover();
+    </script>
+  </body>
+</html>
