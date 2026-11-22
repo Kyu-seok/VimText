@@ -82,3 +82,75 @@ it("says first when the run it reports started, how long it took and on how many
     "run started 15 min ago (2026-11-20T12:20:42.738Z), took 2.1 min on 1 worker",
   );
 });
+
+it("says what the machine was like as the run started, when the report recorded it", () => {
+  const report = {
+    config: { workers: 4, metadata: { machineAtStart: "load average 32.5 on 8 cores, free memory 90 MB" } },
+    stats: {
+      startTime: "2026-11-20T12:20:42.738Z",
+      duration: 125652.4,
+      expected: 1,
+      unexpected: 0,
+      flaky: 0,
+      skipped: 0,
+    },
+  };
+  expect(summarize(report, Date.parse("2026-11-20T12:36:10Z"))).toEqual([
+    "run started 15 min ago (2026-11-20T12:20:42.738Z), took 2.1 min on 4 workers",
+    "as it started: load average 32.5 on 8 cores, free memory 90 MB",
+    "1 passed, 0 failed, 0 flaky, 0 skipped",
+  ]);
+});
+
+/**
+ * A timeout's own error names only the test or the hook. The reporter lists
+ * after it the call the timeout interrupted, with its place in the spec:
+ * implementing #90, two `beforeEach` timeouts could not be told apart as a
+ * page that never loaded or an Activation that never showed NORMAL.
+ */
+it("names under an attempt the call its timeout interrupted, with the line it was made on", () => {
+  const timeout = 'Test timeout of 30000ms exceeded while running "beforeEach" hook.';
+  const report = {
+    stats: { expected: 0, unexpected: 0, flaky: 1, skipped: 0 },
+    suites: [
+      {
+        file: "lexical.spec.ts",
+        specs: [
+          {
+            title: "dw deletes a bold word",
+            line: 98,
+            tests: [
+              {
+                projectName: "e2e",
+                status: "flaky",
+                results: [
+                  {
+                    retry: 0,
+                    status: "timedOut",
+                    error: { message: timeout },
+                    errors: [
+                      { message: `${timeout}\n\n  44 | test.beforeEach(` },
+                      {
+                        message:
+                          "Error: page.waitForSelector: Target page, context or browser has been closed\nCall log:\n  - waiting",
+                        location: { file: "/repo/tests/e2e/extension.ts", line: 85, column: 15 },
+                      },
+                    ],
+                  },
+                  { retry: 1, status: "passed", errors: [] },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+  expect(summarize(report)).toEqual([
+    "0 passed, 0 failed, 1 flaky, 0 skipped",
+    "flaky: [e2e] lexical.spec.ts:98 › dw deletes a bold word",
+    `  attempt 1: timedOut: ${timeout}`,
+    "    then: Error: page.waitForSelector: Target page, context or browser has been closed (extension.ts:85)",
+    "  attempt 2: passed",
+  ]);
+});
