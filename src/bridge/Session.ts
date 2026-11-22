@@ -192,6 +192,7 @@ export class Session {
       container: this.status.mirrorContainer,
       inputField: field.element,
       focus: () => this.focusForEngine(),
+      commandLineLeft: () => this.onCommandLineLeft(),
       doc: field.getValue(),
       cursor: sel.head,
       style: field.wrappingStyle(),
@@ -959,6 +960,16 @@ export class Session {
     } finally {
       this.focusingForEngine = false;
     }
+  }
+
+  /**
+   * Focus left the open command line for elsewhere in the page, which closed it: the bar
+   * `onBlur` kept for the command line hides now, unless it went to
+   * this Field (#100).
+   */
+  private onCommandLineLeft(): void {
+    if (this.destroyed) return;
+    if (!this.field.hasFocus() && !this.noticeOutlivesBlur) this.status.hide();
   }
 
   onFocus(): void {

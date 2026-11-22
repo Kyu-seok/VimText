@@ -187,3 +187,39 @@ describe("Visual mode and text objects", () => {
     expect(ta.value).toMatch(/^the fast brown/);
   });
 });
+
+/**
+ * The command line closes when focus leaves its input for elsewhere in the
+ * page (#100); a click is covered through the built extension
+ * (`tests/e2e/command-line.spec.ts`, "(#100)"). A blur event that leaves the
+ * input its tree's active element closes nothing. Coverage: Normal mode on a
+ * textarea.
+ */
+describe("The command line's input blurring", () => {
+  const nextTask = () => new Promise((r) => setTimeout(r));
+  let other: HTMLInputElement;
+
+  beforeEach(() => {
+    other = document.createElement("input");
+    document.body.appendChild(other);
+  });
+
+  afterEach(() => other.remove());
+
+  it("closes the command line and leaves focus where it went", async () => {
+    keys("w:");
+    other.focus();
+    await nextTask();
+    expect(session.mode).toBe("normal");
+    expect(document.activeElement).toBe(other);
+  });
+
+  it("keeps the command line open after a blur event that leaves its input the active element", async () => {
+    keys("w:");
+    const input = session.status.statusbar.querySelector("input")!;
+    input.dispatchEvent(new FocusEvent("blur"));
+    await nextTask();
+    expect(session.mode).toBe("command-line");
+    expect(session.status.host.shadowRoot!.activeElement).toBe(input);
+  });
+});

@@ -24,6 +24,7 @@ interface VimCM {
   getSelection(): string;
   indexFromPos(pos: unknown): number;
   openNotification(template: Node, options: { bottom?: boolean; duration?: number }): () => void;
+  openDialog(template: Node, callback: unknown, options?: Record<string, unknown>): unknown;
 }
 
 interface VimState {
@@ -67,6 +68,8 @@ interface MirrorOptions {
   inputField: HTMLElement;
   /** Called whenever the engine wants focus back (after a dialog closes, etc). */
   focus(): void;
+  /** Called once the command line has closed because focus left it for elsewhere in the page. */
+  commandLineLeft?(): void;
   doc: string;
   cursor: number;
   style: WrappingStyle;
@@ -93,6 +96,8 @@ export class Mirror {
   readonly cm: VimCM;
   readonly plugin: VimPlugin;
   private updateHandlers = new Set<UpdateHandler>();
+  /** True while the command line closes because focus left it for elsewhere in the page: the engine's re-focus is dropped. */
+  private leavingCommandLine = false;
 
   constructor(opts: MirrorOptions) {
     const updateListener: Extension = EditorView.updateListener.of((u) => {
@@ -126,9 +131,12 @@ export class Mirror {
 
     // The engine must hand focus to the real Field, never to the hidden view,
     // and must record Insert-mode Backspace/Delete from the real Field.
-    cm.focus = () => opts.focus();
+    cm.focus = () => {
+      if (!this.leavingCommandLine) opts.focus();
+    };
     cm.getInputField = () => opts.inputField;
     this.focusAfterNotice();
+    this.cancelOnBlur(opts.commandLineLeft);
 
     this.noteAtomReads();
 
@@ -154,6 +162,45 @@ export class Mirror {
       const hadFocus = !!replaced && replaced.contains(tree?.activeElement ?? null);
       const close = openNotification(template, options);
       if (hadFocus) cm.focus();
+      return close;
+    };
+  }
+
+  /**
+   * A click outside the open command line cancels it, and the click stands
+   * (#100). The adapter's own close on blur (`openDialog`'s `blur` listener)
+   * calls `cm.focus()`, which took focus back from what the person clicked,
+   * and clears nothing, which left the prompt's character in the bar
+   * (`vim.status`). So that close is turned off, and the blur is answered here
+   * with the prompt's own Esc: the engine's cancel path (`onPromptKeyDown`),
+   * its re-focus dropped. A blur that leaves the input the active element of
+   * its tree cancels nothing, as the adapter means: its check reads
+   * `document.activeElement`, which is the Status Line's host
+   * (docs/engine-seams.md, "Dialog lifetime").
+   */
+  private cancelOnBlur(left: (() => void) | undefined): void {
+    const cm = this.cm;
+    const openDialog = cm.openDialog.bind(cm);
+    cm.openDialog = (template, callback, options) => {
+      const close = openDialog(template, callback, { ...options, closeOnBlur: false });
+      const dialog = cm.state.dialog;
+      const input = dialog?.querySelector("input");
+      input?.addEventListener("blur", () => {
+        // A task later, as the adapter did: Esc and Enter blur the input themselves and close at once.
+        setTimeout(() => {
+          // Nothing to cancel once the prompt closed, or the Session ended, by then.
+          if (cm.state.dialog !== dialog || !cm.state.vim) return;
+          const tree = input.getRootNode() as Partial<DocumentOrShadowRoot>;
+          if (tree.activeElement === input) return;
+          this.leavingCommandLine = true;
+          try {
+            input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+          } finally {
+            this.leavingCommandLine = false;
+          }
+          left?.();
+        });
+      });
       return close;
     };
   }
