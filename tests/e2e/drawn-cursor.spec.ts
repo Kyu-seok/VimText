@@ -5,7 +5,9 @@ import {
   ready,
   activateAtStart,
   brightness,
+  caretCharBox,
   drawnCursor,
+  near,
   statusText,
   type Box,
 } from "./extension";
@@ -50,52 +52,12 @@ async function activate(page: Page, f: Fixture, pageStyle?: string): Promise<voi
 }
 
 /**
- * The box of the character after the collapsed caret, read from the page's
- * DOM: its Range's last client rect with a width (a character split by a soft
- * wrap). Null when the selection is not a caret inside a text node.
- */
-function caretCharBox(page: Page, shadowHost?: string): Promise<Box | null> {
-  return page.evaluate((hostSelector) => {
-    const sel = hostSelector
-      ? (
-          document.querySelector(hostSelector)!.shadowRoot as ShadowRoot & { getSelection(): Selection }
-        ).getSelection()
-      : document.getSelection()!;
-    const node = sel.anchorNode;
-    if (!sel.isCollapsed || !node || node.nodeType !== Node.TEXT_NODE) return null;
-    if (sel.anchorOffset >= (node as Text).data.length) return null;
-    const range = document.createRange();
-    range.setStart(node, sel.anchorOffset);
-    range.setEnd(node, sel.anchorOffset + 1);
-    const r = [...range.getClientRects()].filter((x) => x.width > 0).at(-1);
-    if (!r) return null;
-    return {
-      left: Math.round(r.left),
-      top: Math.round(r.top),
-      width: Math.round(r.width),
-      height: Math.round(r.height),
-    };
-  }, shadowHost);
-}
-
-/**
  * The mean brightness (0–255) Chromium painted inside the drawn block: dark
  * where the block inverts the white page and the character's dark glyph,
  * white where it is painted opaque.
  */
 async function brightnessUnderBlock(page: Page): Promise<number> {
   return brightness(page, (await drawnCursor(page))!);
-}
-
-/** Within a pixel: the block is placed from the same rect, rounded on its own. */
-function near(a: Box | null, b: Box | null): boolean {
-  if (!a || !b) return false;
-  return (
-    Math.abs(a.left - b.left) <= 1 &&
-    Math.abs(a.top - b.top) <= 1 &&
-    Math.abs(a.width - b.width) <= 1 &&
-    Math.abs(a.height - b.height) <= 1
-  );
 }
 
 /**

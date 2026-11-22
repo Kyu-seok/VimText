@@ -266,6 +266,46 @@ export function drawnCursor(page: Page | Frame): Promise<(Box & { shape: string 
   });
 }
 
+/**
+ * The box of the character after the collapsed caret, read from the page's
+ * DOM: its Range's last client rect with a width (a character split by a soft
+ * wrap). Null when the selection is not a caret inside a text node.
+ */
+export function caretCharBox(page: Page | Frame, shadowHost?: string): Promise<Box | null> {
+  return page.evaluate((hostSelector) => {
+    const sel = hostSelector
+      ? (
+          document.querySelector(hostSelector)!.shadowRoot as ShadowRoot & { getSelection(): Selection }
+        ).getSelection()
+      : document.getSelection()!;
+    const node = sel.anchorNode;
+    if (!sel.isCollapsed || !node || node.nodeType !== Node.TEXT_NODE) return null;
+    if (sel.anchorOffset >= (node as Text).data.length) return null;
+    const range = document.createRange();
+    range.setStart(node, sel.anchorOffset);
+    range.setEnd(node, sel.anchorOffset + 1);
+    const r = [...range.getClientRects()].filter((x) => x.width > 0).at(-1);
+    if (!r) return null;
+    return {
+      left: Math.round(r.left),
+      top: Math.round(r.top),
+      width: Math.round(r.width),
+      height: Math.round(r.height),
+    };
+  }, shadowHost);
+}
+
+/** Within a pixel: the block is placed from the same rect, rounded on its own. */
+export function near(a: Box | null, b: Box | null): boolean {
+  if (!a || !b) return false;
+  return (
+    Math.abs(a.left - b.left) <= 1 &&
+    Math.abs(a.top - b.top) <= 1 &&
+    Math.abs(a.width - b.width) <= 1 &&
+    Math.abs(a.height - b.height) <= 1
+  );
+}
+
 /** The mean brightness (0–255) of what Chromium painted in `box` of the viewport, read from a screenshot (CODING_STANDARDS rule 14). */
 export async function brightness(page: Page, box: Box): Promise<number> {
   const png = decodePng(

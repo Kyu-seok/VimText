@@ -187,14 +187,19 @@ export class Session {
     this.plugins = config.plugins ?? [];
     this.pluginKeys = new PluginKeyHook(this.plugins.flatMap((p) => p.keys));
     this.status = new StatusLine(field);
+    const doc = field.getValue();
     const sel = field.getSelection();
     this.mirror = new Mirror({
       container: this.status.mirrorContainer,
       inputField: field.element,
       focus: () => this.focusForEngine(),
       commandLineLeft: () => this.onCommandLineLeft(),
-      doc: field.getValue(),
-      cursor: sel.head,
+      doc,
+      // The Field's caret is an empty selection given from outside, which the
+      // engine does not clip (docs/engine-seams.md, "External selection"): at
+      // a line's end the Cursor goes on its last character, as Vim's Esc out
+      // of Insert leaves it (#99). A selection held at Activation is left alone.
+      cursor: sel.anchor === sel.head ? clipToLine(Text.of(doc.split("\n")), sel.head) : sel.head,
       style: field.wrappingStyle(),
       statusbar: this.status.statusbar,
     });
