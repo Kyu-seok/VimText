@@ -125,6 +125,24 @@ export async function activateAtStart(page: Page, selector = "#in"): Promise<voi
   await base.expect.poll(() => statusText(page)).toContain("NORMAL");
 }
 
+/**
+ * Opens the command line with `line`'s first character, types the rest,
+ * presses Enter and waits for the Status Line to show `notice`.
+ */
+export async function submitForNotice(page: Page, line: string, notice: string): Promise<void> {
+  await page.keyboard.press(line[0]!);
+  await base.expect.poll(() => statusText(page)).toContain(line[0]!);
+  await page.keyboard.type(line.slice(1));
+  await page.keyboard.press("Enter");
+  await base.expect.poll(() => statusText(page)).toContain(notice);
+}
+
+/** Two command lines whose Enter ends in a notice: one the engine's, one VimText's own (#90). */
+export const noticeLines = [
+  { line: "/zzz", notice: "No match found" },
+  { line: ":w", notice: "nothing to write" },
+];
+
 /** The text of each direct child block of a contenteditable host, a no-break space read as the space it renders as. */
 export function blockTexts(page: Page | Frame, selector: string): Promise<string[]> {
   return page

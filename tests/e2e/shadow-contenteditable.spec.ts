@@ -8,6 +8,8 @@ import {
   hostCount,
   cursorChar,
   selectedText,
+  submitForNotice,
+  noticeLines,
 } from "./extension";
 
 /**
@@ -116,3 +118,17 @@ test("Esc in the command line leaves the Cursor where it was inside the shadow t
   await page.keyboard.press("x");
   await expect.poll(async () => (await blockTexts(page, "#ce"))[0]).toBe("the uick brown fox");
 });
+
+// A command line whose Enter ends in a notice leaves the Cursor drawn on its character (#90).
+for (const { line, notice } of noticeLines) {
+  test(`Enter on ${line} shows its notice and leaves the Cursor where it was inside the shadow tree (#90)`, async ({
+    page,
+  }) => {
+    await activateAtStart(page, "#ce");
+    await page.keyboard.press("w");
+    await submitForNotice(page, line, notice);
+    await expect.poll(() => cursorChar(page, "#editor")).toBe("q");
+    await page.keyboard.press("x");
+    await expect.poll(async () => (await blockTexts(page, "#ce"))[0]).toBe("the uick brown fox");
+  });
+}

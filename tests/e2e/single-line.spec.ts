@@ -1,4 +1,4 @@
-import { test, expect, statusText, ready } from "./extension";
+import { test, expect, statusText, ready, submitForNotice } from "./extension";
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/single-line.html");
@@ -57,3 +57,22 @@ test("Tab moves focus", async ({ page }) => {
   await page.keyboard.press("Tab");
   await expect(page.locator("#search")).toBeFocused();
 });
+
+// `:wq` and `:x` blur the Field behind the `:w` notice, which has just given it focus back (#90).
+for (const cmd of [":wq", ":x"]) {
+  test(`${cmd} says the page owns saving, then leaves the field; refocus resumes on the same character`, async ({
+    page,
+  }) => {
+    const input = page.locator("#in");
+    await input.focus();
+    await page.keyboard.press("Escape");
+    await page.keyboard.type("0l");
+    await submitForNotice(page, cmd, "nothing to write");
+    await expect(input).not.toBeFocused();
+    await expect.poll(() => statusText(page), { timeout: 5000 }).toBe(""); // notice closes, bar hides
+    await input.focus();
+    await expect.poll(() => statusText(page)).toContain("NORMAL");
+    await page.keyboard.type("x");
+    await expect(input).toHaveValue("hllo world");
+  });
+}

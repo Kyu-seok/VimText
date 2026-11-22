@@ -231,3 +231,20 @@ test(":wq shows its :w notice after the blur, with nothing highlighted; refocus 
   await page.keyboard.type("x");
   await expect.poll(async () => (await blockTexts(page, "#ce"))[0]).toBe("te quick brown fox");
 });
+
+test(":x leaves the host as :wq does: its :w notice after the blur, nothing highlighted, refocus on the same character (#90)", async ({
+  page,
+}) => {
+  const ce = page.locator("#ce");
+  await activateAtStart(page, "#ce");
+  await page.keyboard.type("l:x");
+  await page.keyboard.press("Enter");
+  await expect(ce).not.toBeFocused();
+  expect(await statusText(page)).toContain("nothing to write");
+  await expect.poll(() => highlighted(page)).toBe(false);
+  await expect.poll(() => statusText(page), { timeout: 5000 }).toBe("");
+  await ce.focus();
+  await expect.poll(() => statusText(page)).toContain("NORMAL");
+  await page.keyboard.type("x");
+  await expect.poll(async () => (await blockTexts(page, "#ce"))[0]).toBe("te quick brown fox");
+});
