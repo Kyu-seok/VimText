@@ -1,6 +1,8 @@
 // Prints what the last Playwright run left behind: its counts, and for every test that
 // failed or passed only on a retry, each attempt's status, first error line and `machine`
-// line (browser launch time, load average and free memory, tests/e2e/extension.ts).
+// line (browser launch time, load average and free memory, tests/e2e/extension.ts), and
+// under it the errors the reporter lists after the first: for a timeout, the call it
+// interrupted and the line that made it.
 //
 //   npm run e2e:last
 //   node tools/e2e-last.mjs --clear    (the gate's first step: removes the report)
@@ -16,10 +18,18 @@
 // gate that stopped at the unit tests left the report of the `red-on-main` run before it, and
 // its 13 failures read as the gate's. So the gate removes the report before it starts: one
 // that never reaches e2e leaves none.
+//
+// The second line is the machine as the run started (playwright.config.ts `metadata`): the
+// `machine` line of a failure is read mid-run, when the run's own four workers are part of
+// the load. Implementing #90, two editors' runs each had a `beforeEach` timeout, and nothing
+// kept said whether they had started on a busy machine after tools/quiet.mjs gave up waiting.
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const REPORT = "test-results/last-run-report.json";
+
+/** An error message's first line, without the terminal colours. */
+const firstLine = (message) => (message ?? "").replace(/\u001b\[[0-9;]*m/g, "").split("\n")[0];
 
 /** The lines to print for a Playwright JSON report, read at `now` (ms since the epoch). */
 export function summarize(report, now = Date.now()) {
@@ -33,6 +43,8 @@ export function summarize(report, now = Date.now()) {
       `run started ${ago} min ago (${startTime}), took ${took} min${workers ? ` on ${workers} worker${workers === 1 ? "" : "s"}` : ""}`,
     );
   }
+  const atStart = report.config?.metadata?.machineAtStart;
+  if (atStart) lines.push(`as it started: ${atStart}`);
   lines.push(`${expected} passed, ${unexpected} failed, ${flaky} flaky, ${skipped} skipped`);
   const visit = (suite, file) => {
     for (const spec of suite.specs ?? []) {
@@ -42,12 +54,19 @@ export function summarize(report, now = Date.now()) {
           `${test.status === "flaky" ? "flaky" : "failed"}: [${test.projectName}] ${file}:${spec.line} › ${spec.title}`,
         );
         for (const result of test.results ?? []) {
-          const error = (result.error?.message ?? "").replace(/\u001b\[[0-9;]*m/g, "").split("\n")[0];
+          const error = firstLine(result.error?.message);
           const machine = (result.attachments ?? []).find((a) => a.name === "machine");
           const state = machine?.body ? Buffer.from(machine.body, "base64").toString("utf8") : "";
           lines.push(
             `  attempt ${result.retry + 1}: ${result.status}${error ? `: ${error}` : ""}${state ? ` (${state})` : ""}`,
           );
+          // The errors after the first: for a timeout, the call it interrupted.
+          for (const later of (result.errors ?? []).slice(1)) {
+            const at = later.location
+              ? ` (${later.location.file.split("/").pop()}:${later.location.line})`
+              : "";
+            lines.push(`    then: ${firstLine(later.message)}${at}`);
+          }
         }
       }
     }

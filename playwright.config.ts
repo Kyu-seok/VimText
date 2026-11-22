@@ -1,4 +1,5 @@
 import { defineConfig } from "@playwright/test";
+import { cpus, freemem, loadavg } from "node:os";
 import { fixturePort as port } from "./tests/e2e/fixture-port";
 import type { ContentEditableOption } from "./tests/e2e/contenteditable-option";
 
@@ -20,6 +21,11 @@ export default defineConfig<ContentEditableOption>({
   // The JSON report is the run's record once the terminal output is gone:
   // `npm run e2e:last` prints its failed and flaky tests (tools/e2e-last.mjs).
   reporter: [["list"], ["json", { outputFile: "test-results/last-run-report.json" }]],
+  // The machine as the run starts, kept in that report for `npm run e2e:last`: a start above
+  // the core count means tools/quiet.mjs ran out its wait, or was not asked.
+  metadata: {
+    machineAtStart: `load average ${loadavg()[0]!.toFixed(1)} on ${cpus().length} cores, free memory ${Math.round(freemem() / 2 ** 20)} MB`,
+  },
   use: { baseURL: `http://localhost:${port}`, trace: "on-first-retry" },
   webServer: {
     command: `node tools/serve.mjs tests/fixtures ${port}`,

@@ -77,5 +77,8 @@ it("finds a pin that names a missing file or a test no named file has", () => {
 
 it("every pin docs/engine-seams.md names exists: the file, and each quoted name in one of the entry's files", () => {
   const read = (file: string) => (existsSync(repoPath(file)) ? readText(file) : null);
-  expect(brokenPins(readText("docs/engine-seams.md"), read), "pins that do not exist").toEqual([]);
+  expect(
+    brokenPins(readText("docs/engine-seams.md"), read),
+    'pins that do not exist (a quoted name stands word for word in one of the entry\'s named files; cut it short only at its end, with "…")',
+  ).toEqual([]);
 });

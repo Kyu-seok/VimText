@@ -1,4 +1,6 @@
-npm run check
+# A run that already passed on the very tree being pushed is not made again
+# (tools/tree-stamp.mjs): any other tree, or anything uncommitted, gets the run.
+node tools/tree-stamp.mjs passed || npm run check
 
 # The rich-editor specs again, repeated on four workers, when the push touches
 # the write path, the fixtures, the Status Line host every Field shares or the
@@ -7,5 +9,5 @@ npm run check
 # passed four implementers' gates and the review, and surfaced only by chance.
 base=$(git merge-base HEAD origin/main 2>/dev/null || echo "")
 if [ -z "$base" ] || ! git diff --quiet "$base" HEAD -- src/field src/bridge src/ui tests/fixtures tests/e2e/extension.ts; then
-  npm run test:e2e:editors
+  node tools/tree-stamp.mjs passed editors || npm run test:e2e:editors
 fi
