@@ -193,6 +193,7 @@ export class Session {
       container: this.status.mirrorContainer,
       inputField: field.element,
       focus: () => this.focusForEngine(),
+      commandLineLeft: () => this.onCommandLineLeft(),
       doc,
       // The Field's caret is an empty selection given from outside, which the
       // engine does not clip (docs/engine-seams.md, "External selection"): at
@@ -964,6 +965,16 @@ export class Session {
     } finally {
       this.focusingForEngine = false;
     }
+  }
+
+  /**
+   * Focus left the open command line for elsewhere in the page, which closed it: the bar
+   * `onBlur` kept for the command line hides now, unless it went to
+   * this Field (#100).
+   */
+  private onCommandLineLeft(): void {
+    if (this.destroyed) return;
+    if (!this.field.hasFocus() && !this.noticeOutlivesBlur) this.status.hide();
   }
 
   onFocus(): void {

@@ -7,6 +7,8 @@ import {
   blockTexts,
   hostCount,
   submitForNotice,
+  focusedId,
+  openActivated,
 } from "./extension";
 import type { Page } from "@playwright/test";
 
@@ -268,4 +270,141 @@ test("contenteditable: Esc in the : command line leaves the Cursor where it was 
   await expect.poll(async () => (await blockTexts(page, "#ce"))[0]).toBe("the uick brown fox");
   // The page's change stands.
   expect((await blockTexts(page, "#ce")).at(-1)).toMatch(/!$/);
+});
+
+/**
+ * A click outside the command line while it is open closes it and stands
+ * (#100): focus stays on what the person clicked, what was typed in the
+ * prompt is not run, and the Status Line of the Field they left hides as on
+ * any blur. The adapter's own close on blur re-focused the Field, which undid
+ * the click, and cleared nothing, which left the prompt's character in the bar.
+ *
+ * Coverage (CODING_STANDARDS rule 5): Normal mode on a textarea (a click on a
+ * text input and on a button), a Single-line Field and a contenteditable (a
+ * click on page text, where focus goes to `<body>`), for `:` and `/`, and `?`
+ * on the textarea; on the textarea, the `:` command line opened from Visual
+ * mode and, through `Ctrl-o`, from Insert and Replace mode. A contenteditable
+ * inside an open shadow root: `shadow-contenteditable.spec.ts`. A Field
+ * nested in an editable root: `site-shapes.spec.ts`. A Field inside a frame,
+ * left by a click in the page around it, is not covered.
+ */
+const [textarea, singleLine, contentEditable] = fields as [Fixture, Fixture, Fixture];
+type Fixture = (typeof fields)[number];
+
+/** The Field's whole text, as the person sees it. */
+const wholeText = (page: Page, selector: string) =>
+  page.locator(selector).evaluate((el: HTMLElement) => ("value" in el ? (el.value as string) : el.innerText));
+
+/**
+ * With the command line just opened on `field`: types into it, clicks
+ * `target` and expects the bar hidden, focus on the element with id `focusOn`
+ * (`<body>` reads ""), and the Field's text as `before`, also after a key
+ * that would change it were it still the Field's.
+ */
+async function clickAway(page: Page, field: Fixture, target: string, focusOn: string, before: string) {
+  await page.keyboard.type("zz");
+  await page.locator(target).click();
+  // The command line closes a task after its input blurs.
+  await expect.poll(() => statusText(page)).toBe("");
+  expect(await focusedId(page)).toBe(focusOn);
+  await page.keyboard.press("x");
+  expect(await focusedId(page)).toBe(focusOn);
+  expect(await statusText(page)).toBe("");
+  expect(await wholeText(page, field.selector)).toBe(before);
+}
+
+const clicksAway = [
+  { field: textarea, on: "another text input", target: "#in", focusOn: "in", prompts: [":", "/", "?"] },
+  { field: textarea, on: "a button", target: "#btn", focusOn: "btn", prompts: [":", "/"] },
+  { field: singleLine, on: "the page's heading", target: "h1", focusOn: "", prompts: [":", "/"] },
+  { field: contentEditable, on: "the page's heading", target: "h1", focusOn: "", prompts: [":", "/"] },
+];
+
+for (const { field, on, target, focusOn, prompts } of clicksAway) {
+  for (const prompt of prompts) {
+    test(`${field.name}: a click on ${on} with the ${prompt} command line open keeps focus there and hides the Status Line (#100)`, async ({
+      page,
+    }) => {
+      await page.goto(field.url);
+      await ready(page);
+      await activateAtStart(page, field.selector);
+      const before = await wholeText(page, field.selector);
+      await page.keyboard.press("w");
+      await page.keyboard.press(prompt);
+      await expect.poll(() => statusText(page)).toContain(prompt);
+      await clickAway(page, field, target, focusOn, before);
+    });
+  }
+}
+
+for (const from of [
+  { mode: "Visual mode", keys: ["v", "e", ":"] },
+  { mode: "Insert mode after Ctrl-o", keys: ["i", "Control+o", ":"] },
+  { mode: "Replace mode after Ctrl-o", keys: ["R", "Control+o", ":"] },
+]) {
+  test(`textarea: a click on another text input with the : command line opened from ${from.mode} keeps focus there and hides the Status Line (#100)`, async ({
+    page,
+  }) => {
+    await openActivated(page);
+    const before = await wholeText(page, "#ta");
+    for (const key of from.keys) await page.keyboard.press(key);
+    await expect.poll(() => statusText(page)).toContain(":");
+    await clickAway(page, textarea, "#in", "in", before);
+    // The key pressed after the click went to the input the person clicked.
+    expect(await page.locator("#in").inputValue()).toContain("x");
+  });
+}
+
+for (const field of [textarea, contentEditable]) {
+  for (const prompt of [":", "/"]) {
+    test(`${field.name}: a click back into the Field with the ${prompt} command line open leaves it in Normal mode at the clicked place (#100)`, async ({
+      page,
+    }) => {
+      await page.goto(field.url);
+      await ready(page);
+      await activateAtStart(page, field.selector);
+      await page.keyboard.press("w");
+      await page.keyboard.press(prompt);
+      await expect.poll(() => statusText(page)).toContain(prompt);
+      // The start of the Field's first line, where `w` no longer has the Cursor.
+      await page.locator(field.selector).click({ position: { x: 3, y: 8 } });
+      await expect.poll(() => statusText(page)).toBe("--NORMAL--");
+      await page.keyboard.press("x");
+      await expect.poll(() => field.firstLine(page)).toBe(field.afterX);
+    });
+  }
+
+  test(`${field.name}: a click back into the Field after a click away with the command line open shows its Mode again (#100)`, async ({
+    page,
+  }) => {
+    await page.goto(field.url);
+    await ready(page);
+    await activateAtStart(page, field.selector);
+    await page.keyboard.press("w");
+    await page.keyboard.press(":");
+    await expect.poll(() => statusText(page)).toContain(":");
+    await page.locator("h1").click();
+    await expect.poll(() => statusText(page)).toBe("");
+    await page.locator(field.selector).click({ position: { x: 3, y: 8 } });
+    await expect.poll(() => statusText(page)).toBe("--NORMAL--");
+    await page.keyboard.press("x");
+    await expect.poll(() => field.firstLine(page)).toBe(field.afterX);
+  });
+}
+
+// A textarea keeps its selection while blurred, so focus given back without a click finds the Cursor.
+test("textarea: focus coming back after a click away with the command line open finds the Cursor where it was (#100)", async ({
+  page,
+}) => {
+  await openActivated(page);
+  await page.keyboard.press("w");
+  await page.keyboard.press(":");
+  await expect.poll(() => statusText(page)).toContain(":");
+  await page.locator("#in").click();
+  await expect.poll(() => statusText(page)).toBe("");
+  await page.locator("#ta").focus();
+  await expect.poll(() => statusText(page)).toBe("--NORMAL--");
+  // `x` deletes the character `w` moved to, the second word's first.
+  await page.keyboard.press("x");
+  await expect.poll(() => textarea.firstLine(page)).toBe(textarea.afterWX);
 });

@@ -94,6 +94,11 @@ export function statusText(page: Page | Frame): Promise<string> {
   });
 }
 
+/** The id of the focused element; `<body>`, which has none, reads "". */
+export function focusedId(page: Page): Promise<string | null> {
+  return page.evaluate(() => document.activeElement?.id ?? null);
+}
+
 /** Toggles a Plugin in the options page; it applies at the next Activation, the rule the vimrc follows. */
 export async function setPlugin(page: Page, plugin: "surround" | "targets", on: boolean): Promise<void> {
   await page.goto(`chrome-extension://${extensionId}/options/options.html`);
