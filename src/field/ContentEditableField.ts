@@ -656,8 +656,25 @@ export class ContentEditableField implements Field {
     return target === this.element || readDomSelection(this.element) !== null;
   }
 
+  /**
+   * A host nested in an editable root takes focus by its last selection going
+   * back inside it: focusing the root alone leaves the caret at the root's
+   * start, outside the Field, which then has no focus by `hasFocus` and whose
+   * focus event resolves to the root (#97). A selection set inside a blurred
+   * root focuses it, and that focus event finds the caret already in the
+   * Field (docs/engine-seams.md, "Selection and focus"). The selection is
+   * only what takes the focus: the Session's render on that focus sets the
+   * one the Field keeps, through `setSelection`.
+   */
   focus(): void {
-    this.focusTarget().focus({ preventScroll: true });
+    const target = this.focusTarget();
+    // A root that has focus holds the caret where the person put it, in this Field or another.
+    if (target !== this.element && !target.matches(":focus")) {
+      const projection = project(this.element);
+      const { anchor, head } = this.lastSelection;
+      selectDom(this.element, projection.toDom(anchor), projection.toDom(head));
+    }
+    target.focus({ preventScroll: true });
   }
 
   /**

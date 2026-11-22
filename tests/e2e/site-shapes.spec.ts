@@ -1,4 +1,4 @@
-import { test, expect, statusText, ready, activateAtStart } from "./extension";
+import { test, expect, statusText, ready, activateAtStart, submitForNotice } from "./extension";
 import type { Page } from "@playwright/test";
 
 /**
@@ -273,6 +273,112 @@ test.describe("Notion page: blocks marked contenteditable inside one editable ro
     await repeatUndoLeave(page, () => lines(page, "#n-two").then((l) => l[0]), ["e one", "ne"], "#notion");
     expect(await lines(page, "#n-two")).toEqual(["ne", "line two", "line three"]);
     expect(await page.locator("#n-one").innerText()).toBe("alpha beta gamma");
+  });
+
+  /**
+   * The command line closing gives the block focus back (#97): the root
+   * focused, the caret inside the block, the Cursor on the character it was
+   * on, so the next key is the block's. The engine's re-focus used to focus
+   * the root alone, which left the caret at the root's start, outside every
+   * block: the next key reached no Session and the page took it as text.
+   *
+   * Coverage (CODING_STANDARDS rule 5): Normal mode for each closing, Visual
+   * mode, and Insert and Replace mode through `Ctrl-o`, on a block of the
+   * root in the document. The other Field kinds: `command-line.spec.ts`. A
+   * nested Field inside an open shadow root is not covered here.
+   */
+  /** The root's text before block `#n-two`: the header's controls, the title and block `#n-one`. */
+  const BEFORE_BLOCK = "Add icon Add coverScratchalpha beta gamma";
+  /** The root's whole text with `firstLine` as the first line of block `#n-two`, the rest as the fixture has it. */
+  const rootWith = (firstLine: string) => `${BEFORE_BLOCK}${firstLine}\nline two\nline three`;
+  /** Whether the block has focus as a nested Field does: the root focused, the caret inside the block. */
+  const blockFocused = (page: Page) =>
+    page.locator("#n-two").evaluate((block) => {
+      const doc = block.ownerDocument;
+      return doc.activeElement?.id === "notion" && block.contains(doc.getSelection()!.anchorNode);
+    });
+  const rootText = (page: Page) => page.locator("#notion").evaluate((root) => root.textContent);
+
+  for (const closing of [
+    { name: "Esc in the : command line", keys: [":", "Escape"] },
+    { name: "Esc in the / command line", keys: ["/", "Escape"] },
+    { name: "Esc in the ? command line", keys: ["?", "Escape"] },
+    { name: "Enter on :noh", keys: [":", "n", "o", "h", "Enter"] },
+  ]) {
+    test(`${closing.name} leaves the block focused, the Cursor where it was (#97)`, async ({ page }) => {
+      await page.keyboard.press("w");
+      const prompt = closing.keys[0]!;
+      await page.keyboard.press(prompt);
+      await expect.poll(() => statusText(page)).toContain(prompt);
+      for (const key of closing.keys.slice(1)) await page.keyboard.press(key);
+      await expect.poll(() => blockFocused(page)).toBe(true);
+      // `x` deletes the character `w` moved to, the second word's first, and nothing outside the block.
+      await page.keyboard.press("x");
+      await expect.poll(() => rootText(page)).toBe(rootWith("line ne"));
+    });
+  }
+
+  test("Enter on an unknown ex command shows its notice and leaves the block focused, the Cursor where it was (#97)", async ({
+    page,
+  }) => {
+    await page.keyboard.press("w");
+    await submitForNotice(page, ":bogus", "Not an editor command");
+    await expect.poll(() => blockFocused(page)).toBe(true);
+    await page.keyboard.press("x");
+    await expect.poll(() => rootText(page)).toBe(rootWith("line ne"));
+  });
+
+  test("Esc in the : command line opened from Visual mode leaves the selection the block held (#97)", async ({
+    page,
+  }) => {
+    for (const key of ["w", "v", "e", ":"]) await page.keyboard.press(key);
+    await expect.poll(() => statusText(page)).toContain(":");
+    await page.keyboard.press("Escape");
+    await expect.poll(() => blockFocused(page)).toBe(true);
+    // `x` deletes the second word, which `ve` selected.
+    await page.keyboard.press("x");
+    await expect.poll(() => rootText(page)).toBe(rootWith("line "));
+  });
+
+  for (const mode of [
+    { name: "Insert", key: "i", status: "INSERT" },
+    { name: "Replace", key: "R", status: "REPLACE" },
+  ]) {
+    test(`Enter on an unknown ex command after Ctrl-o in ${mode.name} mode leaves the block focused (#97)`, async ({
+      page,
+    }) => {
+      await page.keyboard.press("w");
+      await page.keyboard.press(mode.key);
+      await expect.poll(() => statusText(page)).toContain(mode.status);
+      await page.keyboard.press("Control+o");
+      await submitForNotice(page, ":bogus", "Not an editor command");
+      await expect.poll(() => blockFocused(page)).toBe(true);
+      // The engine comes back in Insert mode from both (`command-line.spec.ts`): the character goes in at the Cursor.
+      await page.keyboard.type("Z");
+      await expect.poll(() => rootText(page)).toBe(rootWith("line Zone"));
+    });
+  }
+
+  // The command line also closes when its input blurs, a task later, and the
+  // engine re-focuses the Field then too: a caret the person put in another
+  // block meanwhile is theirs, the root already focused around it.
+  test("a click into another block with the command line open leaves the caret where the click put it (#97)", async ({
+    page,
+  }) => {
+    await page.keyboard.press("w");
+    await page.keyboard.press(":");
+    await expect.poll(() => statusText(page)).toContain(":");
+    await page.locator("#n-one").click();
+    const caretBlock = () =>
+      page.evaluate(() => document.getSelection()!.anchorNode?.parentElement?.closest(".block")?.id);
+    // The prompt closes a task after its input blurs; the engine's re-focus runs then.
+    await expect
+      .poll(() =>
+        page.evaluate(() => document.querySelector("vimtext-status")!.shadowRoot!.querySelector("input")),
+      )
+      .toBeNull();
+    expect(await caretBlock()).toBe("n-one");
+    expect(await rootText(page)).toBe(rootWith("line one"));
   });
 
   // Notion takes a line break VimText writes inside a block only as a
