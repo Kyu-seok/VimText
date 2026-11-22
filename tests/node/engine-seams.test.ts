@@ -44,6 +44,7 @@ it("docs/engine-seams.md names each entry once, so a union merge's old copy of a
  */
 function brokenPins(doc: string, read: (file: string) => string | null): string[] {
   const broken: string[] = [];
+  const entries = new Set([...doc.matchAll(/^- \*\*(.+?)\*\*/gm)].map(([, name]) => name));
   for (const [, entry, body] of doc.matchAll(/^- \*\*(.+?)\*\*(.*)$/gm)) {
     const at = body!.indexOf("Pinned by");
     if (at < 0) continue;
@@ -55,7 +56,12 @@ function brokenPins(doc: string, read: (file: string) => string | null): string[
       else source += text;
     }
     for (const [, name] of clause.matchAll(/"([^"]+)"/g)) {
-      if (!source.includes(name!.replace(/…$/, ""))) broken.push(`${entry}: no test "${name}"`);
+      if (source.includes(name!.replace(/…$/, ""))) continue;
+      // Implementing #100, a quoted pointer to another entry read as a pin with no test.
+      const hint = entries.has(name)
+        ? ' (an entry\'s name: after "Pinned by", point to an entry without quotes)'
+        : "";
+      broken.push(`${entry}: no test "${name}"${hint}`);
     }
   }
   return broken;
@@ -66,12 +72,14 @@ it("finds a pin that names a missing file or a test no named file has", () => {
     '- **Top layer** (`place`): a fact. Pinned by `tests/unit/facts.test.ts`, "Top layer" and "hiding hands focus back".',
     '- **Key names** (engine): a fact. Pinned by `tests/unit/gone.test.ts`, "a name that starts a title…".',
     "- **Layout** (adapter): a gotcha with no pin.",
+    '- **Focus** (adapter): a fact. Pinned by `tests/unit/facts.test.ts`, "Top layer"; see "Layout", pinned there.',
   ].join("\n");
   const files: Record<string, string> = { "tests/unit/facts.test.ts": 'describe("Top layer", () => {});' };
   expect(brokenPins(fixture, (f) => files[f] ?? null)).toEqual([
     'Top layer: no test "hiding hands focus back"',
     "Key names: no file tests/unit/gone.test.ts",
     'Key names: no test "a name that starts a title…"',
+    'Focus: no test "Layout" (an entry\'s name: after "Pinned by", point to an entry without quotes)',
   ]);
 });
 
