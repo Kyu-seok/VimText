@@ -78,6 +78,28 @@ describe("Normal mode editing", () => {
   });
 });
 
+describe("Activation with the caret at a line's end (#99)", () => {
+  /** A fresh Session on the textarea, as Activation makes one, the caret at `at`. */
+  function activateAt(at: number): void {
+    session.destroy();
+    ta.setSelectionRange(at, at);
+    session = new Session(field, { vimrc: "" });
+  }
+
+  it("puts the Cursor on the text's last character", () => {
+    activateAt(ta.value.length);
+    expect([ta.selectionStart, ta.selectionEnd]).toEqual([58, 59]);
+  });
+
+  it("leaves a selection held at Activation as it was given: the Cursor goes to its head, unclipped", () => {
+    // Out of #99's scope, kept as it was: only a caret is clipped.
+    session.destroy();
+    ta.setSelectionRange(15, 19); // "fox", to the first line's end
+    session = new Session(field, { vimrc: "" });
+    expect([ta.selectionStart, ta.selectionEnd]).toEqual([19, 19]);
+  });
+});
+
 describe("Insert mode", () => {
   it("is native: typing is not intercepted, Esc returns to Normal one char back", () => {
     keys("A");
