@@ -1,4 +1,4 @@
-import { test, expect, statusText, ready, activateAtStart, submitForNotice } from "./extension";
+import { test, expect, statusText, ready, activateAtStart, submitForNotice, focusedId } from "./extension";
 import type { Page } from "@playwright/test";
 
 /**
@@ -359,26 +359,93 @@ test.describe("Notion page: blocks marked contenteditable inside one editable ro
     });
   }
 
-  // The command line also closes when its input blurs, a task later, and the
-  // engine re-focuses the Field then too: a caret the person put in another
-  // block meanwhile is theirs, the root already focused around it.
-  test("a click into another block with the command line open leaves the caret where the click put it (#97)", async ({
+  /**
+   * A click outside the command line while it is open closes it and stands
+   * (#97, #100): the caret stays where the click put it, the root's text is
+   * unchanged, and the Status Line of the block the caret left hides, with no
+   * prompt character left in it.
+   *
+   * Coverage (CODING_STANDARDS rule 5): Normal mode on a block of the root in
+   * the document, for `:` and `/`: a click into another block, on the
+   * header's controls (in the root, outside every block) and on page text
+   * outside the root, then back into the block by a click and by the caret
+   * moving into it. The other Field kinds: `command-line.spec.ts`.
+   */
+
+  /** Where the caret is: a block's id, "controls", or null outside the root's parts. */
+  const caretIn = (page: Page) =>
+    page.evaluate(() => {
+      const part = document.getSelection()!.anchorNode?.parentElement?.closest(".block, .controls");
+      return part ? part.id || part.className : null;
+    });
+
+  for (const prompt of [":", "/"]) {
+    for (const click of [
+      { on: "into another block", target: "#n-one", focus: "notion", caret: "n-one" },
+      { on: "on the header's controls", target: "#notion .controls", focus: "notion", caret: "controls" },
+      { on: "on text outside the root", target: "h1", focus: "", caret: null },
+    ]) {
+      test(`a click ${click.on} with the ${prompt} command line open leaves the caret where the click put it and hides the Status Line (#97, #100)`, async ({
+        page,
+      }) => {
+        await page.keyboard.press("w");
+        await page.keyboard.press(prompt);
+        await expect.poll(() => statusText(page)).toContain(prompt);
+        await page.locator(click.target).click();
+        // The command line closes a task after its input blurs.
+        await expect.poll(() => statusText(page)).toBe("");
+        expect(await focusedId(page)).toBe(click.focus);
+        if (click.caret) expect(await caretIn(page)).toBe(click.caret);
+        // A key that moves the caret natively, within the clicked part (the click lands past its text's end): not the block's key, whose bar stays hidden.
+        await page.keyboard.press("ArrowLeft");
+        expect(await statusText(page)).toBe("");
+        expect(await focusedId(page)).toBe(click.focus);
+        if (click.caret) expect(await caretIn(page)).toBe(click.caret);
+        expect(await rootText(page)).toBe(rootWith("line one"));
+      });
+    }
+
+    test(`a click back into the block with the ${prompt} command line open leaves it in Normal mode at the clicked place (#100)`, async ({
+      page,
+    }) => {
+      await page.keyboard.press("w");
+      await page.keyboard.press(prompt);
+      await expect.poll(() => statusText(page)).toContain(prompt);
+      // The start of the block's first line, where `w` no longer has the Cursor.
+      await page.locator("#n-two").click({ position: { x: 3, y: 8 } });
+      await expect.poll(() => statusText(page)).toBe("--NORMAL--");
+      await page.keyboard.press("x");
+      await expect.poll(() => rootText(page)).toBe(rootWith("ine one"));
+    });
+  }
+
+  test("a click back into the block after a click into another with the command line open shows its Mode again (#100)", async ({
     page,
   }) => {
     await page.keyboard.press("w");
     await page.keyboard.press(":");
     await expect.poll(() => statusText(page)).toContain(":");
     await page.locator("#n-one").click();
-    const caretBlock = () =>
-      page.evaluate(() => document.getSelection()!.anchorNode?.parentElement?.closest(".block")?.id);
-    // The prompt closes a task after its input blurs; the engine's re-focus runs then.
-    await expect
-      .poll(() =>
-        page.evaluate(() => document.querySelector("vimtext-status")!.shadowRoot!.querySelector("input")),
-      )
-      .toBeNull();
-    expect(await caretBlock()).toBe("n-one");
-    expect(await rootText(page)).toBe(rootWith("line one"));
+    await expect.poll(() => statusText(page)).toBe("");
+    await page.locator("#n-two").click({ position: { x: 3, y: 8 } });
+    await expect.poll(() => statusText(page)).toBe("--NORMAL--");
+    await page.keyboard.press("x");
+    await expect.poll(() => rootText(page)).toBe(rootWith("ine one"));
+  });
+
+  test("the caret moving back into the block after a click into another with the command line open shows its Mode again (#100)", async ({
+    page,
+  }) => {
+    await page.keyboard.press("w");
+    await page.keyboard.press(":");
+    await expect.poll(() => statusText(page)).toContain(":");
+    // The click lands past the end of the block's text: one step right is the next block's start.
+    await page.locator("#n-one").click();
+    await expect.poll(() => statusText(page)).toBe("");
+    await page.keyboard.press("ArrowRight");
+    await expect.poll(() => statusText(page)).toBe("--NORMAL--");
+    await page.keyboard.press("x");
+    await expect.poll(() => rootText(page)).toBe(rootWith("ine one"));
   });
 
   // Notion takes a line break VimText writes inside a block only as a

@@ -10,6 +10,7 @@ import {
   selectedText,
   submitForNotice,
   noticeLines,
+  focusedId,
 } from "./extension";
 
 /**
@@ -117,6 +118,27 @@ test("Esc in the command line leaves the Cursor where it was inside the shadow t
   await expect.poll(() => cursorChar(page, "#editor")).toBe("q");
   await page.keyboard.press("x");
   await expect.poll(async () => (await blockTexts(page, "#ce"))[0]).toBe("the uick brown fox");
+});
+
+test("a click on the page's heading with the command line open keeps focus off the host and hides the Status Line (#100)", async ({
+  page,
+}) => {
+  await activateAtStart(page, "#ce");
+  await page.keyboard.press("w");
+  await page.keyboard.press(":");
+  await expect.poll(() => statusText(page)).toContain(":");
+  await page.locator("h1").click();
+  // The command line closes a task after its input blurs.
+  await expect.poll(() => statusText(page)).toBe("");
+  expect(await focusedId(page)).toBe("");
+  await page.keyboard.press("x");
+  expect(await statusText(page)).toBe("");
+  expect(await blockTexts(page, "#ce")).toEqual(ORIGINAL);
+  // Back by a click at the start of the first line: Normal mode, at the clicked place.
+  await page.locator("#ce").click({ position: { x: 3, y: 8 } });
+  await expect.poll(() => statusText(page)).toBe("--NORMAL--");
+  await page.keyboard.press("x");
+  await expect.poll(async () => (await blockTexts(page, "#ce"))[0]).toBe("he quick brown fox");
 });
 
 // A command line whose Enter ends in a notice leaves the Cursor drawn on its character (#90).
