@@ -332,6 +332,31 @@ describe("Selection and focus", () => {
     expect(getSelection()!.anchorNode).toBe(block.firstChild);
   });
 
+  it("setting a selection inside a nested editable whose root is blurred focuses the root, its focusin firing during the call with the caret already in the nested one (#97)", () => {
+    const { root, block } = nested();
+    caretAt(block.firstChild!, 2);
+    // Focus goes to an input in an open shadow root, as to the command line's.
+    const prompt = document.createElement("x-prompt");
+    prompt.attachShadow({ mode: "open" }).innerHTML = "<input>";
+    document.body.appendChild(prompt);
+    cleanup.push(() => prompt.remove());
+    prompt.shadowRoot!.querySelector("input")!.focus();
+    expect(document.activeElement).toBe(prompt);
+    let seen: { target: EventTarget | null; node: Node | null; offset: number } | null = null;
+    document.addEventListener(
+      "focusin",
+      (e) => {
+        const sel = getSelection()!;
+        seen = { target: e.target, node: sel.anchorNode, offset: sel.anchorOffset };
+      },
+      { once: true },
+    );
+    caretAt(block.firstChild!, 3);
+    expect(seen).toEqual({ target: root, node: block.firstChild, offset: 3 });
+    expect(document.activeElement).toBe(root);
+    expect(root.matches(":focus")).toBe(true);
+  });
+
   it("setting a selection inside a blurred host focuses it", () => {
     const el = host("<p>hello</p>");
     el.blur();
