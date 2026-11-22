@@ -236,6 +236,26 @@ describe("The command line's input blurring", () => {
     expect(document.activeElement).toBe(other);
   });
 
+  it("takes focus back into the command line when a script focuses the Field (#98)", async () => {
+    keys("w:");
+    const input = session.status.statusbar.querySelector("input")!;
+    ta.focus();
+    await nextTask();
+    expect(session.mode).toBe("command-line");
+    expect(session.status.host.shadowRoot!.activeElement).toBe(input);
+  });
+
+  // The bound on the test above, not #98's regression test: without the fix the first focus ends the same way.
+  it("lets a script that focuses the Field again and again have it in the end, the command line closed", async () => {
+    keys("w:");
+    for (let i = 0; i < 4; i++) {
+      ta.focus();
+      await nextTask();
+    }
+    expect(session.mode).toBe("normal");
+    expect(document.activeElement).toBe(ta);
+  });
+
   it("keeps the command line open after a blur event that leaves its input the active element", async () => {
     keys("w:");
     const input = session.status.statusbar.querySelector("input")!;

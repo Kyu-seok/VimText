@@ -355,7 +355,7 @@ for (const from of [
   });
 }
 
-for (const field of [textarea, contentEditable]) {
+for (const field of [textarea, singleLine, contentEditable]) {
   for (const prompt of [":", "/"]) {
     test(`${field.name}: a click back into the Field with the ${prompt} command line open leaves it in Normal mode at the clicked place (#100)`, async ({
       page,
