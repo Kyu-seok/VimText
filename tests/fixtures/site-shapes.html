@@ -85,6 +85,32 @@ line three</div></div>
         if (!e.isTrusted && (e.inputType === "insertParagraph" || e.inputType === "insertLineBreak"))
           e.preventDefault();
       });
+      // Notion takes a selection announced by an untrusted selectionchange into
+      // its model and writes the model's selection back to the DOM some
+      // milliseconds later (collapse, then extend, from one function; 18 ms
+      // after the announcement, live, 2026-11-22; #98), whatever has focus by
+      // then. This script writes only where the DOM's selection is no longer
+      // the model's, which is how the write was seen live: with focus in
+      // VimText's command line. A test sets data-write-delay to widen the gap.
+      let model = null;
+      document.addEventListener("selectionchange", (e) => {
+        if (e.isTrusted) return;
+        const { anchorNode, anchorOffset, focusNode, focusOffset } = document.getSelection();
+        if (!anchorNode || !notion.contains(anchorNode)) return;
+        const taken = (model = { anchorNode, anchorOffset, focusNode, focusOffset });
+        setTimeout(
+          () => {
+            const sel = document.getSelection();
+            if (model !== taken || !notion.contains(anchorNode) || !notion.contains(focusNode)) return;
+            if (Object.keys(taken).every((k) => sel[k] === taken[k])) return;
+            sel.collapse(anchorNode, anchorOffset);
+            sel.extend(focusNode, focusOffset);
+            // How many times the model's selection was written back, for a test to wait on.
+            notion.dataset.writes = String(Number(notion.dataset.writes ?? 0) + 1);
+          },
+          Number(notion.dataset.writeDelay ?? 18),
+        );
+      });
       notion.addEventListener("keydown", (e) => {
         if (e.key !== "Enter" || !e.shiftKey || e.keyCode !== 13) return;
         // The person's own Shift+Enter would get the browser's break as well.

@@ -141,6 +141,20 @@ test("a click on the page's heading with the command line open keeps focus off t
   await expect.poll(async () => (await blockTexts(page, "#ce"))[0]).toBe("he quick brown fox");
 });
 
+test("a click back into the host with the command line open leaves it in Normal mode at the clicked place (#100)", async ({
+  page,
+}) => {
+  await activateAtStart(page, "#ce");
+  await page.keyboard.press("w");
+  await page.keyboard.press(":");
+  await expect.poll(() => statusText(page)).toContain(":");
+  // The start of the first line, where `w` no longer has the Cursor.
+  await page.locator("#ce").click({ position: { x: 3, y: 8 } });
+  await expect.poll(() => statusText(page)).toBe("--NORMAL--");
+  await page.keyboard.press("x");
+  await expect.poll(async () => (await blockTexts(page, "#ce"))[0]).toBe("he quick brown fox");
+});
+
 // A command line whose Enter ends in a notice leaves the Cursor drawn on its character (#90).
 for (const { line, notice } of noticeLines) {
   test(`Enter on ${line} shows its notice and leaves the Cursor where it was inside the shadow tree (#90)`, async ({

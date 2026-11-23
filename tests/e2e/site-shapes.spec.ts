@@ -448,6 +448,134 @@ test.describe("Notion page: blocks marked contenteditable inside one editable ro
     await expect.poll(() => rootText(page)).toBe(rootWith("ine one"));
   });
 
+  /**
+   * The command line keeps focus when the page writes a selection back into
+   * the block just after it opened (#98). Notion writes the Cursor VimText
+   * announced back to the DOM some milliseconds later, and a selection set
+   * inside a blurred editable root focuses it: a move and `:` typed back to
+   * back left the prompt showing with focus on the root, and the keys typed
+   * next were the block's Normal keys.
+   *
+   * Coverage (CODING_STANDARDS rule 5): on a block of the root in the
+   * document, Normal mode after `w` and `b` for `:`, and `/` and `?` after
+   * `w`; Visual mode for `:`. Insert and Replace mode write no Cursor back
+   * before `Ctrl-o :` (the caret is the page's own), and are not covered. The
+   * other Field kinds have no page that writes a selection back; a click back
+   * into each with the command line open, which the Session now reads when
+   * the prompt closes: `command-line.spec.ts` and `shadow-contenteditable.spec.ts`.
+   */
+
+  /**
+   * Types `keys` back to back, the last of them opening the command line, and
+   * waits for the page to write its selection back over it: the keys a test
+   * types next come after the write, the order #98 was seen in. The page's
+   * delay is widened first (live: 18 ms), so the write lands after the
+   * command line opened on a loaded machine too.
+   */
+  async function openOverWrite(page: Page, keys: string): Promise<void> {
+    await page.locator("#notion").evaluate((root: HTMLElement) => (root.dataset.writeDelay = "250"));
+    await page.keyboard.type(keys);
+    await expect.poll(() => page.locator("#notion").getAttribute("data-writes")).toBe("1");
+  }
+
+  for (const move of ["w", "b"]) {
+    test(`${move} and : typed back to back, then noh and Enter after the page's write: the prompt takes the keys and the block has focus again (#98)`, async ({
+      page,
+    }) => {
+      // `b` from the third word, so both moves end on the second word's first character.
+      if (move === "b") await page.keyboard.type("ww");
+      await openOverWrite(page, `${move}:`);
+      // As Normal keys, `o` would open a line and `h` be typed into it.
+      await page.keyboard.type("noh");
+      await page.keyboard.press("Enter");
+      await expect.poll(() => statusText(page)).toBe("--NORMAL--");
+      await expect.poll(() => blockFocused(page)).toBe(true);
+      expect(await rootText(page)).toBe(rootWith("line one"));
+      // `x` deletes the character the move ended on.
+      await page.keyboard.press("x");
+      await expect.poll(() => rootText(page)).toBe(rootWith("line ne"));
+    });
+  }
+
+  // The page's write lands before, among or after these keys, as the machine has it: each
+  // order ends the same. After the write, deterministically: the test above, which is the
+  // one red without the fix; this one passes there whenever the keys beat the write.
+  test("w, : and noh typed with no pause, then Enter: the block has focus again, its text unchanged", async ({
+    page,
+  }) => {
+    await page.keyboard.type("w:noh");
+    await page.keyboard.press("Enter");
+    await expect.poll(() => statusText(page)).toBe("--NORMAL--");
+    await expect.poll(() => blockFocused(page)).toBe(true);
+    expect(await rootText(page)).toBe(rootWith("line one"));
+    await page.keyboard.press("x");
+    await expect.poll(() => rootText(page)).toBe(rootWith("line ne"));
+  });
+
+  test("w and / typed back to back, then two and Enter: the search runs and the Cursor is on its match (#98)", async ({
+    page,
+  }) => {
+    await openOverWrite(page, "w/");
+    await page.keyboard.type("two");
+    await page.keyboard.press("Enter");
+    await expect.poll(() => blockFocused(page)).toBe(true);
+    // `x` deletes the first character of the match, on the block's second line.
+    await page.keyboard.press("x");
+    await expect.poll(() => rootText(page)).toBe(`${BEFORE_BLOCK}line one\nline wo\nline three`);
+  });
+
+  test("the page's write landing while a search is being typed: the prompt keeps what was typed and takes the rest (#98)", async ({
+    page,
+  }) => {
+    await openOverWrite(page, "w/tw");
+    await page.keyboard.type("o");
+    await page.keyboard.press("Enter");
+    await expect.poll(() => blockFocused(page)).toBe(true);
+    // The search for `two` ran: `x` deletes the first character of its match.
+    await page.keyboard.press("x");
+    await expect.poll(() => rootText(page)).toBe(`${BEFORE_BLOCK}line one\nline wo\nline three`);
+  });
+
+  for (const prompt of ["/", "?"]) {
+    test(`w and ${prompt} typed back to back, then zz and Esc: nothing is typed into the block, which has focus again (#98)`, async ({
+      page,
+    }) => {
+      await openOverWrite(page, `w${prompt}`);
+      await page.keyboard.type("zz");
+      await expect.poll(() => statusText(page)).toContain(prompt);
+      await page.keyboard.press("Escape");
+      await expect.poll(() => statusText(page)).toBe("--NORMAL--");
+      await expect.poll(() => blockFocused(page)).toBe(true);
+      expect(await rootText(page)).toBe(rootWith("line one"));
+      await page.keyboard.press("x");
+      await expect.poll(() => rootText(page)).toBe(rootWith("line ne"));
+    });
+  }
+
+  test("w and : typed back to back, then an unknown ex command and Enter: its notice shows and the block has focus again (#98)", async ({
+    page,
+  }) => {
+    await openOverWrite(page, "w:");
+    await page.keyboard.type("bogus");
+    await page.keyboard.press("Enter");
+    await expect.poll(() => statusText(page)).toContain("Not an editor command");
+    await expect.poll(() => blockFocused(page)).toBe(true);
+    await page.keyboard.press("x");
+    await expect.poll(() => rootText(page)).toBe(rootWith("line ne"));
+  });
+
+  test("w, v, e and : typed back to back: Esc leaves the selection the block held (#98)", async ({
+    page,
+  }) => {
+    await openOverWrite(page, "wve:");
+    await expect.poll(() => statusText(page)).toContain(":");
+    await page.keyboard.press("Escape");
+    await expect.poll(() => blockFocused(page)).toBe(true);
+    // `x` deletes the second word, which `ve` selected.
+    await page.keyboard.press("x");
+    await expect.poll(() => rootText(page)).toBe(rootWith("line "));
+  });
+
   // Notion takes a line break VimText writes inside a block only as a
   // Shift+Enter keydown, offered after the refused paragraph break (#70).
   test("u of J brings the line break back (#70)", async ({ page }) => {

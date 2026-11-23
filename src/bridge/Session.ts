@@ -194,6 +194,10 @@ export class Session {
       inputField: field.element,
       focus: () => this.focusForEngine(),
       commandLineLeft: () => this.onCommandLineLeft(),
+      // A page that writes a selection into the Field focuses it (Notion, #98): the command line stays.
+      // Not mid-write: a write's own selection of the host focuses it the same way, and the
+      // command line taking focus back would put the write's commands into the prompt.
+      keepCommandLine: () => !this.pendingWrite && this.field.hasFocus(),
       doc,
       // The Field's caret is an empty selection given from outside, which the
       // engine does not clip (docs/engine-seams.md, "External selection"): at
@@ -974,13 +978,26 @@ export class Session {
    */
   private onCommandLineLeft(): void {
     if (this.destroyed) return;
-    if (!this.field.hasFocus() && !this.noticeOutlivesBlur) this.status.hide();
+    // A click back into this Field: the focus handling `onFocus` left for the close.
+    if (this.field.hasFocus()) this.readFieldOnFocus();
+    else if (!this.noticeOutlivesBlur) this.status.hide();
   }
 
   onFocus(): void {
     if (this.destroyed) return;
-    this.mirror.applyStyle(this.field.wrappingStyle());
     this.status.show();
+    // Focus that arrives while the command line is open is not yet the
+    // Field's to act on: a selection the page wrote back takes it for a
+    // moment, mid-write (#98), and a click's is taken up when the command
+    // line closes (`onCommandLineLeft`). The engine's own focus of the Field
+    // comes after its dialog has closed.
+    if (this.mirror.commandLineOpen()) return;
+    this.readFieldOnFocus();
+  }
+
+  /** The Field has focus: its text and caret are read, and the Cursor drawn. */
+  private readFieldOnFocus(): void {
+    this.mirror.applyStyle(this.field.wrappingStyle());
     this.syncFromField();
     this.render();
   }

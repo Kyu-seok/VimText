@@ -70,11 +70,30 @@ interface MirrorOptions {
   focus(): void;
   /** Called once the command line has closed because focus left it for elsewhere in the page. */
   commandLineLeft?(): void;
+  /**
+   * Asked when a script, not the person, took focus from the command line's
+   * input: true takes focus back into the command line.
+   */
+  keepCommandLine?(): boolean;
   doc: string;
   cursor: number;
   style: WrappingStyle;
   /** Element the engine renders mode text, pending keys, and dialogs into. */
   statusbar: HTMLElement;
+}
+
+/** How many times one command line takes focus back from a script that focused the Field. */
+const RETAKES = 3;
+
+/**
+ * True for a blur no device of the person's caused: Chromium names the device
+ * behind a click's or a key's focus change in `sourceCapabilities` and leaves
+ * it null for a script's (docs/engine-seams.md, "A page that writes its
+ * selection back"). Where the property is missing nothing is known, and the
+ * blur counts as the person's.
+ */
+function byScript(blur: Event): boolean {
+  return "sourceCapabilities" in blur && blur.sourceCapabilities === null;
 }
 
 /** Normal-mode cursors sit on a character, never past the end of a non-empty line. */
@@ -136,7 +155,7 @@ export class Mirror {
     };
     cm.getInputField = () => opts.inputField;
     this.focusAfterNotice();
-    this.cancelOnBlur(opts.commandLineLeft);
+    this.cancelOnBlur(opts.commandLineLeft, opts.keepCommandLine);
 
     this.noteAtomReads();
 
@@ -177,15 +196,30 @@ export class Mirror {
    * its tree cancels nothing, as the adapter means: its check reads
    * `document.activeElement`, which is the Status Line's host
    * (docs/engine-seams.md, "Dialog lifetime").
+   *
+   * A blur that names no device of the person's (`sourceCapabilities`) is a
+   * script's: a page that writes a selection into the Field focuses it
+   * (Notion, #98). Where `keep` says so the input takes focus back, in a
+   * microtask, which runs once the page's script is done and before any key
+   * that follows; `RETAKES` times at most for one prompt, so a page that
+   * takes focus again every time ends with it, the prompt cancelled. A
+   * browser without `sourceCapabilities` reads every blur as the person's.
    */
-  private cancelOnBlur(left: (() => void) | undefined): void {
+  private cancelOnBlur(left: (() => void) | undefined, keep: (() => boolean) | undefined): void {
     const cm = this.cm;
     const openDialog = cm.openDialog.bind(cm);
     cm.openDialog = (template, callback, options) => {
       const close = openDialog(template, callback, { ...options, closeOnBlur: false });
       const dialog = cm.state.dialog;
       const input = dialog?.querySelector("input");
-      input?.addEventListener("blur", () => {
+      let retakes = 0;
+      input?.addEventListener("blur", (e) => {
+        if (byScript(e) && retakes < RETAKES)
+          queueMicrotask(() => {
+            if (cm.state.dialog !== dialog || !cm.state.vim || !keep?.()) return;
+            retakes++;
+            input.focus();
+          });
         // A task later, as the adapter did: Esc and Enter blur the input themselves and close at once.
         setTimeout(() => {
           // Nothing to cancel once the prompt closed, or the Session ended, by then.

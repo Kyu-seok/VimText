@@ -374,6 +374,130 @@ describe("Selection and focus", () => {
   });
 });
 
+describe("A page that writes its selection back", () => {
+  /** An input in an open shadow root, focused, as the command line's is. */
+  function prompt(): HTMLInputElement {
+    const el = document.createElement("x-prompt");
+    el.attachShadow({ mode: "open" }).innerHTML = "<input>";
+    document.body.appendChild(el);
+    cleanup.push(() => el.remove());
+    const input = el.shadowRoot!.querySelector("input")!;
+    input.focus();
+    return input;
+  }
+
+  /** Whether `input`'s next blur names the person's device (`FocusEvent.sourceCapabilities`), once it has fired. */
+  function deviceAtBlur(input: HTMLInputElement): () => boolean | null {
+    let named: boolean | null = null;
+    input.addEventListener(
+      "blur",
+      (e) => (named = (e as FocusEvent & { sourceCapabilities: object | null }).sourceCapabilities !== null),
+      { once: true },
+    );
+    return () => named;
+  }
+
+  function mount<K extends keyof HTMLElementTagNameMap>(tag: K, text = ""): HTMLElementTagNameMap[K] {
+    const el = document.createElement(tag);
+    el.textContent = text;
+    document.body.appendChild(el);
+    cleanup.push(() => el.remove());
+    return el;
+  }
+
+  /** An editable root holding a block itself marked editable, the caret in the block: the block's text node. */
+  function nestedText(): { root: HTMLElement; text: Node } {
+    const root = host('<div>title</div><div id="block" contenteditable="true">body</div>');
+    const text = root.querySelector("#block")!.firstChild!;
+    caretAt(text, 2);
+    return { root, text };
+  }
+
+  it("the blur a click makes names the person's device, when the click focuses another input", async () => {
+    const input = prompt();
+    const other = mount("input");
+    const named = deviceAtBlur(input);
+    await userEvent.click(other);
+    expect(document.activeElement).toBe(other);
+    expect(named()).toBe(true);
+  });
+
+  it("the blur a click makes names the person's device, when the click is on text that takes no focus", async () => {
+    const input = prompt();
+    const text = mount("p", "page text");
+    const named = deviceAtBlur(input);
+    await userEvent.click(text);
+    expect(document.activeElement).toBe(document.body);
+    expect(named()).toBe(true);
+  });
+
+  it("the blur a click into an editable root makes names the person's device", async () => {
+    const { root } = nestedText();
+    const input = prompt();
+    const named = deviceAtBlur(input);
+    await userEvent.click(root.querySelector("#block")!);
+    expect(document.activeElement).toBe(root);
+    expect(named()).toBe(true);
+  });
+
+  it("the blur Tab makes names the person's device", async () => {
+    const input = prompt();
+    mount("input");
+    const named = deviceAtBlur(input);
+    await userEvent.keyboard("{Tab}");
+    expect(input.getRootNode()).toHaveProperty("activeElement", null);
+    expect(named()).toBe(true);
+  });
+
+  it("the blur a script's focus() makes names no device, in the task of a key the person pressed too", async () => {
+    const input = prompt();
+    const other = mount("input");
+    const named = deviceAtBlur(input);
+    input.addEventListener("keydown", () => other.focus(), { once: true });
+    await userEvent.keyboard("a");
+    expect(document.activeElement).toBe(other);
+    expect(named()).toBe(false);
+  });
+
+  it("a selection a script sets inside a blurred editable root blurs the focused input during the call, naming no device; the root's focusin fires before the script extends the selection, and a microtask from the blur runs once the script is done", async () => {
+    const { root, text } = nestedText();
+    const input = prompt();
+    const named = deviceAtBlur(input);
+    const order: string[] = [];
+    input.addEventListener("blur", () => {
+      order.push("blur");
+      queueMicrotask(() => order.push("microtask"));
+    });
+    root.addEventListener("focusin", () => order.push(`focusin, collapsed: ${getSelection()!.isCollapsed}`));
+    await new Promise<void>((done) =>
+      setTimeout(() => {
+        const sel = getSelection()!;
+        sel.collapse(text, 1);
+        order.push("collapsed");
+        sel.extend(text, 3);
+        order.push("extended");
+        done();
+      }),
+    );
+    expect(order).toEqual(["blur", "focusin, collapsed: true", "collapsed", "extended", "microtask"]);
+    expect(named()).toBe(false);
+    expect(document.activeElement).toBe(root);
+  });
+
+  it("focus() on the input again blurs the root and takes the document's selection out of it", () => {
+    const { root, text } = nestedText();
+    const input = prompt();
+    const sel = getSelection()!;
+    sel.collapse(text, 1);
+    sel.extend(text, 3);
+    expect(root.contains(sel.anchorNode)).toBe(true);
+    input.focus();
+    expect(input.getRootNode()).toHaveProperty("activeElement", input);
+    expect(root.matches(":focus")).toBe(false);
+    expect(root.contains(sel.anchorNode)).toBe(false);
+  });
+});
+
 describe("Leaving a contenteditable Field", () => {
   it("a host keeps its selection when it blurs: a one-character range stays selected (#65)", () => {
     const el = host("<p>hello</p>");
