@@ -9,18 +9,21 @@ Terms as in `GLOSSARY.md`; the decisions behind this procedure are in spec #27.
 
 A store release is gated by the [dogfooding pass](#dogfooding-pass) on the build from `main`.
 
-1. **Bump both versions.** `manifest.json` and `package.json` each keep a version, bumped by
-   hand. `npm test` (the Node project, `tests/node/versions.test.ts`) refuses a commit that
-   bumps one and not the other.
+1. **Bump both versions and add the release notes.** `manifest.json` and `package.json` each
+   keep a version, bumped by hand, and the notes are `docs/release-notes/<version>.txt`.
+   `npm test` (the Node project) refuses a commit that bumps one version and not the other
+   (`tests/node/versions.test.ts`), or that bumps them without the notes file
+   (`tests/node/release-notes.test.ts`).
 2. **Make the release commit**: `chore: release <version> — <milestone>`, for example
    `chore: release 0.3.0 — M3`.
 3. **Tag it with an annotated tag whose message is the release notes**:
-   `git tag -a v<version>` and write the notes in the editor (or `-F <file>`). The notes are
-   drafted in `docs/store/announcements.md` (ticket #32); the tag message is what the Release
-   shows as its body, so write it for the reader of the Releases page. A change to
+   `git tag -a v<version> -F docs/release-notes/<version>.txt`. The file's first line is the
+   Release's title (`VimText <version>: …`), the rest plain text; the tag message is what the
+   Release shows as its body, so write it for the reader of the Releases page. A change to
    `PRIVACY.md` is noted here. The tag message never changes after the push, so the notes
-   name only what exists at tag time: no store URL before the first upload
-   (`tests/node/release-notes.test.ts` refuses a `<PLACEHOLDER>` token).
+   name only what exists at tag time: no store URL before the first upload (the same test
+   refuses a `<PLACEHOLDER>` token). The 0.4.0 notes are also section 1 of
+   `docs/store/announcements.md`, beside the announcements that quote them.
 4. **Push the commit, then the tag**: `git push && git push origin v<version>`. The pre-push
    hook runs the gate locally; the workflow runs it again on the runner, then
    `npm run package -- --expect-tag v<version>`, then `gh release create` with the zip
