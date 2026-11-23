@@ -408,3 +408,21 @@ test("textarea: focus coming back after a click away with the command line open 
   await page.keyboard.press("x");
   await expect.poll(() => textarea.firstLine(page)).toBe(textarea.afterWX);
 });
+
+// A contenteditable write is still in flight when the command line opens right after an
+// edit: the write's own selection of the host takes focus from the prompt, as a script's
+// does, and the prompt must not take it back mid-write (#98's review). The write lands in
+// the Field, and the prompt is cancelled as by any blur.
+test("contenteditable: x and : typed back to back: the deletion lands in the Field, and the next key is the Field's", async ({
+  page,
+}) => {
+  await page.goto(contentEditable.url);
+  await ready(page);
+  await activateAtStart(page, contentEditable.selector);
+  await page.keyboard.type("wx:");
+  await expect.poll(() => contentEditable.firstLine(page)).toBe("the uick brown fox");
+  await page.keyboard.press("Escape");
+  await expect.poll(() => statusText(page)).toBe("--NORMAL--");
+  await page.keyboard.press("x");
+  await expect.poll(() => contentEditable.firstLine(page)).toBe("the ick brown fox");
+});

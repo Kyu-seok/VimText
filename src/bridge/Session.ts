@@ -195,7 +195,9 @@ export class Session {
       focus: () => this.focusForEngine(),
       commandLineLeft: () => this.onCommandLineLeft(),
       // A page that writes a selection into the Field focuses it (Notion, #98): the command line stays.
-      keepCommandLine: () => this.field.hasFocus(),
+      // Not mid-write: a write's own selection of the host focuses it the same way, and the
+      // command line taking focus back would put the write's commands into the prompt.
+      keepCommandLine: () => !this.pendingWrite && this.field.hasFocus(),
       doc,
       // The Field's caret is an empty selection given from outside, which the
       // engine does not clip (docs/engine-seams.md, "External selection"): at

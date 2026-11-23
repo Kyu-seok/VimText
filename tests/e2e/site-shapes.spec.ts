@@ -524,6 +524,18 @@ test.describe("Notion page: blocks marked contenteditable inside one editable ro
     await expect.poll(() => rootText(page)).toBe(`${BEFORE_BLOCK}line one\nline wo\nline three`);
   });
 
+  test("the page's write landing while a search is being typed: the prompt keeps what was typed and takes the rest (#98)", async ({
+    page,
+  }) => {
+    await openOverWrite(page, "w/tw");
+    await page.keyboard.type("o");
+    await page.keyboard.press("Enter");
+    await expect.poll(() => blockFocused(page)).toBe(true);
+    // The search for `two` ran: `x` deletes the first character of its match.
+    await page.keyboard.press("x");
+    await expect.poll(() => rootText(page)).toBe(`${BEFORE_BLOCK}line one\nline wo\nline three`);
+  });
+
   for (const prompt of ["/", "?"]) {
     test(`w and ${prompt} typed back to back, then zz and Esc: nothing is typed into the block, which has focus again (#98)`, async ({
       page,
