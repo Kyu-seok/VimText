@@ -91,25 +91,26 @@ line three</div></div>
       // after the announcement, live, 2026-11-22; #98), whatever has focus by
       // then. This script writes only where the DOM's selection is no longer
       // the model's, which is how the write was seen live: with focus in
-      // VimText's command line. A test sets data-write-delay to widen the gap.
+      // VimText's command line. Off until a test sets data-write-delay, the
+      // milliseconds to wait.
       let model = null;
       document.addEventListener("selectionchange", (e) => {
         if (e.isTrusted) return;
         const { anchorNode, anchorOffset, focusNode, focusOffset } = document.getSelection();
         if (!anchorNode || !notion.contains(anchorNode)) return;
+        // Only for a test that asks: with it always on, a test that presses a move and `:`
+        // back to back took either path, as the machine's timing had it.
+        if (notion.dataset.writeDelay === undefined) return;
         const taken = (model = { anchorNode, anchorOffset, focusNode, focusOffset });
-        setTimeout(
-          () => {
-            const sel = document.getSelection();
-            if (model !== taken || !notion.contains(anchorNode) || !notion.contains(focusNode)) return;
-            if (Object.keys(taken).every((k) => sel[k] === taken[k])) return;
-            sel.collapse(anchorNode, anchorOffset);
-            sel.extend(focusNode, focusOffset);
-            // How many times the model's selection was written back, for a test to wait on.
-            notion.dataset.writes = String(Number(notion.dataset.writes ?? 0) + 1);
-          },
-          Number(notion.dataset.writeDelay ?? 18),
-        );
+        setTimeout(() => {
+          const sel = document.getSelection();
+          if (model !== taken || !notion.contains(anchorNode) || !notion.contains(focusNode)) return;
+          if (Object.keys(taken).every((k) => sel[k] === taken[k])) return;
+          sel.collapse(anchorNode, anchorOffset);
+          sel.extend(focusNode, focusOffset);
+          // How many times the model's selection was written back, for a test to wait on.
+          notion.dataset.writes = String(Number(notion.dataset.writes ?? 0) + 1);
+        }, Number(notion.dataset.writeDelay));
       });
       notion.addEventListener("keydown", (e) => {
         if (e.key !== "Enter" || !e.shiftKey || e.keyCode !== 13) return;
