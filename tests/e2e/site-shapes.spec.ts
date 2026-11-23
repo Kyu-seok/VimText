@@ -468,9 +468,10 @@ test.describe("Notion page: blocks marked contenteditable inside one editable ro
   /**
    * Types `keys` back to back, the last of them opening the command line, and
    * waits for the page to write its selection back over it: the keys a test
-   * types next come after the write, the order #98 was seen in. The page's
-   * delay is widened first (live: 18 ms), so the write lands after the
-   * command line opened on a loaded machine too.
+   * types next come after the write, the order #98 was seen in. The page
+   * writes back only once a test sets its delay, wider here than live
+   * (18 ms), so the write lands after the command line opened on a loaded
+   * machine too.
    */
   async function openOverWrite(page: Page, keys: string): Promise<void> {
     await page.locator("#notion").evaluate((root: HTMLElement) => (root.dataset.writeDelay = "250"));
@@ -503,6 +504,8 @@ test.describe("Notion page: blocks marked contenteditable inside one editable ro
   test("w, : and noh typed with no pause, then Enter: the block has focus again, its text unchanged", async ({
     page,
   }) => {
+    // The page's write-back at the delay seen live.
+    await page.locator("#notion").evaluate((root: HTMLElement) => (root.dataset.writeDelay = "18"));
     await page.keyboard.type("w:noh");
     await page.keyboard.press("Enter");
     await expect.poll(() => statusText(page)).toBe("--NORMAL--");
