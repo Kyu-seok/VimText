@@ -66,10 +66,18 @@ none. In the 0.3.0 pass a stale tab read as "GitHub does not work".
   was not found in 2026-11; `old.reddit.com` has a `<textarea>`. Claude in Chrome cannot open
   reddit.com.
 
-**An agent driving the pass** (Claude in Chrome): focus the box with `element.focus()` from
-the page's JavaScript, not a coordinate click (a late layout shift sent keys to the page),
-send keys, and assert the Field's `.value` after each step. Posting publicly is the user's
-call; ask before step 6.
+**An agent driving the pass** (Claude in Chrome): on every site, first run the output of
+`npm run -s dogfood:probe` in the page (`tools/dogfood-probe.mjs`), then
+`__vimtextProbe.watch(box)` on the box, with `{ enterSends: true }` where Enter sends or
+submits (Slack, Stack Overflow's comment box). `watch` focuses the box from the page's
+JavaScript (a coordinate click met a late layout shift and sent keys to the page), and from
+then on a key that arrives while focus is outside the box is stopped and listed. Send keys,
+and after each step assert on `__vimtextProbe.state()`: the text, the selection, `focused`
+and an empty `leaks`. A batch of tool calls ends at the read that follows one step's keys,
+and a non-empty `leaks` ends the run on that site: in the 0.4.2 pass focus left Gmail's
+compose body mid-batch and the keys behind it ran Gmail's shortcuts on the inbox (#108).
+Start the console capture (`read_console_messages`) right after navigating: it records
+from its first call. Posting publicly is the user's call; ask before step 6.
 
 ### M4: contenteditable editors
 
@@ -127,7 +135,12 @@ do: Ctrl-r reaches Chrome as a reload, never the page, so the owner checks redo 
 reddit.com is blocked; `app.notion.com` needs the owner to allow it in the extension first; a
 send or post (Slack's Enter, Gmail's and GitHub's Cmd+Enter) waits for the owner's go-ahead
 in chat. A confirm dialog stops the tool: discard Stack Overflow's draft with `window.confirm`
-stubbed.
+stubbed. Cmd+B from the tool makes a bold run on Gmail only: on Stack Overflow and Slack
+click the editor's Bold button while in Insert. Gmail's compose URL
+(`#inbox?compose=new`) on a full page load needs more than four seconds before the body
+exists. A notice (`/zzz`'s "No match found") stays in the Status Line for some seconds
+before `--NORMAL--` returns. On Notion, Enter in Insert makes a new block and the Status
+Line hides, since the caret is in another Field: that is step 4 passing.
 
 **No one at a signed-in browser** (the owner remote, #56): `npm run build`, then
 `npm run dogfood:demos [prosemirror|lexical|slate|quill]` runs these steps on the libraries'
