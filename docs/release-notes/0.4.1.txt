@@ -1,0 +1,36 @@
+VimText 0.4.1: fixes for contenteditable editors
+
+VimText gives Vim's modal editing to the text fields of ordinary web pages
+(textarea, single-line text inputs and contenteditable editors), editing
+the page's own field in place: no native host, no replacement editor.
+Chrome only.
+
+Install: https://chromewebstore.google.com/detail/vimtext/egfolppakllammjdjnpbajpioigchbkp
+Source, issues, design and the accepted limitations: https://github.com/Kyu-seok/VimText
+
+What is new since 0.4.0:
+
+Fixes
+- Notion: o, O, a linewise p and u of J now work inside a block. 0.4.0
+  listed them as refused; when a page refuses a line break, VimText now
+  offers it once more the way Shift+Enter would.
+- After cw, s or another change on a bold or italic word, the text you
+  type keeps the formatting of the text it replaced; a after a bold word
+  types bold, i before one types plain, as typing there would.
+- :q, :wq and :x on a contenteditable editor leave nothing highlighted,
+  and clicking back in resumes Normal on the same character.
+- Enter in Normal on a single-line editor (aria-multiline="false") whose
+  page does not handle Enter no longer inserts a line break over the
+  cursor's character. The page's own Enter handling still runs.
+
+Look
+- The toolbar and chrome://extensions icons match the store icon.
+
+Known limits added
+- On Quill and Gmail, cw on the first word of a bold run types plain:
+  Chrome types there in the style before the run.
+- A formatting shortcut such as Cmd+B pressed while an edit is still
+  landing (typed within about 60 ms of o or A) can apply to nothing, or to
+  the wrong text. The text itself is always kept.
+The full list is under "Accepted limitations" in DESIGN.md.
+

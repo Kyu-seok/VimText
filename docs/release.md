@@ -9,18 +9,21 @@ Terms as in `GLOSSARY.md`; the decisions behind this procedure are in spec #27.
 
 A store release is gated by the [dogfooding pass](#dogfooding-pass) on the build from `main`.
 
-1. **Bump both versions.** `manifest.json` and `package.json` each keep a version, bumped by
-   hand. `npm test` (the Node project, `tests/node/versions.test.ts`) refuses a commit that
-   bumps one and not the other.
+1. **Bump both versions and add the release notes.** `manifest.json` and `package.json` each
+   keep a version, bumped by hand, and the notes are `docs/release-notes/<version>.txt`.
+   `npm test` (the Node project) refuses a commit that bumps one version and not the other
+   (`tests/node/versions.test.ts`), or that bumps them without the notes file
+   (`tests/node/release-notes.test.ts`).
 2. **Make the release commit**: `chore: release <version> — <milestone>`, for example
    `chore: release 0.3.0 — M3`.
 3. **Tag it with an annotated tag whose message is the release notes**:
-   `git tag -a v<version>` and write the notes in the editor (or `-F <file>`). The notes are
-   drafted in `docs/store/announcements.md` (ticket #32); the tag message is what the Release
-   shows as its body, so write it for the reader of the Releases page. A change to
+   `git tag -a v<version> -F docs/release-notes/<version>.txt`. The file's first line is the
+   Release's title (`VimText <version>: …`), the rest plain text; the tag message is what the
+   Release shows as its body, so write it for the reader of the Releases page. A change to
    `PRIVACY.md` is noted here. The tag message never changes after the push, so the notes
-   name only what exists at tag time: no store URL before the first upload
-   (`tests/node/release-notes.test.ts` refuses a `<PLACEHOLDER>` token).
+   name only what exists at tag time: no store URL before the first upload (the same test
+   refuses a `<PLACEHOLDER>` token). The 0.4.0 notes are also section 1 of
+   `docs/store/announcements.md`, beside the announcements that quote them.
 4. **Push the commit, then the tag**: `git push && git push origin v<version>`. The pre-push
    hook runs the gate locally; the workflow runs it again on the runner, then
    `npm run package -- --expect-tag v<version>`, then `gh release create` with the zip
@@ -66,10 +69,18 @@ none. In the 0.3.0 pass a stale tab read as "GitHub does not work".
   was not found in 2026-11; `old.reddit.com` has a `<textarea>`. Claude in Chrome cannot open
   reddit.com.
 
-**An agent driving the pass** (Claude in Chrome): focus the box with `element.focus()` from
-the page's JavaScript, not a coordinate click (a late layout shift sent keys to the page),
-send keys, and assert the Field's `.value` after each step. Posting publicly is the user's
-call; ask before step 6.
+**An agent driving the pass** (Claude in Chrome): on every site, first run the output of
+`npm run -s dogfood:probe` in the page (`tools/dogfood-probe.mjs`), then
+`__vimtextProbe.watch(box)` on the box, with `{ enterSends: true }` where Enter sends or
+submits (Slack, Stack Overflow's comment box). `watch` focuses the box from the page's
+JavaScript (a coordinate click met a late layout shift and sent keys to the page), and from
+then on a key that arrives while focus is outside the box is stopped and listed. Send keys,
+and after each step assert on `__vimtextProbe.state()`: the text, the selection, `focused`
+and an empty `leaks`. A batch of tool calls ends at the read that follows one step's keys,
+and a non-empty `leaks` ends the run on that site: in the 0.4.2 pass focus left Gmail's
+compose body mid-batch and the keys behind it ran Gmail's shortcuts on the inbox (#108).
+Start the console capture (`read_console_messages`) right after navigating: it records
+from its first call. Posting publicly is the user's call; ask before step 6.
 
 ### M4: contenteditable editors
 
@@ -127,7 +138,12 @@ do: Ctrl-r reaches Chrome as a reload, never the page, so the owner checks redo 
 reddit.com is blocked; `app.notion.com` needs the owner to allow it in the extension first; a
 send or post (Slack's Enter, Gmail's and GitHub's Cmd+Enter) waits for the owner's go-ahead
 in chat. A confirm dialog stops the tool: discard Stack Overflow's draft with `window.confirm`
-stubbed.
+stubbed. Cmd+B from the tool makes a bold run on Gmail only: on Stack Overflow and Slack
+click the editor's Bold button while in Insert. Gmail's compose URL
+(`#inbox?compose=new`) on a full page load needs more than four seconds before the body
+exists. A notice (`/zzz`'s "No match found") stays in the Status Line for some seconds
+before `--NORMAL--` returns. On Notion, Enter in Insert makes a new block and the Status
+Line hides, since the caret is in another Field: that is step 4 passing.
 
 **No one at a signed-in browser** (the owner remote, #56): `npm run build`, then
 `npm run dogfood:demos [prosemirror|lexical|slate|quill]` runs these steps on the libraries'

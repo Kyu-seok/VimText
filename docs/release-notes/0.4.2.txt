@@ -1,0 +1,41 @@
+VimText 0.4.2: the command line and the Cursor on contenteditable editors
+
+VimText gives Vim's modal editing to the text fields of ordinary web pages
+(textarea, single-line text inputs and contenteditable editors), editing
+the page's own field in place: no native host, no replacement editor.
+Chrome only.
+
+Install: https://chromewebstore.google.com/detail/vimtext/egfolppakllammjdjnpbajpioigchbkp
+Source, issues, design and the accepted limitations: https://github.com/Kyu-seok/VimText
+
+What is new since 0.4.1:
+
+The Cursor on contenteditable editors
+- VimText now draws the Normal-mode Cursor itself: the character under it
+  shows inverted, and the page's own selection stays a caret. A site's
+  selection toolbar no longer opens over every Normal move, and Notion no
+  longer shows an opaque box over the character.
+- Esc with the caret at a line's end puts the Cursor on the last character,
+  not one past it. This holds on textarea and input too.
+
+The command line (: / ?)
+- Esc in the command line closes it.
+- Closing it on a contenteditable editor leaves the Cursor where it was.
+- A command whose Enter ends in a message (a search that finds nothing, an
+  unknown command, :w) gives the field focus back, so the next key is
+  Vim's.
+- A click elsewhere while the command line is open stands: the field does
+  not take focus back, and the Status Line hides.
+- Notion: after the command line closes, keys act on the block again; they
+  were typed into the page.
+- Notion: : typed right after a cursor move keeps the command line open.
+
+Elsewhere
+- The Status Line shows over a modal dialog or popover its field sits in.
+- Esc pressed before VimText's settings have loaded Activates the field
+  even on a page that blurs the field on Esc (Lexical).
+
+Known limits added
+- Esc in a : command line opened from Visual closes it and leaves the
+  field in Visual, where Vim returns to Normal. Press Esc once more.
+The full list is under "Accepted limitations" in DESIGN.md.
