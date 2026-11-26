@@ -25,6 +25,23 @@
       #slack p {
         margin: 0;
       }
+      .monaco-editor {
+        position: relative;
+        width: 480px;
+        height: 80px;
+        margin-bottom: 24px;
+        border: 1px solid #888;
+      }
+      .monaco-editor .inputarea {
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 20px;
+        resize: none;
+        border: 0;
+        color: transparent;
+        background: transparent;
+      }
       .block {
         white-space: break-spaces;
       }
@@ -132,5 +149,18 @@ line three</div></div>
         }
       });
     </script>
+    <!--
+      Monaco's input on leetcode and neetcode (live, 2026-11-26; #111): a one-line
+      textarea over the caret's line, inside the editor's root. It is not the
+      code: Monaco keeps that in its own model and holds a window of it here,
+      which it rewrites. A write to it is dropped or read back as typing, and
+      the code was corrupted. VimText stands down on it (DESIGN.md "Scope").
+      The classes and the role are the live ones; Monaco's own code is not here,
+      so the value is the page's to keep.
+    -->
+    <!-- prettier-ignore -->
+    <div class="monaco-editor" role="code"><div class="overflow-guard"><textarea id="monaco" class="inputarea monaco-mouse-cursor-text" role="textbox" wrap="off" spellcheck="false">line one
+line two
+line three</textarea></div></div>
   </body>
 </html>

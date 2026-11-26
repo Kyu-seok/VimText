@@ -1,4 +1,13 @@
-import { test, expect, statusText, ready, activateAtStart, submitForNotice, focusedId } from "./extension";
+import {
+  test,
+  expect,
+  statusText,
+  ready,
+  activateAtStart,
+  submitForNotice,
+  focusedId,
+  hostCount,
+} from "./extension";
 import type { Page } from "@playwright/test";
 
 /**
@@ -610,5 +619,27 @@ test.describe("Notion page: blocks marked contenteditable inside one editable ro
       .poll(() => lines(page, "#n-two"))
       .toEqual(["line one", "line two", "line one", "line three"]);
     await notRefused(page);
+  });
+});
+
+test.describe("Monaco's input textarea: a window of the code, not the code (#111)", () => {
+  test("Esc and dd reach the page as if VimText were not installed", async ({ page }) => {
+    const input = page.locator("#monaco");
+    await input.focus();
+    await input.evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(0, 0));
+    // The keys the page's own listener is handed: Monaco acts on its input's keydowns.
+    await input.evaluate((el: HTMLTextAreaElement) => {
+      const seen: string[] = [];
+      el.addEventListener("keydown", (e) => {
+        seen.push(e.key);
+        el.dataset.keys = seen.join(" ");
+      });
+    });
+    await page.keyboard.press("Escape");
+    await page.keyboard.type("dd");
+    await expect(input).toHaveValue("ddline one\nline two\nline three");
+    expect(await input.getAttribute("data-keys")).toBe("Escape d d");
+    expect(await statusText(page)).toBe("");
+    expect(await hostCount(page)).toBe(0);
   });
 });
