@@ -22,7 +22,7 @@ contenteditable model in [docs/adr/0007](docs/adr/0007-contenteditable-is-plain-
 | contenteditable inside a closed shadow root             | never (unreachable)                                    |
 | password/number/date/color/file inputs                  | never                                                  |
 | canvas editors (Google Docs)                            | impossible, out of scope                               |
-| code editors with their own text model (Monaco)         | never a Field: VimText stands down on its input (#111) |
+| code editors with their own text model (Monaco)         | never a Field: VimText leaves the input alone (#111)   |
 
 ## Architecture
 

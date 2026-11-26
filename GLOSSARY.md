@@ -5,7 +5,7 @@ VimText is a Chrome extension that gives Vim's modal editing to the text fields 
 ## Language
 
 **Field**:
-An editable element on a web page that VimText can attach to: a textarea, a single-line text input, or a contenteditable Field. To Vim every Field is plain text; formatting is not part of it.
+An editable element on a web page that VimText can attach to: a textarea, a single-line text input, or a contenteditable Field. To Vim every Field is plain text; formatting is not part of it. A code editor's own input (Monaco's) is not a Field (DESIGN.md "Scope").
 _Avoid_: input, element, editor, box
 
 **contenteditable Field**:

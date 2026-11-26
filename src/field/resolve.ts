@@ -20,18 +20,16 @@ export interface ResolvedField {
 const TEXT_INPUT_TYPES = new Set(["text", "search", "url", "email", "tel"]);
 
 /**
- * Monaco's input textarea (DESIGN.md "Scope", #111): `inputarea`, or
- * `ime-text-area` where Monaco takes input through an EditContext. It holds a
- * window of the code around the caret, which Monaco rewrites; the code is in
- * Monaco's own model. Monaco reads a change to it as typing, so a write
- * corrupted the code.
+ * Monaco's input textarea, which is not the code (docs/engine-seams.md,
+ * "Monaco's input textarea"; #111): `inputarea`, or `ime-text-area` where
+ * Monaco takes input through an EditContext.
  */
-function isCodeEditorInput(el: HTMLTextAreaElement): boolean {
+function isMonacoInput(el: HTMLTextAreaElement): boolean {
   return el.matches(".monaco-editor textarea.inputarea, .monaco-editor textarea.ime-text-area");
 }
 
 function isTextControl(el: EventTarget | null): el is TextControl {
-  if (el instanceof HTMLTextAreaElement) return !el.readOnly && !el.disabled && !isCodeEditorInput(el);
+  if (el instanceof HTMLTextAreaElement) return !el.readOnly && !el.disabled && !isMonacoInput(el);
   if (el instanceof HTMLInputElement) {
     return TEXT_INPUT_TYPES.has(el.type) && !el.readOnly && !el.disabled;
   }

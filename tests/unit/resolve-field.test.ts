@@ -24,16 +24,19 @@ function add<K extends keyof HTMLElementTagNameMap>(
 }
 
 describe("resolveField", () => {
-  it.each(["inputarea", "ime-text-area"])(
-    "Monaco's %s textarea is not a Field: it holds a window of the code, not the code (#111)",
-    (cls) => {
-      const editor = add("div", (el) => (el.className = "monaco-editor"));
-      const ta = document.createElement("textarea");
-      ta.className = cls;
-      editor.appendChild(ta);
-      expect(resolveField(ta)).toBeNull();
-    },
-  );
+  it.each(["inputarea", "ime-text-area"])("Monaco's %s textarea is not a Field (#111)", (cls) => {
+    const editor = add("div", (el) => (el.className = "monaco-editor"));
+    const ta = document.createElement("textarea");
+    ta.className = cls;
+    editor.appendChild(ta);
+    expect(resolveField(ta)).toBeNull();
+  });
+
+  it("Monaco's inputarea textarea inside an open shadow root is not a Field (#111)", () => {
+    const root = add("div").attachShadow({ mode: "open" });
+    root.innerHTML = '<div class="monaco-editor"><textarea class="inputarea"></textarea></div>';
+    expect(resolveField(root.querySelector("textarea"))).toBeNull();
+  });
 
   it("a textarea with Monaco's class outside a Monaco editor is a Field", () => {
     const ta = add("textarea", (el) => (el.className = "inputarea"));
