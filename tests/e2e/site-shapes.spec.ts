@@ -624,7 +624,7 @@ test.describe("Notion page: blocks marked contenteditable inside one editable ro
   });
 });
 
-test.describe("Monaco's input textarea: a window of the code, not the code (#111)", () => {
+test.describe("Monaco's input textarea is not a Field (#111)", () => {
   test("Esc and dd reach the page as if VimText were not installed", async ({ page }) => {
     const input = page.locator("#monaco");
     await input.focus();
