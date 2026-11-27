@@ -28,3 +28,25 @@ Why: Monaco keeps its code in its own model and draws only the lines in view, so
 - Only the writable main code editor is a Monaco Field. Monaco's find and rename inputs stay textarea Fields.
 - The fixture for its tests loads the real Monaco package; #111's could imitate the markup because it tested a refusal.
 - The spike must show, on leetcode and code-bite from a real content script: the text read, one edit written, the selection read and set, the cursor style switched, and an update that adds the page-world script installing with no new warning.
+
+## What the spike showed (2026-11-28, #113)
+
+Signed out on leetcode and code-bite, every answer through the built extension. It held on both sites unless a line says otherwise. Still proposed: the owner decides on this report.
+
+- The round trip from the content script to the page world and back is synchronous, so a Monaco Field reads its text synchronously. Reading 2.8 MB took about 4 ms.
+- An edit through `editor.executeEdits` lands byte-exact, with no indenting or bracket closing, and in Monaco's undo stack. One undo step per Vim change needs `editor.pushUndoStop()` before and after it.
+- The selection reads and sets as offsets; the view follows only on `revealPosition`. `executeEdits` keeps Monaco's other cursors, so dropping them takes a `setSelection` after each command.
+- The cursor style switches with `updateOptions` and the original reads back through `getOption`. Neither site reset it.
+- A capture-phase `keydown` listener in the content script stops a key before Monaco acts on it, on `textarea.inputarea` and on the EditContext input alike.
+- A suggestion popup shows in the DOM as `.suggest-widget.visible`; with Esc stopped it stays open until the page-world side hides it.
+- The manifest with the page-world script reports the same install warnings as 0.4.3's (`chrome.management.getPermissionWarningsByManifest`, Chromium 158). A real packed update was not tried.
+
+Three consequences above change with it:
+
+- Neither site swaps the model on a language change: leetcode flushes it and code-bite replaces its whole range. Undo history and marks are cleared on a flush or a language change, not on a swapped model.
+- "The writable main code editor" needs a rule: leetcode has a second writable editor of one plaintext line. The Field is the instance that holds text focus.
+- Whole-text reads are cheap and whole-text writes are not (about 100 ms at 50k lines), so a write sends the mirror's changes as edits. No size limit came out of the bridge; the engine's cost on a large mirror was not measured.
+
+And one reason weakens: the same check reported no new warning for `scripting` with `host_permissions: <all_urls>` either. The declared script remains the choice because it needs neither.
+
+Riskiest piece: Insert pass-through. Monaco's own edits (a closed bracket, an accepted suggestion, a site rewrite) must reach the mirror without the engine's history and Monaco's undo stack disagreeing.
