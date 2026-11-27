@@ -59,6 +59,18 @@ function monacoTextarea(cls = "inputarea"): HTMLTextAreaElement {
   return ta;
 }
 
+/** Monaco's markup around its EditContext input (`div.native-edit-context`, focusable, not contenteditable). */
+function monacoEditContextInput(): HTMLElement {
+  const editor = document.createElement("div");
+  editor.className = "monaco-editor";
+  const input = document.createElement("div");
+  input.className = "native-edit-context";
+  input.tabIndex = 0;
+  editor.appendChild(input);
+  document.body.appendChild(editor);
+  return input;
+}
+
 describe("resolveField on Monaco's input, the setting on", () => {
   it("is a multi-line Monaco Field on the input where the page world answers for its editor", () => {
     honestPageWorld("one\ntwo", 4);
@@ -83,6 +95,30 @@ describe("resolveField on Monaco's input, the setting on", () => {
 
   it("is not a Field where nothing answers: no page-world script, no window.monaco, no writable editor", () => {
     expect(resolveField(monacoTextarea(), { monaco: true })).toBeNull();
+  });
+
+  it("is a multi-line Monaco Field on the EditContext input where the page world answers for its editor", () => {
+    honestPageWorld("one\ntwo", 4);
+    const input = monacoEditContextInput();
+    const resolved = resolveField(input, { monaco: true });
+    expect(resolved?.element).toBe(input);
+    expect(resolved?.singleLine).toBe(false);
+    const field = resolved!.create();
+    expect(field.getValue()).toBe("one\ntwo");
+    expect(field.getSelection()).toEqual({ anchor: 4, head: 4 });
+  });
+
+  it("the EditContext input is not a Field where nothing answers", () => {
+    expect(resolveField(monacoEditContextInput(), { monaco: true })).toBeNull();
+  });
+
+  it("a div with the EditContext input's class outside a Monaco editor is not a Field, and the page world is not asked", () => {
+    const seen = honestPageWorld("one");
+    const div = document.createElement("div");
+    div.className = "native-edit-context";
+    document.body.appendChild(div);
+    expect(resolveField(div, { monaco: true })).toBeNull();
+    expect(seen).toEqual([]);
   });
 
   it("the EditContext input's textarea is not a Field", () => {
@@ -115,6 +151,15 @@ describe("resolveField on Monaco's input, the setting off", () => {
     expect(resolveField(monacoTextarea(), options)).toBeNull();
     expect(seen).toEqual([]);
   });
+
+  it.each([{}, { monaco: false }])(
+    "the EditContext input is not a Field and the page world is not asked (%o)",
+    (options) => {
+      const seen = honestPageWorld("one");
+      expect(resolveField(monacoEditContextInput(), options)).toBeNull();
+      expect(seen).toEqual([]);
+    },
+  );
 });
 
 describe("an answer from the page world is untrusted", () => {

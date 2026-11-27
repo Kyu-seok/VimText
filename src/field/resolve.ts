@@ -118,11 +118,13 @@ export interface ResolveOptions {
 }
 
 /**
- * The input a Monaco code editor focuses and takes typing through, as far as
- * the Monaco Field covers it: `textarea.inputarea`.
+ * The input a Monaco code editor focuses and takes typing through:
+ * `textarea.inputarea`, or `div.native-edit-context` where Monaco takes input
+ * through an EditContext (docs/engine-seams.md, "Monaco: the EditContext input").
  */
-function monacoCodeInput(target: EventTarget | null): HTMLTextAreaElement | null {
-  return target instanceof HTMLTextAreaElement && target.matches(".monaco-editor textarea.inputarea")
+function monacoCodeInput(target: EventTarget | null): HTMLElement | null {
+  return target instanceof HTMLElement &&
+    target.matches(".monaco-editor textarea.inputarea, .monaco-editor div.native-edit-context")
     ? target
     : null;
 }

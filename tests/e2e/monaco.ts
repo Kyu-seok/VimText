@@ -1,6 +1,7 @@
-import type { BrowserContext, Page } from "@playwright/test";
+import { test, type BrowserContext, type Page } from "@playwright/test";
 import type * as Monaco from "monaco-editor";
 import { ready, setSettings } from "./extension";
+import type { MonacoInputOption } from "./monaco-option";
 
 export { MONACO_TEXT } from "../fixtures/monaco-text";
 
@@ -10,10 +11,20 @@ export { MONACO_TEXT } from "../fixtures/monaco-text";
 // holds only the lines in view. Every read goes through the fixture's own
 // `window.fixtureMonaco`, which is there whether or not the page exposes
 // `window.monaco`.
+//
+// Both input kinds (#117): a `monaco*.spec.ts` runs twice, in the `e2e` project
+// on `textarea.inputarea` and in `e2e monaco edit-context` on the EditContext
+// input (playwright.config.ts). `openMonaco` picks the kind from the project,
+// so a spec passes no `editContext` and reads no element by its class; a case
+// whose expectation differs by kind asks `monacoInputKind()`.
 
 /** The editor the fixture page makes (its query string, tests/fixtures/monaco.ts). */
 export interface MonacoPage {
-  /** Monaco takes input through an EditContext instead of `textarea.inputarea`. */
+  /**
+   * Monaco takes input through an EditContext instead of `textarea.inputarea`.
+   * Left out, the project decides (`monacoInputKind`): leave it out unless the
+   * case is about one input kind.
+   */
   editContext?: boolean;
   /** False: the page keeps Monaco to itself, with no `window.monaco`. */
   expose?: boolean;
@@ -35,10 +46,19 @@ export async function setMonacoSetting(
   await setSettings(context, { enabled: true, sites: {}, vimrc: "", plugins: {}, ...rest, monaco: on });
 }
 
+/**
+ * The input kind the running test's project asks for (playwright.config.ts):
+ * `textarea.inputarea` in the `e2e` project, the EditContext input in
+ * `e2e monaco edit-context`, which reruns the Monaco specs.
+ */
+export function monacoInputKind(): MonacoInputOption["monacoInput"] {
+  return (test.info().project.use as Partial<MonacoInputOption>).monacoInput ?? "textarea";
+}
+
 /** Opens the Monaco fixture and waits for its editor and for VimText's settings. */
 export async function openMonaco(page: Page, options: MonacoPage = {}): Promise<void> {
   const query = new URLSearchParams();
-  if (options.editContext) query.set("editContext", "1");
+  if (options.editContext ?? monacoInputKind() === "editContext") query.set("editContext", "1");
   if (options.expose === false) query.set("expose", "0");
   if (options.readOnly) query.set("readOnly", "1");
   if (options.diff) query.set("diff", "1");
