@@ -45,17 +45,6 @@ function concernsFields(record: MutationRecord): boolean {
   return false;
 }
 
-/**
- * True while the element a Session is keyed by still resolves to a Field on
- * itself, of the kind its Field was made as: a host that gains or loses
- * `aria-multiline="false"` stops qualifying, and the next Activation makes a
- * Field of the new kind.
- */
-function stillQualifies(el: HTMLElement, field: Field): boolean {
-  const resolved = resolveField(el);
-  return resolved?.element === el && resolved.singleLine === field.singleLine;
-}
-
 const lifecycleOptions: MutationObserverInit = {
   childList: true,
   subtree: true,
@@ -143,7 +132,7 @@ export class Sessions {
 
   /** Mode of the Session on the focused Field, or null when it has none. */
   get focusedMode(): Session["mode"] | null {
-    const resolved = resolveField(deepActiveElement(this.document));
+    const resolved = this.resolve(deepActiveElement(this.document));
     const entry = resolved ? this.sessions.get(resolved.element) : undefined;
     return entry?.session.mode ?? null;
   }
@@ -151,6 +140,22 @@ export class Sessions {
   /** True while the lifecycle observer is connected: only while a Session exists. */
   get observing(): boolean {
     return this.lifecycleObserver !== null;
+  }
+
+  /** `resolveField` under the settings as they stand: the one way this class asks what is a Field. */
+  private resolve(target: EventTarget | null): ResolvedField | null {
+    return resolveField(target, { monaco: this.settings?.monaco ?? false });
+  }
+
+  /**
+   * True while the element a Session is keyed by still resolves to a Field on
+   * itself, of the kind its Field was made as: a host that gains or loses
+   * `aria-multiline="false"` stops qualifying, and the next Activation makes a
+   * Field of the new kind.
+   */
+  private stillQualifies(el: HTMLElement, field: Field): boolean {
+    const resolved = this.resolve(el);
+    return resolved?.element === el && resolved.singleLine === field.singleLine;
   }
 
   /** The Site Policy for this Site, or null while settings have not arrived. */
@@ -217,7 +222,7 @@ export class Sessions {
     const active = deepActiveElement(this.document);
     const blurred = this.remembered?.blurredByKey ? this.remembered.field : null;
     if (blurred?.isConnected && (active === null || active === this.document.body)) {
-      const resolved = resolveField(blurred);
+      const resolved = this.resolve(blurred);
       if (resolved?.element !== blurred) return;
       this.activate(resolved);
       const field = this.sessions.get(blurred)?.field;
@@ -226,7 +231,7 @@ export class Sessions {
       if (!field?.hasFocus()) this.dispose(blurred);
       return;
     }
-    const resolved = resolveField(active);
+    const resolved = this.resolve(active);
     if (!resolved || this.sessions.has(resolved.element)) return;
     if (policy === "normal" || resolved.element === this.remembered?.field) this.activate(resolved);
   }
@@ -239,7 +244,7 @@ export class Sessions {
     // sees the result. Keys inside the command line are handled by its own
     // input's listener, after this one: those are caught by `onDialog`.
     if (this.sessions.size) this.stateSync?.queueSnapshot();
-    const resolved = resolveField(deepTarget(e));
+    const resolved = this.resolve(deepTarget(e));
     if (!resolved) return;
     this.caretIn(resolved.element);
     const entry = this.sessions.get(resolved.element);
@@ -272,12 +277,12 @@ export class Sessions {
 
   private onSelectionChange = (): void => {
     if (!this.sessions.size) return;
-    const resolved = resolveField(deepActiveElement(this.document));
+    const resolved = this.resolve(deepActiveElement(this.document));
     if (resolved) this.caretIn(resolved.element);
   };
 
   private onFocusin = (e: FocusEvent): void => {
-    const resolved = resolveField(deepTarget(e));
+    const resolved = this.resolve(deepTarget(e));
     if (!resolved) return;
     this.caretField = resolved.element;
     const entry = this.sessions.get(resolved.element);
@@ -286,7 +291,7 @@ export class Sessions {
   };
 
   private onFocusout = (e: FocusEvent): void => {
-    const resolved = resolveField(deepTarget(e));
+    const resolved = this.resolve(deepTarget(e));
     if (!resolved) return;
     this.sessions.get(resolved.element)?.session.onBlur();
     if (this.caretField === resolved.element) this.caretField = null;
@@ -316,7 +321,7 @@ export class Sessions {
       this.lifecycleObserver = new MutationObserver((records) => {
         if (!records.some(concernsFields)) return;
         for (const [el, { field }] of [...this.sessions])
-          if (!el.isConnected || !stillQualifies(el, field)) this.dispose(el);
+          if (!el.isConnected || !this.stillQualifies(el, field)) this.dispose(el);
       });
       this.lifecycleObserver.observe(this.document, lifecycleOptions);
     }

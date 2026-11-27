@@ -12,4 +12,7 @@ tests/fixtures/quill.js
 tests/fixtures/quill.css
 tests/fixtures/lexical.js
 tests/fixtures/slate.js
+tests/fixtures/monaco.js
+tests/fixtures/monaco.css
+tests/fixtures/monaco.worker.js
 .claude/worktrees/

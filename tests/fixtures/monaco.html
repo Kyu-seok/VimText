@@ -1,0 +1,26 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>VimText fixture: Monaco</title>
+    <!-- monaco.js, monaco.css and monaco.worker.js are bundled from monaco.ts by tools/build.mjs and gitignored. -->
+    <link rel="stylesheet" href="monaco.css" />
+    <style>
+      body {
+        font-family: system-ui;
+        margin: 40px;
+      }
+      #editor {
+        width: 640px;
+        height: 240px;
+        border: 1px solid #888;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>VimText fixture: Monaco</h1>
+    <div id="editor"></div>
+    <p><textarea id="plain">a plain textarea</textarea></p>
+    <script src="monaco.js"></script>
+  </body>
+</html>

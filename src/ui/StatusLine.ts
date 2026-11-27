@@ -149,7 +149,7 @@ export class StatusLine {
    */
   reposition = (): void => {
     if (!this.visible) return;
-    const r = this.field.element.getBoundingClientRect();
+    const r = (this.field.boxElement?.() ?? this.field.element).getBoundingClientRect();
     const wrap = this.bar.parentElement!;
     const height = this.bar.offsetHeight;
     const viewport = window.innerHeight;

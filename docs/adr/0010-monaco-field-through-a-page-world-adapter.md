@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # A Monaco code editor is a Field through one page-world adapter; contenteditable editors stay on the DOM
@@ -50,3 +50,7 @@ Three consequences above change with it:
 And one reason weakens: the same check reported no new warning for `scripting` with `host_permissions: <all_urls>` either. The declared script remains the choice because it needs neither.
 
 Riskiest piece: Insert pass-through. Monaco's own edits (a closed bracket, an accepted suggestion, a site rewrite) must reach the mirror without the engine's history and Monaco's undo stack disagreeing.
+
+## Accepted (2026-11-28, #116)
+
+The owner decided to build on the spike's report (spec #115). The tracer (#116) is the route above end to end, on a fixture that loads the real Monaco package: the setting, the declared page-world script, the Monaco Field resolved by `resolveField`, and writes as the mirror's changes through `executeEdits` between undo stops. The install-warning check is now a test (`tests/e2e/install-warning.spec.ts`): Chromium reports the same warnings for the manifest with the page-world script as without it. A real packed update is still untried.
