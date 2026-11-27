@@ -56,7 +56,19 @@ Or load it unpacked from a clone: see [Develop](#develop).
   `Cmd`/`Ctrl+Enter`. When an editor refuses an edit, the editor's text stays
   and the Status Line says so. Password, number, date and file inputs never;
   canvas editors (Google Docs) are out of scope. A code editor that keeps its
-  own text (Monaco, as on LeetCode) is left alone: VimText does not attach to it.
+  own text (Monaco, as on LeetCode) is left alone unless you switch on the
+  setting below.
+- **Monaco code editors (experimental, off by default).** The options page has
+  a switch, "Vim in Monaco code editors": with it on, the code editor of sites
+  such as LeetCode and CodeBite is a Field like any other, with your vimrc,
+  your Plugins, the Status Line and the Site Policy. In Insert the editor
+  itself types, so its bracket closing, indenting and suggestions keep working;
+  one `Esc` closes a suggestion popup and goes to Normal. Turn off the site's
+  own Vim mode there: with both on, both act on every key. A Vim command acts
+  on the editor's primary cursor only, and no Vim key calls the editor's own
+  features (go to definition, folding, commenting). Where a site does not
+  expose Monaco to the page (NeetCode), and in read-only and diff editors,
+  VimText stays out, as it does with the switch off.
 - **On contenteditable editors** VimText edits the text and leaves the
   formatting to the editor, which shows in a few places:
   - Yank and put carry plain text, never formatting. `Cmd+V` keeps the
@@ -79,7 +91,8 @@ Or load it unpacked from a clone: see [Develop](#develop).
   - An editor inside a closed shadow root is out of reach.
 - **Options page.** A vimrc box of ex commands (`nnoremap Y y$`,
   `set ignorecase`, ...) run on every Activation, with each failing line listed
-  under the box; the Plugin toggles; the Site Policy table. The popup holds the
+  under the box; the Plugin toggles; the switch for Monaco code editors; the
+  Site Policy table. The popup holds the
   global on/off switch, the Site Policy for the current site and the Mode of
   the focused Field.
 

@@ -14,15 +14,15 @@ contenteditable model in [docs/adr/0007](docs/adr/0007-contenteditable-is-plain-
 
 ## Scope
 
-| Surface                                                 | Status                                                 |
-| ------------------------------------------------------- | ------------------------------------------------------ |
-| `<textarea>`                                            | first-class, M1                                        |
-| `<input>` text/search/url/email/tel (Single-line Field) | first-class, M2                                        |
-| contenteditable (Gmail, Slack, Notion, …)               | first-class, M4 (one Field per editing host, ADR 0007) |
-| contenteditable inside a closed shadow root             | never (unreachable)                                    |
-| password/number/date/color/file inputs                  | never                                                  |
-| canvas editors (Google Docs)                            | impossible, out of scope                               |
-| code editors with their own text model (Monaco)         | never a Field: VimText leaves the input alone (#111)   |
+| Surface                                                 | Status                                                                                                                                |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `<textarea>`                                            | first-class, M1                                                                                                                       |
+| `<input>` text/search/url/email/tel (Single-line Field) | first-class, M2                                                                                                                       |
+| contenteditable (Gmail, Slack, Notion, …)               | first-class, M4 (one Field per editing host, ADR 0007)                                                                                |
+| contenteditable inside a closed shadow root             | never (unreachable)                                                                                                                   |
+| password/number/date/color/file inputs                  | never                                                                                                                                 |
+| canvas editors (Google Docs)                            | impossible, out of scope                                                                                                              |
+| code editors with their own text model (Monaco)         | the Monaco Field behind its setting, off unless switched on (ADR 0010, #113); stood down where the page does not expose Monaco (#111) |
 
 ## Architecture
 

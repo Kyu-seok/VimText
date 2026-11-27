@@ -85,6 +85,14 @@ so Chrome and the store page show the same words):
 > Display-line motions approximate on mixed fonts. Google Docs draws on a canvas
 > and is out of scope.
 >
+> Experimental, off by default: a setting on the options page, "Vim in Monaco
+> code editors", brings the same Vim, with your vimrc and Plugins, to the code
+> editor of sites such as LeetCode and CodeBite. While you type in Insert mode
+> the editor's own bracket closing, indenting and suggestions keep working. Turn
+> off the site's own Vim mode there, or both act on every key. With the setting
+> off, and on sites whose editor cannot be reached from the page, VimText leaves
+> code editors alone.
+>
 > No analytics, no network requests, no remote code. Settings travel with
 > Chrome Sync when you have it on. Open source, MIT:
 > https://github.com/Kyu-seok/VimText
@@ -121,7 +129,8 @@ Why these permissions and not narrower ones is also recorded in
 **`storage`:**
 
 > VimText keeps the user's settings (which sites it is enabled on and in which
-> Start Mode, the user's vimrc text, and two Plugin toggles) in
+> Start Mode, the user's vimrc text, two Plugin toggles and the switch for
+> Monaco code editors) in
 > `chrome.storage.sync`, so they follow the user's Chrome Sync when it is on and
 > otherwise stay on the device. It keeps Vim's registers, macros and command
 > history in `chrome.storage.session`, so they are shared by every tab and gone
@@ -213,8 +222,8 @@ content is collected.)
 >
 > The extension's toolbar popup shows the global on/off switch, the Site Policy
 > for the current site and the Mode of the focused field. The options page
-> (right-click the icon, Options) holds the vimrc box, the Plugin toggles and
-> the Site Policy table.
+> (right-click the icon, Options) holds the vimrc box, the Plugin toggles, the
+> switch for Monaco code editors (off by default) and the Site Policy table.
 >
 > There are no network requests, no analytics and no remote code. The source
 > is at https://github.com/Kyu-seok/VimText and the privacy policy at
