@@ -636,6 +636,9 @@ export class Session {
     const doc = view.state.doc.toString();
     const sel = this.field.getSelection();
     const insert = this.mirror.vim.insertMode;
+    // The page replaced the Field's whole document (a Monaco Field's flush or
+    // language change): once its text is the mirror's, the past is forgotten.
+    const replaced = this.field.takeDocumentReplaced?.() ?? false;
     this.lastText = text;
 
     if (text !== doc) {
@@ -663,8 +666,13 @@ export class Session {
             : EditorSelection.cursor(insert ? head : clipToLine(newDoc, head)),
         userEvent,
       });
+      if (replaced) this.mirror.forgetPast();
       this.agreeOn(this.here());
       return;
+    }
+    if (replaced) {
+      this.mirror.forgetPast();
+      this.agreeOn(this.here());
     }
 
     // The engine's own focus of the Field, its command line closing: focusing

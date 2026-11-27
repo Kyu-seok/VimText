@@ -190,6 +190,8 @@ describe("an answer from the page world is untrusted", () => {
       "a text longer than the limit",
       JSON.stringify({ anchor: 0, head: 0, text: "x".repeat(MAX_ANSWER_LENGTH) }),
     ],
+    ["a count of flushes that is not a count", '{"anchor":0,"head":0,"text":"x","generation":"7"}'],
+    ["a negative count of flushes", '{"anchor":0,"head":0,"text":"x","generation":-1}'],
   ];
 
   it.each(badReads)("a read answered with %s leaves the Field at the text it last read", (_name, detail) => {
@@ -222,6 +224,48 @@ describe("an answer from the page world is untrusted", () => {
     expect(field.getValue()).toBe("abc");
     expect(field.getSelection()).toEqual({ anchor: 0, head: 2 });
     expect(field.singleLine).toBe(false);
+  });
+});
+
+describe("the page's count of its flushes and language changes, as a Monaco Field reads it (#121)", () => {
+  /** A page world whose `read` answers carry `state.generation`, when it is a number. */
+  function countingPageWorld(state: { generation?: number }): void {
+    pageWorld((request) => [
+      JSON.stringify(
+        request.op === "read"
+          ? { anchor: 0, head: 0, text: "code", generation: state.generation }
+          : { anchor: 0, head: 0 },
+      ),
+    ]);
+  }
+
+  it("the first count read is where the Field starts: nothing was replaced", () => {
+    countingPageWorld({ generation: 5 });
+    const field = resolveField(monacoTextarea(), { monaco: true })!.create();
+    field.getValue();
+    expect(field.takeDocumentReplaced!()).toBe(false);
+  });
+
+  it("a count that moved says the document was replaced, once, however many reads saw it", () => {
+    const state = { generation: 0 };
+    countingPageWorld(state);
+    const field = resolveField(monacoTextarea(), { monaco: true })!.create();
+    field.getValue();
+    state.generation = 2;
+    field.getValue();
+    field.getValue();
+    expect(field.takeDocumentReplaced!()).toBe(true);
+    expect(field.takeDocumentReplaced!()).toBe(false);
+    field.getValue();
+    expect(field.takeDocumentReplaced!()).toBe(false);
+  });
+
+  it("a page world that sends no count never says so", () => {
+    countingPageWorld({});
+    const field = resolveField(monacoTextarea(), { monaco: true })!.create();
+    field.getValue();
+    field.getValue();
+    expect(field.takeDocumentReplaced!()).toBe(false);
   });
 });
 

@@ -365,6 +365,82 @@ describe("The Monaco Field's setting switched off (#118)", () => {
   });
 });
 
+describe("A Monaco Field's element replaced by its editor, focus kept (#121)", () => {
+  /** Monaco's markup as far as `resolveField` reads it, on the page. */
+  function monacoInput(): HTMLTextAreaElement {
+    const editor = document.createElement("div");
+    editor.className = "monaco-editor";
+    const input = document.createElement("textarea");
+    input.className = "inputarea";
+    editor.appendChild(input);
+    document.body.appendChild(editor);
+    return input;
+  }
+  /** What Monaco does on `setModel`, in one script: the old elements off the page, a new input focused. */
+  function replace(old: HTMLTextAreaElement): HTMLTextAreaElement {
+    old.parentElement!.remove();
+    const input = monacoInput();
+    input.focus();
+    return input;
+  }
+  const pageWorld = (e: Event) => {
+    const request = JSON.parse((e as CustomEvent<string>).detail) as { op: string };
+    const answer = { anchor: 0, head: 0, ...(request.op === "read" ? { text: "code" } : {}) };
+    e.composedPath()[0]!.dispatchEvent(
+      new CustomEvent("vimtext:monaco:answer", { detail: JSON.stringify(answer) }),
+    );
+  };
+  beforeEach(() => window.addEventListener("vimtext:monaco:request", pageWorld, true));
+  afterEach(() => window.removeEventListener("vimtext:monaco:request", pageWorld, true));
+
+  it("from Normal, the new input is Activated at once in Normal and the old Session is gone", async () => {
+    port.arrive({ ...settingsFor(null), monaco: true });
+    await settle();
+    const input = monacoInput();
+    input.focus();
+    keydown(input, "Escape");
+    expect(statusText()).toContain("NORMAL");
+    const next = replace(input);
+    expect(hostCount()).toBe(1);
+    expect(statusText()).toContain("NORMAL");
+    expect(keydown(next, "x").defaultPrevented).toBe(true); // Vim's key
+  });
+
+  it.each([null, "normal"] as const)(
+    "from Insert, the new input is left inert until Esc (Site Policy %s)",
+    async (policy) => {
+      port.arrive({ ...settingsFor(policy), monaco: true });
+      await settle();
+      const input = monacoInput();
+      input.focus();
+      if (policy === null) keydown(input, "Escape");
+      keydown(input, "i");
+      expect(statusText()).toContain("INSERT");
+      const next = replace(input);
+      expect(hostCount()).toBe(0);
+      expect(keydown(next, "x").defaultPrevented).toBe(false); // the page's typing
+      keydown(next, "Escape");
+      expect(statusText()).toContain("NORMAL");
+    },
+  );
+
+  it("a textarea Field replaced the same way is not carried over: its Session ends with it", async () => {
+    port.arrive(settingsFor(null));
+    await settle();
+    const ta = document.createElement("textarea");
+    document.body.appendChild(ta);
+    ta.focus();
+    keydown(ta, "Escape");
+    expect(statusText()).toContain("NORMAL");
+    ta.remove();
+    const next = document.createElement("textarea");
+    document.body.appendChild(next);
+    next.focus();
+    await settle();
+    expect(hostCount()).toBe(0);
+  });
+});
+
 describe("Once settings are known", () => {
   it("'insert' Activates on Esc at once, taking the key from the page", async () => {
     port.arrive(settingsFor(null));

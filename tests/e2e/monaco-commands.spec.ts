@@ -8,6 +8,7 @@ import {
   monacoText,
   openMonaco,
   setMonacoSetting,
+  shownStatusText,
   withEditor,
 } from "./monaco";
 
@@ -50,19 +51,6 @@ async function activate(
   await focusMonaco(page, offset);
   await page.keyboard.press("Escape");
   await expect.poll(() => statusText(page)).toContain("NORMAL");
-}
-
-/**
- * The text of the Status Line that shows. The page has one per Activated Field,
- * the blurred Field's hidden, so `statusText`, which reads the first, is not enough here.
- */
-function shownStatusText(page: Page): Promise<string> {
-  return page.evaluate(() =>
-    [...document.querySelectorAll<HTMLElement>("vimtext-status")]
-      .filter((host) => !host.hidden)
-      .map((host) => host.shadowRoot?.querySelector(".bar")?.textContent ?? "")
-      .join("|"),
-  );
 }
 
 /** Whether the editor has text focus, as Monaco itself tells it. */

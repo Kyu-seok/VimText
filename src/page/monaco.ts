@@ -3,7 +3,9 @@
 // VimText's content script asks: its one listener is for VimText's own request
 // event, and it reads nothing, `window.monaco` included, before a request
 // arrives. It finds Monaco only through `window.monaco`, and answers with
-// offsets and text only (src/field/monacoProtocol.ts).
+// offsets, text and one count only (src/field/monacoProtocol.ts). From its
+// first request for an editor it listens to that editor's flushes and language
+// changes, to count them.
 import type * as Monaco from "monaco-editor";
 import {
   MONACO_ANSWER,
@@ -123,15 +125,42 @@ function showCursor(api: Api, editor: Editor, block: boolean): void {
   }
 }
 
+/**
+ * Changes from outside (#121): per editor, how many times the page flushed its
+ * model (`setValue`, as a reset button does) or changed its language, counted
+ * from the first request for that editor, which is when the two listeners are
+ * added (docs/engine-seams.md, "Monaco: changes from outside"). An edit, the
+ * page's or VimText's, is no flush.
+ */
+const generations = new WeakMap<Editor, { count: number }>();
+
+function generationOf(editor: Editor): number {
+  let generation = generations.get(editor);
+  if (!generation) {
+    const counted = { count: 0 };
+    generations.set(editor, (generation = counted));
+    editor.onDidChangeModelContent((e) => {
+      if (e.isFlush) counted.count++;
+    });
+    editor.onDidChangeModelLanguage(() => counted.count++);
+  }
+  return generation.count;
+}
+
 function answerTo(api: Api, input: Element, request: MonacoRequest): MonacoAnswer | null {
   const editor = editorOf(api, input);
   const model = editor?.getModel();
   if (!editor || !model) return null;
+  const generation = generationOf(editor);
   switch (request.op) {
     case "selection":
       break;
     case "read":
-      return { ...selectionOf(editor, model), text: model.getValue(api.editor.EndOfLinePreference.LF) };
+      return {
+        ...selectionOf(editor, model),
+        text: model.getValue(api.editor.EndOfLinePreference.LF),
+        generation,
+      };
     case "edit":
       applyEdits(editor, model, request.edits);
       break;

@@ -33,10 +33,17 @@ export type MonacoRequest =
 
 /**
  * All an answer may hold: the primary selection as offsets, and for `read` the
- * text. No answer at all means the element has no editor that can be a Field.
+ * text and the count of the page's flushes. No answer at all means the element has no editor that can be a Field.
  */
 export interface MonacoAnswer {
   anchor: number;
   head: number;
   text?: string;
+  /**
+   * Changes from outside (#121), with `read` only: how many times the page has
+   * flushed the editor's model (`setValue`) or changed its language since the
+   * page-world script first answered for this editor. A count that differs
+   * from the last one read says the text before it is no state to undo to.
+   */
+  generation?: number;
 }

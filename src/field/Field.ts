@@ -25,6 +25,22 @@ export interface Field {
   readonly singleLine: boolean;
   getValue(): string;
   /**
+   * True once after a `getValue()` found that the page replaced the Field's
+   * document under VimText: a Monaco Field's editor flushed its model or
+   * changed its language (ADR 0010; docs/engine-seams.md, "Monaco: changes
+   * from outside"). The texts before it are no states to undo to, and the
+   * Session forgets its undo history and marks. Absent on Fields where a
+   * page's rewrite is a change like any other.
+   */
+  takeDocumentReplaced?(): boolean;
+  /**
+   * True on a Field whose element the page's editor makes anew, focus kept,
+   * when it takes another document (a Monaco Field's on a swapped model;
+   * docs/engine-seams.md, "Monaco: changes from outside"): `Sessions` carries
+   * a Session's hold of the keys over to the element that took the focus.
+   */
+  readonly elementReplaced?: boolean;
+  /**
    * Writes text in a way the host page's framework notices (React, Vue, …).
    * A textarea or input writes synchronously; a contenteditable host returns a
    * promise that resolves once the write has settled (ADR 0008), and the

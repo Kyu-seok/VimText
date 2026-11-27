@@ -1,4 +1,11 @@
-import { type ChangeSet, EditorSelection, EditorState, type Extension, type Text } from "@codemirror/state";
+import {
+  type ChangeSet,
+  Compartment,
+  EditorSelection,
+  EditorState,
+  type Extension,
+  type Text,
+} from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { history, undo, undoDepth } from "@codemirror/commands";
 import { vim, getCM, Vim } from "@replit/codemirror-vim";
@@ -35,6 +42,8 @@ interface VimState {
   insertModeReturn: boolean;
   mode?: string;
   status: string;
+  /** The marks by name, each a bookmark in the mirror's text. */
+  marks: Record<string, { clear(): void }>;
   inputState: {
     keyBuffer: string[];
     operator: string | null | undefined;
@@ -115,6 +124,8 @@ export class Mirror {
   readonly cm: VimCM;
   readonly plugin: VimPlugin;
   private updateHandlers = new Set<UpdateHandler>();
+  /** Holds the undo history, so that `forgetPast` can replace it with an empty one. */
+  private readonly past = new Compartment();
   /** True while the command line closes because focus left it for elsewhere in the page: the engine's re-focus is dropped. */
   private leavingCommandLine = false;
 
@@ -128,7 +139,7 @@ export class Mirror {
         selection: { anchor: Math.min(opts.cursor, opts.doc.length) },
         extensions: [
           vim(),
-          history(),
+          this.past.of(history()),
           EditorView.lineWrapping,
           EditorState.allowMultipleSelections.of(true),
           updateListener,
@@ -355,6 +366,20 @@ export class Mirror {
       selection: EditorSelection.cursor(clipToLine(newDoc, Math.min(head, newDoc.length))),
       userEvent: "input.type",
     });
+  }
+
+  /**
+   * Empties the undo history and removes every mark: the page replaced the
+   * Field's document (a Monaco Field's flushed model or changed language), so
+   * no earlier text is a state `u` may bring back and no mark points into this
+   * one. The history's state lives in its extension, and goes with it.
+   */
+  forgetPast(): void {
+    this.view.dispatch({ effects: this.past.reconfigure([]) });
+    this.view.dispatch({ effects: this.past.reconfigure(history()) });
+    const vim = this.vim;
+    for (const mark of Object.values(vim.marks)) mark.clear();
+    vim.marks = {};
   }
 
   /** Runs an ex command line (without the leading colon). */

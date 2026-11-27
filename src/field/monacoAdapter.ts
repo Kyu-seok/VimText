@@ -14,8 +14,8 @@ function isOffset(value: unknown, max: number): value is number {
 /**
  * The answer in `detail`, or null. The page world is the page's: what comes
  * back is untrusted (ADR 0010), so only a JSON string of the expected shape is
- * taken, a selection as two offsets and at most a text they fit in, and only
- * those fields are kept.
+ * taken, a selection as two offsets and at most a text they fit in and a
+ * count, and only those fields are kept.
  */
 function parseAnswer(detail: unknown, wantsText: boolean): MonacoAnswer | null {
   if (typeof detail !== "string" || detail.length > MAX_ANSWER_LENGTH) return null;
@@ -26,11 +26,13 @@ function parseAnswer(detail: unknown, wantsText: boolean): MonacoAnswer | null {
     return null;
   }
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return null;
-  const { anchor, head, text } = parsed as Record<string, unknown>;
+  const { anchor, head, text, generation } = parsed as Record<string, unknown>;
   if (wantsText) {
     if (typeof text !== "string" || !isOffset(anchor, text.length) || !isOffset(head, text.length))
       return null;
-    return { anchor, head, text };
+    // The count of the page's flushes (#121) is a count or the answer is not one.
+    if (generation === undefined) return { anchor, head, text };
+    return isOffset(generation, Number.MAX_SAFE_INTEGER) ? { anchor, head, text, generation } : null;
   }
   if (!isOffset(anchor, Number.MAX_SAFE_INTEGER) || !isOffset(head, Number.MAX_SAFE_INTEGER)) return null;
   return { anchor, head };

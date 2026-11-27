@@ -1,5 +1,14 @@
 import { test, expect } from "./extension";
-import { MONACO_TEXT, monacoHistory, monacoText, openMonaco, tallText, withEditor } from "./monaco";
+import {
+  MONACO_TEXT,
+  changeFromOutside,
+  monacoHistory,
+  monacoText,
+  openMonaco,
+  tallText,
+  withEditor,
+  type OutsideChange,
+} from "./monaco";
 
 // The Monaco facts the Monaco Field rests on (docs/engine-seams.md, the
 // "Monaco: …" entries; CODING_STANDARDS rule 12), observed on the real package
@@ -178,5 +187,80 @@ test.describe("Monaco: the cursor style", () => {
     expect(block.layer).toContain("cursor-block-style");
     await withEditor(page, (ed) => ed.updateOptions({ cursorStyle: "line" }), null);
     expect((await read()).option).toBe(1);
+  });
+});
+
+test.describe("Monaco: changes from outside", () => {
+  /**
+   * Makes one edit, then `change`, and reports which of the editor's change
+   * events fired during `change` and whether its content change was a flush.
+   */
+  function eventsOf(page: import("@playwright/test").Page, change: OutsideChange) {
+    return (async () => {
+      await edit(page, "executeEdits", { from: 0, to: 1, text: "F" });
+      await withEditor(
+        page,
+        (ed) => {
+          const seen: string[] = [];
+          Object.assign(window, { seenChanges: seen });
+          ed.onDidChangeModelContent((e) => seen.push(e.isFlush ? "content, a flush" : "content"));
+          ed.onDidChangeModelLanguage(() => seen.push("language"));
+          ed.onDidChangeModel(() => seen.push("model"));
+        },
+        null,
+      );
+      await changeFromOutside(page, change);
+      return page.evaluate(() => (window as unknown as { seenChanges: string[] }).seenChanges);
+    })();
+  }
+
+  test("setValue is a content change marked as a flush, and empties the undo stack", async ({ page }) => {
+    expect(await eventsOf(page, { kind: "flush", text: "new text" })).toEqual(["content, a flush"]);
+    await monacoHistory(page, "undo");
+    expect(await monacoText(page)).toBe("new text");
+  });
+
+  test("an edit replacing the whole range is a content change, no flush, and can be undone", async ({
+    page,
+  }) => {
+    expect(await eventsOf(page, { kind: "replace", text: "new text" })).toEqual(["content"]);
+    expect(await monacoText(page)).toBe("new text");
+    // With the edit before it, as no undo stop sits between them ("Monaco: undo stops").
+    await monacoHistory(page, "undo");
+    expect(await monacoText(page)).toBe(MONACO_TEXT);
+  });
+
+  test("a language change is its own event with no content change, and keeps the undo stack", async ({
+    page,
+  }) => {
+    expect(await eventsOf(page, { kind: "language", language: "plaintext" })).toEqual(["language"]);
+    await monacoHistory(page, "undo");
+    expect(await monacoText(page)).toBe(MONACO_TEXT);
+  });
+
+  test("a swapped model is its own event with no content change; the editor makes its elements anew, the old input off the page and the new one focused", async ({
+    page,
+  }) => {
+    await withEditor(page, (ed) => ed.focus(), null);
+    await page.evaluate(() =>
+      Object.assign(window, {
+        before: { input: document.activeElement, editor: document.querySelector("#editor .monaco-editor") },
+      }),
+    );
+    expect(await eventsOf(page, { kind: "model", text: "another model" })).toEqual(["model"]);
+    expect(await monacoText(page)).toBe("another model");
+    expect(
+      await page.evaluate(() => {
+        const { input, editor } = (window as unknown as { before: { input: Element; editor: Element } })
+          .before;
+        const now = document.activeElement!;
+        return {
+          oldInputOnPage: input.isConnected,
+          oldEditorOnPage: editor.isConnected,
+          focusOnAnotherInput: now !== input && now.className === input.className,
+        };
+      }),
+    ).toEqual({ oldInputOnPage: false, oldEditorOnPage: false, focusOnAnotherInput: true });
+    expect(await withEditor(page, (ed) => ed.hasTextFocus(), null)).toBe(true);
   });
 });
