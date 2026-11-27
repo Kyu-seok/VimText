@@ -6,6 +6,7 @@ import {
   monacoText,
   openMonaco,
   tallText,
+  tokensReady,
   withEditor,
   type OutsideChange,
 } from "./monaco";
@@ -368,6 +369,37 @@ test.describe("Monaco: bracket closing", () => {
       await reset(page);
       expect(await typeParenAt(page, 20)).toBe("()\n");
     }
+  });
+
+  test("( typed on a line below one Monaco has not tokenized yet, in the script that made the text or the line, is not closed; once the tokens are in, it is", async ({
+    page,
+  }) => {
+    // Offset 36: the end of the second line, "  return a + b;".
+    const typed = await withEditor(
+      page,
+      (ed, text) => {
+        ed.setValue(text);
+        ed.focus();
+        ed.setPosition(ed.getModel()!.getPositionAt(36));
+        ed.trigger("keyboard", "type", { text: "(" });
+        return ed.getValue().slice(36, 38);
+      },
+      MONACO_TEXT,
+    );
+    expect(typed).toBe("(\n");
+
+    await reset(page);
+    await caretAt(page, 20);
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("(");
+    expect((await monacoText(page)).slice(20, 25)).toBe("\n  (\n");
+
+    await reset(page);
+    await caretAt(page, 20);
+    await page.keyboard.press("Enter");
+    await tokensReady(page);
+    await page.keyboard.type("(");
+    expect((await monacoText(page)).slice(20, 26)).toBe("\n  ()\n");
   });
 
   test("{ then Enter at a line's end leaves the caret on an indented line between the brackets", async ({

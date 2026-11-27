@@ -1,4 +1,4 @@
-import { test, type BrowserContext, type Page } from "@playwright/test";
+import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import type * as Monaco from "monaco-editor";
 import { ready, setSettings } from "./extension";
 import type { MonacoInputOption } from "./monaco-option";
@@ -144,6 +144,29 @@ export function withEditor<T, A>(
     },
     [fn.toString(), arg, editor] as const,
   );
+}
+
+/**
+ * Waits until Monaco has the tokens of the lines above the caret's. Until
+ * then, for a moment after an Enter or a `setValue`, a bracket typed there is
+ * not closed (docs/engine-seams.md, "Monaco: bracket closing"): a case that
+ * types one on a line just made waits here first, as a person's hands do.
+ * `tokenization` is not in Monaco's typings.
+ */
+export async function tokensReady(page: Page, editor = 0): Promise<void> {
+  await expect
+    .poll(() =>
+      withEditor(
+        page,
+        (ed) =>
+          (
+            ed.getModel() as unknown as { tokenization: { isCheapToTokenize(line: number): boolean } }
+          ).tokenization.isCheapToTokenize(ed.getPosition()!.lineNumber),
+        null,
+        editor,
+      ),
+    )
+    .toBe(true);
 }
 
 /** A text of `lines` lines, "line 1" to "line <lines>": taller than the fixture's editor from about 13 lines. */

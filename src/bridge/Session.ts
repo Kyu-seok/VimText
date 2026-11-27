@@ -1,6 +1,6 @@
 import { ChangeSet, EditorSelection, Text } from "@codemirror/state";
 import type { Field } from "../field/Field";
-import { diffText } from "../field/diff";
+import { diffText, diffTextAtCaret } from "../field/diff";
 import { ATOM_CHAR } from "../field/atoms";
 import { clipToLine, Mirror, Vim, type KeyLike } from "../engine/mirror";
 import { engineApi } from "../engine/pluginApi";
@@ -223,6 +223,9 @@ export class Session {
     // Key Policy row 6 passes a Single-line Field's Enter in Normal to the
     // page; the browser's own break it would then make is refused (#51).
     this.stopRefusingBreaks = field.refuseNativeBreaks?.(() => !this.mirror.vim.insertMode) ?? (() => {});
+    // The keys are VimText's from here: a popup the page's editor had open
+    // over the text would wait for an Esc that no longer reaches it.
+    field.closePopups?.();
     this.runVimrc(config);
     this.status.show();
     this.status.setMode(this.mode);
@@ -317,6 +320,8 @@ export class Session {
         if (this.pendingWrite || this.field.selectionSettling?.()) this.typeWhileWriting(e);
         return; // native typing
       }
+      // The Esc that would have closed the editor's popup over the text is taken here.
+      if (isEscape(e)) this.field.closePopups?.();
       this.syncFromField();
       this.dispatchToEngine(e);
       return;
@@ -642,7 +647,9 @@ export class Session {
     this.lastText = text;
 
     if (text !== doc) {
-      const { start, endOld, endNew } = diffText(doc, text);
+      // Typing ends at the Field's caret, which tells where among the same
+      // characters it went: the engine repeats that text with `.`.
+      const { start, endOld, endNew } = insert ? diffTextAtCaret(doc, text, sel.head) : diffText(doc, text);
       const changes = view.state.changes({ from: start, to: endOld, insert: text.slice(start, endNew) });
       const newDoc = changes.apply(view.state.doc);
       // The Field's caret is where the cursor goes, unless the engine's own

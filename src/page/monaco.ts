@@ -179,6 +179,10 @@ function answerTo(api: Api, input: Element, request: MonacoRequest): MonacoAnswe
     case "cursor":
       showCursor(api, editor, request.block === true);
       break;
+    case "closeSuggest":
+      // An Esc stopped before Monaco sees it leaves the popup open (docs/engine-seams.md, "Monaco: the suggestion popup").
+      editor.trigger("vimtext", "hideSuggestWidget", null);
+      break;
     default:
       return null;
   }

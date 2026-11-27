@@ -29,7 +29,9 @@ export type MonacoRequest =
    * `block`: the editor's cursor style becomes a block, the style it had kept
    * for later. Not `block`: that style comes back.
    */
-  | { op: "cursor"; block: boolean };
+  | { op: "cursor"; block: boolean }
+  /** Closes the editor's suggestion popup, as the Esc VimText takes would have. */
+  | { op: "closeSuggest" };
 
 /**
  * All an answer may hold: the primary selection as offsets, and for `read` the

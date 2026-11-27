@@ -97,6 +97,11 @@ export class MonacoField implements Field {
     askMonaco(this.element, { op: "cursor", block: on });
   }
 
+  /** Monaco's suggestion popup: its own Esc would close it, and Esc is VimText's (ADR 0010). */
+  closePopups(): void {
+    askMonaco(this.element, { op: "closeSuggest" });
+  }
+
   hasFocus(): boolean {
     return this.element.matches(":focus");
   }
@@ -121,8 +126,11 @@ export class MonacoField implements Field {
   }
 
   /**
-   * Nothing yet: in Insert, Monaco's own edits reach the mirror when the next
-   * Vim key reads the Field. Change notifications from the page world are #120.
+   * Nothing to hear: in Insert the typing is Monaco's, and what it wrote (a
+   * closed bracket, an indent, an accepted suggestion, its own undo) reaches
+   * the mirror when the next key VimText takes reads the Field, Esc at the
+   * latest, as one change of the Insert's undo step (#120; DESIGN.md
+   * "Ownership of text, by Mode"). The page world sends nothing unasked.
    */
   onInput(): () => void {
     return () => {};
