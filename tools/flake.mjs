@@ -4,7 +4,7 @@
 //   npm run flake                                             # the pre-push editors mix, 5 rounds
 //   npm run flake -- tests/e2e/slate.spec.ts:159 --rounds 3 --repeat-each 100 --stress 6
 //
-// A round is `playwright test --project=e2e <specs> --repeat-each=<n> --workers=<n> --retries=0
+// A round is `playwright test --project=e2e --project="e2e monaco edit-context" <specs> --repeat-each=<n> --workers=<n> --retries=0
 // --trace retain-on-failure`, its traces under test-results/flake-<round>/. Each round prints
 // its last line, its failures and the machine's load average: a round that was red while the
 // load was far above the core count may be the machine, not the test (#83). `--stress K` runs
@@ -59,6 +59,8 @@ for (let round = 1; round <= options.rounds; round++) {
       "playwright",
       "test",
       "--project=e2e",
+      // The Monaco specs among them again on Monaco's EditContext input (playwright.config.ts).
+      "--project=e2e monaco edit-context",
       ...specs,
       `--repeat-each=${options["repeat-each"]}`,
       `--workers=${options.workers}`,
