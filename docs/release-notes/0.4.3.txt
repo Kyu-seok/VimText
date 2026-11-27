@@ -1,0 +1,24 @@
+VimText 0.4.3: VimText leaves Monaco code editors alone
+
+VimText gives Vim's modal editing to the text fields of ordinary web pages
+(textarea, single-line text inputs and contenteditable editors), editing
+the page's own field in place: no native host, no replacement editor.
+Chrome only.
+
+Install: https://chromewebstore.google.com/detail/vimtext/egfolppakllammjdjnpbajpioigchbkp
+Source, issues, design and the accepted limitations: https://github.com/Kyu-seok/VimText
+
+What is new since 0.4.2:
+
+Code editors
+- VimText no longer attaches to a Monaco code editor (LeetCode, NeetCode).
+  It took Monaco's hidden input for a textarea and wrote to it, so dd or u
+  could drop the command or duplicate and re-indent lines of the code.
+  Now no Status Line shows there and every key goes to the site's editor,
+  as if VimText were not installed.
+
+Known limits added
+- A code editor that keeps its own text (Monaco) is never a Field, so
+  VimText gives no Vim keys there. Use the site's own Vim mode if it has
+  one.
+The scope table is under "Scope" in DESIGN.md.
