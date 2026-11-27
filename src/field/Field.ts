@@ -14,6 +14,13 @@ export interface FieldSelection {
 
 export interface Field {
   readonly element: HTMLElement;
+  /**
+   * The element whose box is the Field's on the page, which the Status Line
+   * sits under and the mirror takes its height from, where that is not
+   * `element`: a Monaco Field's element is a one-line input at the caret, and
+   * its box is the editor's. Absent on Fields whose element is their box.
+   */
+  boxElement?(): HTMLElement;
   /** True for fields that cannot hold a newline (single-line inputs). */
   readonly singleLine: boolean;
   getValue(): string;

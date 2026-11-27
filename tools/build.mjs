@@ -22,6 +22,7 @@ const ctx = await esbuild.context({
   ...common,
   entryPoints: {
     content: "src/content.ts",
+    "monaco-page": "src/page/monaco.ts",
     background: "src/background.ts",
     "popup/popup": "popup/popup.ts",
     "options/options": "options/options.ts",
@@ -33,6 +34,8 @@ const ctx = await esbuild.context({
 // pages: React 19 ships no UMD build (tests/fixtures/react.tsx), and the pinned
 // ProseMirror, Quill, Lexical and Slate builds are npm modules, the first two with
 // their stylesheets (tests/fixtures/prosemirror.ts, quill.ts, lexical.ts, slate.ts).
+// Monaco (tests/fixtures/monaco.ts) comes with its stylesheet, its icon font
+// inlined in it, and its editor worker as a file of its own.
 async function buildFixtures() {
   await esbuild.build({
     ...common,
@@ -42,7 +45,10 @@ async function buildFixtures() {
       quill: "tests/fixtures/quill.ts",
       lexical: "tests/fixtures/lexical.ts",
       slate: "tests/fixtures/slate.ts",
+      monaco: "tests/fixtures/monaco.ts",
+      "monaco.worker": "monaco-editor/esm/vs/editor/editor.worker.js",
     },
+    loader: { ".ttf": "dataurl" },
     outdir: "tests/fixtures",
   });
 }

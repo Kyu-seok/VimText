@@ -14,6 +14,7 @@ const vimrcStatus = document.getElementById("vimrc-status")!;
 const vimrcErrors = document.getElementById("vimrc-errors") as HTMLUListElement;
 const surround = document.getElementById("plugin-surround") as HTMLInputElement;
 const targets = document.getElementById("plugin-targets") as HTMLInputElement;
+const monacoField = document.getElementById("monaco-field") as HTMLInputElement;
 const sitesBody = document.querySelector("#sites tbody") as HTMLTableSectionElement;
 
 function renderSites(settings: Settings): void {
@@ -72,6 +73,7 @@ function render(settings: Settings): void {
   renderVimrcErrors(checkVimrc(settings.vimrc));
   surround.checked = settings.plugins.surround;
   targets.checked = settings.plugins.targets;
+  monacoField.checked = settings.monaco;
   renderSites(settings);
 }
 
@@ -96,6 +98,13 @@ targets.addEventListener(
   () =>
     void updateSettings((s) => {
       s.plugins.targets = targets.checked;
+    }),
+);
+monacoField.addEventListener(
+  "change",
+  () =>
+    void updateSettings((s) => {
+      s.monaco = monacoField.checked;
     }),
 );
 

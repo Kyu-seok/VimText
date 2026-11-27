@@ -13,7 +13,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import { loadavg } from "node:os";
 
-const EDITORS = ["slate", "lexical", "quill", "prosemirror"].map((e) => `tests/e2e/${e}.spec.ts`);
+const EDITORS = ["slate", "lexical", "quill", "prosemirror", "monaco"].map((e) => `tests/e2e/${e}.spec.ts`);
 const options = { rounds: 5, "repeat-each": 5, workers: 4, stress: 0 };
 const specs = [];
 const args = process.argv.slice(2);

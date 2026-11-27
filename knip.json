@@ -3,6 +3,7 @@
   "entry": [
     "src/content.ts",
     "src/background.ts",
+    "src/page/monaco.ts",
     "popup/popup.ts",
     "options/options.ts",
     "tools/*.mjs",
@@ -10,7 +11,8 @@
     "tests/fixtures/prosemirror.ts",
     "tests/fixtures/quill.ts",
     "tests/fixtures/lexical.ts",
-    "tests/fixtures/slate.ts"
+    "tests/fixtures/slate.ts",
+    "tests/fixtures/monaco.ts"
   ],
   "project": ["src/**/*.ts", "popup/**/*.ts", "options/**/*.ts", "tools/**/*.mjs", "tests/**/*.{ts,tsx}"]
 }
