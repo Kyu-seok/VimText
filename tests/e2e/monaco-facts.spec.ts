@@ -388,11 +388,20 @@ test.describe("Monaco: bracket closing", () => {
     );
     expect(typed).toBe("(\n");
 
+    // The same on the line an Enter just made, typed as the keys' own command so no task runs between.
     await reset(page);
     await caretAt(page, 20);
-    await page.keyboard.press("Enter");
-    await page.keyboard.type("(");
-    expect((await monacoText(page)).slice(20, 25)).toBe("\n  (\n");
+    await tokensReady(page);
+    const afterEnter = await withEditor(
+      page,
+      (ed) => {
+        ed.trigger("keyboard", "type", { text: "\n" });
+        ed.trigger("keyboard", "type", { text: "(" });
+        return ed.getValue().slice(20, 25);
+      },
+      null,
+    );
+    expect(afterEnter).toBe("\n  (\n");
 
     await reset(page);
     await caretAt(page, 20);
