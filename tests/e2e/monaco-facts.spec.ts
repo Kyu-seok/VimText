@@ -1,29 +1,10 @@
-import type * as Monaco from "monaco-editor";
 import { test, expect } from "./extension";
-import { MONACO_TEXT, monacoHistory, monacoText, openMonaco } from "./monaco";
+import { MONACO_TEXT, monacoHistory, monacoText, openMonaco, tallText, withEditor } from "./monaco";
 
 // The Monaco facts the Monaco Field rests on (docs/engine-seams.md, the
 // "Monaco: …" entries; CODING_STANDARDS rule 12), observed on the real package
 // with VimText standing down: the setting is off, so none of its code acts on
 // the editor. Each `describe` is named after its engine-seams entry.
-
-type Editor = Monaco.editor.IStandaloneCodeEditor;
-
-/** Runs `fn` in the page with the fixture's editor. */
-function withEditor<T, A>(
-  page: import("@playwright/test").Page,
-  fn: (ed: Editor, arg: A) => T,
-  arg: A,
-): Promise<T> {
-  return page.evaluate(
-    ([source, a]) => {
-      const m = (window as unknown as { fixtureMonaco: typeof Monaco }).fixtureMonaco;
-      const run = new Function(`return (${source as string})`)() as (ed: Editor, arg: A) => T;
-      return run(m.editor.getEditors()[0] as Editor, a as A);
-    },
-    [fn.toString(), arg] as const,
-  );
-}
 
 /** Replaces the text from offset `from` to `to` with `text`, through the named API. */
 function edit(
@@ -116,5 +97,86 @@ test.describe("Monaco: undo stops", () => {
     await edit(page, "executeEdits", { from: 2, to: 3, text: "" });
     await monacoHistory(page, "undo");
     expect(await monacoText(page)).toBe(MONACO_TEXT);
+  });
+});
+
+/** Monaco's selections as line numbers, the primary one first. */
+function cursorLines(page: import("@playwright/test").Page): Promise<number[]> {
+  return withEditor(page, (ed) => (ed.getSelections() ?? []).map((s) => s.positionLineNumber), null);
+}
+
+test.describe("Monaco: the view and the cursors", () => {
+  test("setSelection on a line below the view does not scroll; revealPosition does", async ({ page }) => {
+    await withEditor(page, (ed, text) => ed.setValue(text), tallText(200));
+    const line150 = { lineNumber: 150, column: 1 };
+    await withEditor(
+      page,
+      (ed, at) =>
+        ed.setSelection({ ...at, endLineNumber: 150, endColumn: 1, startLineNumber: 150, startColumn: 1 }),
+      line150,
+    );
+    await page.waitForTimeout(300);
+    expect(await withEditor(page, (ed) => ed.getScrollTop(), null)).toBe(0);
+    expect(await cursorLines(page)).toEqual([150]);
+    await withEditor(page, (ed, at) => ed.revealPosition(at), line150);
+    await expect.poll(() => withEditor(page, (ed) => ed.getScrollTop(), null)).toBeGreaterThan(0);
+    await expect
+      .poll(() =>
+        withEditor(
+          page,
+          (ed) => ed.getVisibleRanges().some((r) => r.startLineNumber <= 150 && r.endLineNumber >= 150),
+          null,
+        ),
+      )
+      .toBe(true);
+  });
+
+  test("executeEdits keeps the extra cursors; setSelection leaves one", async ({ page }) => {
+    await withEditor(
+      page,
+      (ed) =>
+        ed.setSelections([
+          { selectionStartLineNumber: 1, selectionStartColumn: 1, positionLineNumber: 1, positionColumn: 1 },
+          { selectionStartLineNumber: 2, selectionStartColumn: 1, positionLineNumber: 2, positionColumn: 1 },
+        ]),
+      null,
+    );
+    await edit(page, "executeEdits", { from: 0, to: 1, text: "" });
+    expect(await monacoText(page)).toBe(MONACO_TEXT.slice(1));
+    expect(await cursorLines(page)).toEqual([1, 2]);
+    await withEditor(
+      page,
+      (ed) => ed.setSelection({ startLineNumber: 1, startColumn: 1, endLineNumber: 1, endColumn: 1 }),
+      null,
+    );
+    expect(await cursorLines(page)).toEqual([1]);
+  });
+});
+
+test.describe("Monaco: the cursor style", () => {
+  test("the style a page did not set reads through getOption, not the raw options; updateOptions switches it and back", async ({
+    page,
+  }) => {
+    const read = () =>
+      withEditor(
+        page,
+        (ed) => ({
+          raw: ed.getRawOptions().cursorStyle ?? null,
+          // EditorOption.cursorStyle; TextEditorCursorStyle: Line 1, Block 2, Underline 3.
+          option: ed.getOption(34),
+          layer: ed.getDomNode()!.querySelector(".cursors-layer")!.className,
+        }),
+        null,
+      );
+    const before = await read();
+    expect(before.raw).toBeNull();
+    expect(before.option).toBe(1);
+    expect(before.layer).toContain("cursor-line-style");
+    await withEditor(page, (ed) => ed.updateOptions({ cursorStyle: "block" }), null);
+    const block = await read();
+    expect(block.option).toBe(2);
+    expect(block.layer).toContain("cursor-block-style");
+    await withEditor(page, (ed) => ed.updateOptions({ cursorStyle: "line" }), null);
+    expect((await read()).option).toBe(1);
   });
 });

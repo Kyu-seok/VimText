@@ -700,7 +700,8 @@ export class Session {
     // A Field that measures the Cursor's box gets a caret before the Cursor's
     // character, and VimText draws the Cursor (ADR 0009): a page reads a
     // one-character selection as a person selecting it.
-    if (this.field.cursorBox) return { anchor: main.head, head: main.head };
+    // So does a Field whose editor draws the Cursor as its own block (ADR 0010).
+    if (this.field.cursorBox || this.field.showBlockCursor) return { anchor: main.head, head: main.head };
     const line = state.doc.lineAt(main.head);
     return main.head < line.to
       ? { anchor: main.head, head: main.head + 1 }
@@ -862,7 +863,6 @@ export class Session {
    * Command-line or while the Field does not have focus.
    */
   private drawCursor(): void {
-    if (!this.field.cursorBox) return;
     const mode = this.mode;
     const shape = !this.field.hasFocus()
       ? null
@@ -871,6 +871,10 @@ export class Session {
         : mode === "replace"
           ? "bar"
           : null;
+    // A Field whose editor draws the Cursor (a Monaco Field, ADR 0010) shows
+    // its block in the same Modes, and the page's own cursor style in the rest.
+    this.field.showBlockCursor?.(shape === "block");
+    if (!this.field.cursorBox) return;
     this.status.cursor.draw(shape, this.mirror.view.state.selection.main.head);
   }
 
@@ -1010,6 +1014,7 @@ export class Session {
     // alone, like a pending operator.
     this.pluginKeys.discard();
     this.status.cursor.hide();
+    this.field.showBlockCursor?.(false);
     for (const plugin of this.plugins) plugin.onBlur?.();
     // Keep the bar while the command line has focus (it lives in our shadow
     // root) or `:wq` is leaving behind its notice.

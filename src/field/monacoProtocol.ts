@@ -24,7 +24,12 @@ export type MonacoRequest =
   /** The edits, as one step of the editor's undo stack. */
   | { op: "edit"; edits: MonacoEdit[] }
   /** Sets the selection, which leaves the editor one cursor, and scrolls its head into view. */
-  | { op: "select"; anchor: number; head: number };
+  | { op: "select"; anchor: number; head: number }
+  /**
+   * `block`: the editor's cursor style becomes a block, the style it had kept
+   * for later. Not `block`: that style comes back.
+   */
+  | { op: "cursor"; block: boolean };
 
 /**
  * All an answer may hold: the primary selection as offsets, and for `read` the

@@ -329,6 +329,42 @@ describe("A later settings change", () => {
   });
 });
 
+describe("The Monaco Field's setting switched off (#118)", () => {
+  it("ends the Session on a Monaco Field at once, its last word to the page world the cursor style's return", async () => {
+    // Monaco's markup as far as `resolveField` reads it, and a page world that answers for it.
+    const editor = document.createElement("div");
+    editor.className = "monaco-editor";
+    const input = document.createElement("textarea");
+    input.className = "inputarea";
+    editor.appendChild(input);
+    document.body.appendChild(editor);
+    const seen: { op: string; block?: boolean }[] = [];
+    const pageWorld = (e: Event) => {
+      const request = JSON.parse((e as CustomEvent<string>).detail) as { op: string };
+      seen.push(request);
+      const answer = { anchor: 0, head: 0, ...(request.op === "read" ? { text: "code" } : {}) };
+      e.composedPath()[0]!.dispatchEvent(
+        new CustomEvent("vimtext:monaco:answer", { detail: JSON.stringify(answer) }),
+      );
+    };
+    window.addEventListener("vimtext:monaco:request", pageWorld, true);
+    try {
+      port.arrive({ ...settingsFor(null), monaco: true });
+      await settle();
+      input.focus();
+      keydown(input, "Escape");
+      expect(statusText()).toContain("NORMAL");
+      expect(seen.filter((r) => r.op === "cursor")).toEqual([{ op: "cursor", block: true }]);
+      port.change({ ...settingsFor(null), monaco: false });
+      expect(hostCount()).toBe(0);
+      expect(seen.at(-1)).toEqual({ op: "cursor", block: false });
+      expect(keydown(input, "Escape").defaultPrevented).toBe(false); // the page's again
+    } finally {
+      window.removeEventListener("vimtext:monaco:request", pageWorld, true);
+    }
+  });
+});
+
 describe("Once settings are known", () => {
   it("'insert' Activates on Esc at once, taking the key from the page", async () => {
     port.arrive(settingsFor(null));

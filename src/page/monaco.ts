@@ -16,6 +16,7 @@ import {
 type Api = typeof Monaco;
 type Editor = Monaco.editor.ICodeEditor;
 type Model = Monaco.editor.ITextModel;
+type CursorStyleName = NonNullable<Monaco.editor.IEditorOptions["cursorStyle"]>;
 
 /**
  * The editor `input` is the input of, when it can be a Monaco Field: a code
@@ -84,6 +85,44 @@ function applyEdits(editor: Editor, model: Model, edits: MonacoEdit[]): void {
   editor.pushUndoStop();
 }
 
+/**
+ * The cursor style each editor had before VimText made it a block, as
+ * `getOption` gave it: the raw options hold no style a page did not set
+ * (docs/engine-seams.md, "Monaco: the cursor style").
+ */
+const ownCursorStyle = new WeakMap<Editor, Monaco.editor.TextEditorCursorStyle>();
+
+/** The name `updateOptions` takes for a cursor style `getOption` gave. */
+function cursorStyleName(api: Api, style: Monaco.editor.TextEditorCursorStyle): CursorStyleName {
+  const styles = api.editor.TextEditorCursorStyle;
+  switch (style) {
+    case styles.Block:
+      return "block";
+    case styles.Underline:
+      return "underline";
+    case styles.LineThin:
+      return "line-thin";
+    case styles.BlockOutline:
+      return "block-outline";
+    case styles.UnderlineThin:
+      return "underline-thin";
+    default:
+      return "line";
+  }
+}
+
+/** A block cursor, or the style the editor had before its first block. */
+function showCursor(api: Api, editor: Editor, block: boolean): void {
+  const own = ownCursorStyle.get(editor);
+  if (block) {
+    if (own === undefined) ownCursorStyle.set(editor, editor.getOption(api.editor.EditorOption.cursorStyle));
+    editor.updateOptions({ cursorStyle: "block" });
+  } else if (own !== undefined) {
+    ownCursorStyle.delete(editor);
+    editor.updateOptions({ cursorStyle: cursorStyleName(api, own) });
+  }
+}
+
 function answerTo(api: Api, input: Element, request: MonacoRequest): MonacoAnswer | null {
   const editor = editorOf(api, input);
   const model = editor?.getModel();
@@ -108,6 +147,9 @@ function answerTo(api: Api, input: Element, request: MonacoRequest): MonacoAnswe
       editor.revealPosition(head);
       break;
     }
+    case "cursor":
+      showCursor(api, editor, request.block === true);
+      break;
     default:
       return null;
   }
