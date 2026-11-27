@@ -83,6 +83,12 @@ export interface Field {
    * character, as with `cursorBox`.
    */
   showBlockCursor?(on: boolean): void;
+  /**
+   * Closes what the page's editor has open over the text for the person's
+   * typing (a Monaco Field's suggestion popup), which the editor would have
+   * closed on the Esc VimText takes. Absent on Fields with nothing of the kind.
+   */
+  closePopups?(): void;
   focus(): void;
   /**
    * Takes focus off the Field, leaving nothing in it highlighted. A Field

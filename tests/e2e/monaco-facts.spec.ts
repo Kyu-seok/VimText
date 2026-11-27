@@ -6,6 +6,7 @@ import {
   monacoText,
   openMonaco,
   tallText,
+  tokensReady,
   withEditor,
   type OutsideChange,
 } from "./monaco";
@@ -262,5 +263,161 @@ test.describe("Monaco: changes from outside", () => {
       }),
     ).toEqual({ oldInputOnPage: false, oldEditorOnPage: false, focusOnAnotherInput: true });
     expect(await withEditor(page, (ed) => ed.hasTextFocus(), null)).toBe(true);
+  });
+});
+
+/** Focuses the editor with its caret at `offset` of the text. */
+function caretAt(page: import("@playwright/test").Page, offset: number): Promise<void> {
+  return withEditor(
+    page,
+    (ed, at) => {
+      ed.focus();
+      ed.setPosition(ed.getModel()!.getPositionAt(at));
+    },
+    offset,
+  );
+}
+
+test.describe("Monaco: the suggestion popup", () => {
+  const popup = "#editor .suggest-widget.visible";
+
+  /** Types the start of `return`, a word of the text, on the text's empty last line. */
+  async function typeRe(page: import("@playwright/test").Page): Promise<void> {
+    await caretAt(page, MONACO_TEXT.length);
+    await expect(page.locator(popup)).toHaveCount(0);
+    await page.keyboard.type("re");
+    await expect(page.locator(popup)).toHaveCount(1);
+  }
+
+  test("typing the start of a word opens a popup that shows as .suggest-widget.visible, and Esc closes it", async ({
+    page,
+  }) => {
+    await typeRe(page);
+    await page.keyboard.press("Escape");
+    await expect(page.locator(popup)).toHaveCount(0);
+  });
+
+  test("with Esc stopped in the capture phase the popup stays open, until hideSuggestWidget is triggered on the editor", async ({
+    page,
+  }) => {
+    await page.evaluate(() =>
+      document.addEventListener(
+        "keydown",
+        (e) => {
+          if (e.key !== "Escape") return;
+          e.preventDefault();
+          e.stopImmediatePropagation();
+        },
+        true,
+      ),
+    );
+    await typeRe(page);
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(300);
+    await expect(page.locator(popup)).toHaveCount(1);
+    await withEditor(page, (ed) => ed.trigger("test", "hideSuggestWidget", null), null);
+    await expect(page.locator(popup)).toHaveCount(0);
+    expect(await monacoText(page)).toBe(MONACO_TEXT + "re");
+  });
+
+  test("hideSuggestWidget with no popup open changes nothing", async ({ page }) => {
+    await caretAt(page, 5);
+    await withEditor(page, (ed) => ed.trigger("test", "hideSuggestWidget", null), null);
+    expect(await monacoText(page)).toBe(MONACO_TEXT);
+    expect(await withEditor(page, (ed) => ed.getModel()!.getOffsetAt(ed.getPosition()!), null)).toBe(5);
+  });
+
+  test("Enter accepts the suggestion: the word is in the text", async ({ page }) => {
+    await typeRe(page);
+    await page.keyboard.press("Enter");
+    expect(await monacoText(page)).toBe(MONACO_TEXT + "return");
+  });
+});
+
+test.describe("Monaco: bracket closing", () => {
+  /** Puts the caret at `offset`, types `(`, and returns the three characters from there. */
+  async function typeParenAt(page: import("@playwright/test").Page, offset: number): Promise<string> {
+    await caretAt(page, offset);
+    await page.keyboard.type("(");
+    return (await monacoText(page)).slice(offset, offset + 3);
+  }
+  const reset = (page: import("@playwright/test").Page) =>
+    withEditor(page, (ed, text) => ed.setValue(text), MONACO_TEXT);
+
+  test("( typed at a line's end, before a space or before a closing bracket is closed", async ({ page }) => {
+    // Offset 20: the end of "function add(a, b) {".
+    expect(await typeParenAt(page, 20)).toBe("()\n");
+    await reset(page);
+    // Offset 8: before the space of "function add".
+    expect(await typeParenAt(page, 8)).toBe("() ");
+    await reset(page);
+    // Offset 17: before the ")" of "(a, b)".
+    expect(await typeParenAt(page, 17)).toBe("())");
+  });
+
+  test("( typed where a setValue leaves the caret, the text's start, is before a word character and not closed", async ({
+    page,
+  }) => {
+    await reset(page);
+    await withEditor(page, (ed) => ed.focus(), null);
+    await page.keyboard.type("(");
+    expect((await monacoText(page)).slice(0, 3)).toBe("(fu");
+  });
+
+  test("( typed at a line's end right after a setValue is closed, ten times of ten", async ({ page }) => {
+    for (let i = 0; i < 10; i++) {
+      await reset(page);
+      expect(await typeParenAt(page, 20)).toBe("()\n");
+    }
+  });
+
+  test("( typed on a line below one Monaco has not tokenized yet, in the script that made the text or the line, is not closed; once the tokens are in, it is", async ({
+    page,
+  }) => {
+    // Offset 36: the end of the second line, "  return a + b;".
+    const typed = await withEditor(
+      page,
+      (ed, text) => {
+        ed.setValue(text);
+        ed.focus();
+        ed.setPosition(ed.getModel()!.getPositionAt(36));
+        ed.trigger("keyboard", "type", { text: "(" });
+        return ed.getValue().slice(36, 38);
+      },
+      MONACO_TEXT,
+    );
+    expect(typed).toBe("(\n");
+
+    // The same on the line an Enter just made, typed as the keys' own command so no task runs between.
+    await reset(page);
+    await caretAt(page, 20);
+    await tokensReady(page);
+    const afterEnter = await withEditor(
+      page,
+      (ed) => {
+        ed.trigger("keyboard", "type", { text: "\n" });
+        ed.trigger("keyboard", "type", { text: "(" });
+        return ed.getValue().slice(20, 25);
+      },
+      null,
+    );
+    expect(afterEnter).toBe("\n  (\n");
+
+    await reset(page);
+    await caretAt(page, 20);
+    await page.keyboard.press("Enter");
+    await tokensReady(page);
+    await page.keyboard.type("(");
+    expect((await monacoText(page)).slice(20, 26)).toBe("\n  ()\n");
+  });
+
+  test("{ then Enter at a line's end leaves the caret on an indented line between the brackets", async ({
+    page,
+  }) => {
+    await caretAt(page, MONACO_TEXT.length);
+    await page.keyboard.type("{");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("y");
+    expect(await monacoText(page)).toBe(MONACO_TEXT + "{\n  y\n}");
   });
 });

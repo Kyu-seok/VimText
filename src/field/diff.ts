@@ -26,6 +26,35 @@ export function diffText(oldText: string, newText: string): TextDiff {
   return { start, endOld, endNew };
 }
 
+/**
+ * `diffText` for typing, which ends at the caret. Where the same characters
+ * stand on both sides of an insertion or a deletion the texts alone do not say
+ * which of them it was, and `diffText` takes the last: a line typed above one
+ * of the same indent (`\n  x` before `\n  y`) reads as `x\n  `. The span is
+ * moved back toward `caret`, the caret in `newText`, while it still holds the
+ * same characters: an insertion until it ends at the caret, or as near after
+ * it as it gets (an editor's closing bracket stands after the caret), a
+ * deletion until it is at the caret. A span that does not reach the caret
+ * stays `diffText`'s.
+ */
+export function diffTextAtCaret(oldText: string, newText: string, caret: number): TextDiff {
+  const d = diffText(oldText, newText);
+  const inserted = d.endOld === d.start;
+  if (inserted === (d.endNew === d.start)) return d; // a replacement has one place
+  // The text that holds the span, and the span's end in it.
+  const text = inserted ? newText : oldText;
+  let start = d.start;
+  let end = inserted ? d.endNew : d.endOld;
+  const stop = inserted ? end - caret : start - caret;
+  for (let moved = 0; moved < stop && start > 0 && text[start - 1] === text[end - 1]; moved++) {
+    start--;
+    end--;
+  }
+  if (start === d.start || caret < start || (inserted ? caret > end : caret !== start)) return d;
+  const back = d.start - start;
+  return { start, endOld: d.endOld - back, endNew: d.endNew - back };
+}
+
 /** One changed span: `fromOld`..`toOld` of the old text became `fromNew`..`toNew` of the new one. */
 export interface Hunk {
   fromOld: number;
