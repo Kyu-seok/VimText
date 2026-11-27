@@ -19,6 +19,7 @@
     "e2e:last": "node tools/e2e-last.mjs",
     "screenshots": "npm run build && playwright test --config playwright.screenshots.config.ts",
     "dogfood:demos": "node tools/dogfood-demos.mjs",
+    "dogfood:monaco": "node tools/dogfood-monaco.mjs",
     "dogfood:probe": "node tools/dogfood-probe.mjs",
     "package": "node tools/package.mjs",
     "check": "node tools/e2e-last.mjs --clear && node tools/tree-stamp.mjs record && npm run typecheck && npm run check:imports && npm run check:unused && npm test && npm run test:e2e && node tools/tree-stamp.mjs verify",
