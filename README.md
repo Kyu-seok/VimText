@@ -55,7 +55,8 @@ Or load it unpacked from a clone: see [Develop](#develop).
   in Normal is Vim's motion, so a chat box sends with `Enter` in Insert or
   `Cmd`/`Ctrl+Enter`. When an editor refuses an edit, the editor's text stays
   and the Status Line says so. Password, number, date and file inputs never;
-  canvas editors (Google Docs) are out of scope.
+  canvas editors (Google Docs) are out of scope. A code editor that keeps its
+  own text (Monaco, as on LeetCode) is left alone: VimText does not attach to it.
 - **On contenteditable editors** VimText edits the text and leaves the
   formatting to the editor, which shows in a few places:
   - Yank and put carry plain text, never formatting. `Cmd+V` keeps the
