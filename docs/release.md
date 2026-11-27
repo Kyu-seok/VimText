@@ -153,6 +153,60 @@ libraries, not the sites: the sign-ins, the send keys and Stack Overflow (behind
 challenge) stay with a person, and the comment on the gate ticket says which were reached.
 To tell a regression from an old gap, build `main` in a temporary worktree and run it there too.
 
+### Monaco code editors
+
+Added with the Monaco Field (#122, ADR 0010). The same blocker rule. Signed out is enough, and
+nothing is run or submitted: never press the site's Run or Submit.
+
+**Switch the setting on**: the options page, "Vim in Monaco code editors". Leave the site's own
+Vim mode off (LeetCode: Settings, Code Editor, Key binding; CodeBite: the editor's settings).
+
+**On each site,** in the code editor, on the code the site starts with, with the console open.
+After each step the editor's whole text is what Vim gives for the text before it
+(`monaco.editor.getEditors()` in the console reads it: Monaco draws only the lines in view):
+
+1. Click into the code; Esc shows `--NORMAL--` under the editor and Monaco's block cursor.
+2. `gg dd`, `u`, Ctrl-r, `u`.
+3. `gg yy p`, `u`.
+4. `gg ^ cw`, a word, Esc; one `u` takes the whole change back.
+5. `gg 0 x`, then `.`; `u` twice.
+6. Visual: `gg 0 v l l d`, `u`; `gg V j d`, `u`.
+7. `:%s/e/E/g`, `u`. The engine's notice stays on the Status Line for about 15 seconds.
+8. Insert: `gg A`, a space, `zq(`: the site closes the bracket, `zq()`. Esc, and one `u`
+   takes the typing back. A bracket Monaco leaves open is its own choice (DESIGN.md
+   "Accepted limitations").
+9. `gg A`, a space, the first letters of a word the code holds: where a suggestion popup
+   opens, one Esc closes it and shows `--NORMAL--`. `u`.
+10. Switch the language with the site's picker and click back into the code: `gg dd` and `u`
+    work on the new code, and a second `u` changes nothing (no way back into the old language).
+11. Change something (`x`), press the site's reset button and confirm, click back into the
+    code: the starting code is back, and `gg dd`, `u` work on it.
+12. `i`: the cursor is the site's own again, and Esc brings the block back.
+13. No console errors from VimText.
+
+**Then, with the setting switched off** (reload the tab): Esc shows no Status Line and `dd`
+types `dd` into the code, as 0.4.3.
+
+**Which page, per site** (re-check when a site redesigns):
+
+- **LeetCode**: any problem, e.g. `leetcode.com/problems/stone-removal-game`. Input through
+  `textarea.inputarea`. Signed out, typing opened no suggestion popup in 2026-11: step 9 is
+  then the Esc alone. The reset button is the arrow turning left above the editor.
+- **CodeBite**: any problem, e.g. `code-bite.com/problems/reverse-linked-list`. Monaco's
+  EditContext input. The reset button (코드 초기화) asks to confirm.
+- **NeetCode**, with the setting on: `neetcode.io/problems/climbing-stairs/question` has no
+  `window.monaco`, so VimText stands down: no Status Line, `dd` typed as text.
+
+**No one at the browser**: `npm run build`, then
+`npm run dogfood:monaco -- <leetcode|code-bite|neetcode> [--off] [--out <dir>]`
+(`tools/dogfood-monaco.mjs`) walks steps 1 to 11, or the stand-down check with `--off` and on
+NeetCode, through the built extension in Playwright's Chromium with a fresh profile, compares
+the whole text after each step and exits non-zero on a difference. `--out` keeps a video and
+the step log. LeetCode serves a Cloudflare challenge to headless Chromium, so the tool opens a
+window for it and for CodeBite; when a site redesigns, its picker and reset button are the
+`SITES` entry at the top of the tool. Step 12 and a signed-in editor (its suggestions, the
+site's own Vim mode switched on by mistake) stay with a person.
+
 ## The package script
 
 `npm run package` (`tools/package.mjs`) is what the workflow runs and what a local check of

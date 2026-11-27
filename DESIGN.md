@@ -411,6 +411,17 @@ it is outside the gate, so PNG churn never fails `npm run check`.
 - On a Monaco Field, a bracket typed in Insert is closed or not as Monaco decides, with
   VimText as without it: not before a word character, and not for a moment after an Enter
   or after the page replaced the text (docs/engine-seams.md, "Monaco: bracket closing").
+- On a Monaco Field a Vim command acts on Monaco's primary cursor and leaves that one: the
+  extra cursors a person made (Alt+click, Cmd+D) are gone after the next command or motion
+  (#118, ADR 0010). Pinned by tests/e2e/monaco-cursor.spec.ts, "a Vim command acts on the
+  primary cursor and leaves one".
+- On a Monaco Field no Vim key calls a feature of Monaco (ADR 0010, #113): go to definition,
+  folding, commenting and placing the view have no key of VimText's (`gd`, `zc`/`zo`, `gc`,
+  `zz`/`zt`/`zb` in a code editor's own Vim mode). Each does what the engine does with it on
+  any Field, or nothing. The view follows the Cursor on every move.
+- A site's own Vim mode (LeetCode, CodeBite and NeetCode each have one in their editor
+  settings) is not detected: with it and the Monaco Field's setting both on, both act on
+  every key. Turn one of the two off; the options page says so beside the setting.
 - Visual block highlights only the primary range.
 - Engine deviation: a user mapping whose prefix is itself a bound key (e.g. `nnoremap <Space>x dd`
   while `<Space>` is `l`) never fires; the engine takes the full match at once instead of waiting
