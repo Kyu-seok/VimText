@@ -15,7 +15,11 @@ import type { MonacoEdit } from "./monacoProtocol";
  */
 export class MonacoField implements Field {
   readonly singleLine = false;
+  readonly elementReplaced = true;
   private text = "";
+  /** The page's count of its flushes and language changes at the last read, and whether it has moved since `takeDocumentReplaced`. */
+  private generation: number | undefined;
+  private replaced = false;
   private selection: FieldSelection = { anchor: 0, head: 0 };
   /** Whether the editor's cursor style is the block VimText set. */
   private block = false;
@@ -36,8 +40,19 @@ export class MonacoField implements Field {
     if (answer?.text !== undefined) {
       this.text = answer.text;
       this.selection = { anchor: answer.anchor, head: answer.head };
+      if (answer.generation !== undefined) {
+        // The first count read is where this Field starts from.
+        if (this.generation !== undefined && this.generation !== answer.generation) this.replaced = true;
+        this.generation = answer.generation;
+      }
     }
     return this.text;
+  }
+
+  takeDocumentReplaced(): boolean {
+    const replaced = this.replaced;
+    this.replaced = false;
+    return replaced;
   }
 
   /**

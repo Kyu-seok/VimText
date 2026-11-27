@@ -3,7 +3,7 @@ import type * as Monaco from "monaco-editor";
 import { ready, setSettings } from "./extension";
 import type { MonacoInputOption } from "./monaco-option";
 
-export { MONACO_TEXT } from "../fixtures/monaco-text";
+export { MONACO_TEXT, ONE_LINE_TEXT, SECOND_TEXT } from "../fixtures/monaco-text";
 
 // The shared helpers of the Monaco fixture's specs (tests/fixtures/monaco.ts):
 // opening the page with the editor a spec needs, switching the setting on, and
@@ -33,6 +33,10 @@ export interface MonacoPage {
   diff?: boolean;
   /** The model's line ends are `\r\n`. */
   eol?: "crlf";
+  /** A second code editor, index 1 among the editors, holding `SECOND_TEXT`. */
+  second?: boolean;
+  /** A plaintext editor of one line holding `ONE_LINE_TEXT`, the last among the editors. */
+  oneLine?: boolean;
 }
 
 type FixtureWindow = Window & { fixtureMonaco: typeof Monaco; pageKeys: string[] };
@@ -63,6 +67,8 @@ export async function openMonaco(page: Page, options: MonacoPage = {}): Promise<
   if (options.readOnly) query.set("readOnly", "1");
   if (options.diff) query.set("diff", "1");
   if (options.eol) query.set("eol", options.eol);
+  if (options.second) query.set("second", "1");
+  if (options.oneLine) query.set("oneLine", "1");
   await page.goto(`/monaco.html?${query.toString()}`);
   await page.waitForSelector('html[data-monaco="ready"]', { state: "attached" });
   await ready(page);
@@ -163,4 +169,52 @@ export function monacoCursorLine(page: Page, editor = 0): Promise<{ line: number
     const height = ed.getLayoutInfo().height;
     return { line, inView: top >= 0 && top < height };
   }, editor);
+}
+
+/**
+ * The text of the Status Line that shows. A page has one host per Activated
+ * Field, the blurred Field's hidden, and `statusText` reads the first: this is
+ * the read for a page with more than one Activated Field.
+ */
+export function shownStatusText(page: Page): Promise<string> {
+  return page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>("vimtext-status")]
+      .filter((host) => !host.hidden)
+      .map((host) => host.shadowRoot?.querySelector(".bar")?.textContent ?? "")
+      .join("|"),
+  );
+}
+
+/** What a page does to its editor's text or model from outside, each as a site was seen or might do it (#113). */
+export type OutsideChange =
+  /** The whole range replaced by an edit, as code-bite's language switch does: undoable in Monaco. */
+  | { kind: "replace"; text: string }
+  /** `setValue`, a flush of the model, as leetcode's reset and language switch do. */
+  | { kind: "flush"; text: string }
+  /** The model's language changed, its text left alone. */
+  | { kind: "language"; language: string }
+  /** Another model given to the editor. */
+  | { kind: "model"; text: string };
+
+/** Makes `change` to one of the fixture's editors, as the page's own script would. */
+export async function changeFromOutside(page: Page, change: OutsideChange, editor = 0): Promise<void> {
+  await page.evaluate(
+    ([c, index]) => {
+      const m = (window as unknown as FixtureWindow).fixtureMonaco;
+      const ed = m.editor.getEditors()[index]!;
+      const model = ed.getModel()!;
+      if (c.kind === "replace") ed.executeEdits("page", [{ range: model.getFullModelRange(), text: c.text }]);
+      else if (c.kind === "flush") model.setValue(c.text);
+      else if (c.kind === "language") m.editor.setModelLanguage(model, c.language);
+      else {
+        // Monaco 0.55.1 leaves a promise it cancels on the swap unhandled ("Canceled"), with or
+        // without VimText: this page handles it, as the specs fail on any error a page reports.
+        window.addEventListener("unhandledrejection", (e) => {
+          if ((e.reason as Error | undefined)?.name === "Canceled") e.preventDefault();
+        });
+        ed.setModel(m.editor.createModel(c.text, "javascript"));
+      }
+    },
+    [change, editor] as const,
+  );
 }

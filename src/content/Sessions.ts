@@ -292,8 +292,34 @@ export class Sessions {
     this.caretField = resolved.element;
     const entry = this.sessions.get(resolved.element);
     if (entry) entry.session.onFocus();
-    else if (this.policy() === "normal") this.activate(resolved);
+    else if (this.heldBeforeReplaced() ?? this.policy() === "normal") this.activate(resolved);
   };
+
+  /**
+   * Focus arrived on a Field with no Session. Where a Session's Field has just
+   * lost its element to the page's editor, which made a new one and focused it
+   * (a Monaco Field's editor given another model, `Field.elementReplaced`),
+   * that Session ends here, and the answer is whether it held the keys (any
+   * Mode but Insert and Replace): then the new element's Field is Activated,
+   * so a Vim key typed next is not typed into the code, in Normal, with no
+   * undo history and no marks, on the new document. From Insert or Replace it
+   * is not, whatever the Start Mode: the person is typing, the typing stays
+   * the page's, and Esc Activates. Null when no element was replaced. The
+   * lifecycle observer has not run yet: it runs after the page's script, and
+   * the focus moves inside it. Covered in the four Modes, and from Insert on
+   * a Site with a Normal Start Mode, by `tests/e2e/monaco-lifecycle.spec.ts`,
+   * "the page swaps the editor's model".
+   */
+  private heldBeforeReplaced(): boolean | null {
+    let held: boolean | null = null;
+    for (const [el, { field, session }] of [...this.sessions]) {
+      if (el.isConnected || !field.elementReplaced) continue;
+      const mode = session.mode;
+      held = held || (mode !== "insert" && mode !== "replace");
+      this.dispose(el);
+    }
+    return held;
+  }
 
   private onFocusout = (e: FocusEvent): void => {
     const resolved = this.resolve(deepTarget(e));

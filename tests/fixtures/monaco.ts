@@ -12,6 +12,10 @@
 //   ?readOnly=1     the editor is read-only
 //   ?diff=1         a diff editor instead of a code editor
 //   ?eol=crlf       the model's line ends are \r\n
+//   ?second=1       a second code editor in #second, holding SECOND_TEXT
+//   ?oneLine=1      a writable plaintext editor of one line in #one-line,
+//                   holding ONE_LINE_TEXT, as leetcode has beside its code editor (#113)
+// The extra editors come after the first in `monaco.editor.getEditors()`, in that order.
 // What the e2e specs rely on:
 //   #editor                the element the editor is created in
 //   window.pageKeys        the keys of the `keydown` events that reached the page (a listener on #editor)
@@ -20,7 +24,7 @@ import * as monaco from "monaco-editor/esm/vs/editor/editor.api.js";
 // Every editor feature (suggestions, find, bracket closing), and one language for them to work on.
 import "monaco-editor/esm/vs/editor/edcore.main.js";
 import "monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution.js";
-import { MONACO_TEXT } from "./monaco-text";
+import { MONACO_TEXT, ONE_LINE_TEXT, SECOND_TEXT } from "./monaco-text";
 
 const params = new URLSearchParams(location.search);
 const on = (name: string) => params.get(name) === "1";
@@ -48,6 +52,27 @@ if (on("diff")) {
   });
 } else {
   monaco.editor.create(container, { ...options, value: text });
+}
+
+/** A container for one more editor, under the first. */
+function extraContainer(id: string, height: number): HTMLElement {
+  const el = document.createElement("div");
+  el.id = id;
+  el.style.cssText = `width: 640px; height: ${height}px; border: 1px solid #888; margin-top: 12px`;
+  container.after(el);
+  return el;
+}
+// Appended in reverse, so #second sits above #one-line.
+const oneLine = on("oneLine") ? extraContainer("one-line", 24) : null;
+if (on("second")) monaco.editor.create(extraContainer("second", 120), { ...options, value: SECOND_TEXT });
+if (oneLine) {
+  monaco.editor.create(oneLine, {
+    ...options,
+    language: "plaintext",
+    value: ONE_LINE_TEXT,
+    lineNumbers: "off",
+    scrollbar: { vertical: "hidden", horizontal: "hidden" },
+  });
 }
 
 Object.assign(window, { pageKeys });

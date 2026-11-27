@@ -13,7 +13,7 @@ A Field that is one editing host of a rich-text region, such as Gmail's compose 
 _Avoid_: rich-text field, contenteditable region, editor
 
 **Monaco Field**:
-A Field that is one Monaco code editor, such as the code box of LeetCode: the editor itself, not the input element Monaco focuses, which is never a Field. Its text is the editor's whole code. Behind a setting that is off unless switched on: ADR 0010.
+A Field that is one Monaco code editor, such as the code box of LeetCode: the editor itself, not the input element Monaco focuses, which is never a Field. Its text is the editor's whole code. Behind a setting that is off unless switched on: ADR 0010. A page that gives the editor another model ends the Field's Session, since Monaco makes its input anew; where that Session held the keys (any Mode but Insert and Replace) the new input is Activated at once, in Normal.
 _Avoid_: code field, Monaco editor, model field
 
 **Atom**:
