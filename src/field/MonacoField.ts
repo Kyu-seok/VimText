@@ -17,6 +17,8 @@ export class MonacoField implements Field {
   readonly singleLine = false;
   private text = "";
   private selection: FieldSelection = { anchor: 0, head: 0 };
+  /** Whether the editor's cursor style is the block VimText set. */
+  private block = false;
 
   constructor(readonly element: HTMLElement) {}
 
@@ -70,6 +72,16 @@ export class MonacoField implements Field {
     askMonaco(this.element, { op: "select", anchor, head });
   }
 
+  /**
+   * Monaco's block cursor style for Normal, or the style the page had, which
+   * the page-world script keeps. Asked only on a change: every render calls it.
+   */
+  showBlockCursor(on: boolean): void {
+    if (on === this.block) return;
+    this.block = on;
+    askMonaco(this.element, { op: "cursor", block: on });
+  }
+
   hasFocus(): boolean {
     return this.element.matches(":focus");
   }
@@ -120,5 +132,8 @@ export class MonacoField implements Field {
     return this.element.isConnected;
   }
 
-  destroy(): void {}
+  /** The Session ended: the editor gets the page's cursor style back. */
+  destroy(): void {
+    this.showBlockCursor(false);
+  }
 }

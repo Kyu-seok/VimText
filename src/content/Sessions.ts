@@ -203,7 +203,12 @@ export class Sessions {
     this.settings = s;
     const policy = policyFor(s, this.site);
     if (policy === "off") this.disposeAll();
-    else this.reconcile(policy);
+    else {
+      // A setting that decides what is a Field (the Monaco Field's) may have
+      // been switched off: its Sessions end now, not at the page's next mutation.
+      for (const [el, { field }] of [...this.sessions]) if (!this.stillQualifies(el, field)) this.dispose(el);
+      this.reconcile(policy);
+    }
     // The arrival has decided what the remembered key was; a later change must not Activate from it.
     this.remembered = null;
     this.announcePolicy();

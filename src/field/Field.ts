@@ -59,6 +59,14 @@ export interface Field {
    * input selects the character instead. Null when nothing is laid out there.
    */
   cursorBox?(offset: number): DOMRect | null;
+  /**
+   * Has the page's editor draw the Normal-mode Cursor itself (a Monaco Field;
+   * ADR 0010): a block over the character after its caret when `on`, the
+   * cursor style the page had otherwise. Present only on such a Field, whose
+   * selection outside Insert and Visual is a caret before the Cursor's
+   * character, as with `cursorBox`.
+   */
+  showBlockCursor?(on: boolean): void;
   focus(): void;
   /**
    * Takes focus off the Field, leaving nothing in it highlighted. A Field

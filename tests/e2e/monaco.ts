@@ -119,3 +119,48 @@ export async function monacoHistory(page: Page, step: "undo" | "redo", editor = 
 export function pageKeys(page: Page): Promise<string[]> {
   return page.evaluate(() => (window as unknown as FixtureWindow).pageKeys);
 }
+
+/** Runs `fn` in the page with one of the fixture's editors; `fn` sees only its two arguments. */
+export function withEditor<T, A>(
+  page: Page,
+  fn: (ed: Monaco.editor.IStandaloneCodeEditor, arg: A) => T,
+  arg: A,
+  editor = 0,
+): Promise<T> {
+  return page.evaluate(
+    ([source, a, index]) => {
+      const m = (window as unknown as FixtureWindow).fixtureMonaco;
+      const run = new Function(`return (${source as string})`)() as (
+        ed: Monaco.editor.IStandaloneCodeEditor,
+        arg: A,
+      ) => T;
+      return run(m.editor.getEditors()[index as number] as Monaco.editor.IStandaloneCodeEditor, a as A);
+    },
+    [fn.toString(), arg, editor] as const,
+  );
+}
+
+/** A text of `lines` lines, "line 1" to "line <lines>": taller than the fixture's editor from about 13 lines. */
+export function tallText(lines: number): string {
+  return Array.from({ length: lines }, (_, i) => `line ${i + 1}`).join("\n");
+}
+
+/** The editor's cursor style as Monaco names it: "Line", "Block", "Underline", … */
+export function monacoCursorStyle(page: Page, editor = 0): Promise<string> {
+  return page.evaluate((index) => {
+    const m = (window as unknown as FixtureWindow).fixtureMonaco;
+    const style = m.editor.getEditors()[index]!.getOption(m.editor.EditorOption.cursorStyle);
+    return m.editor.TextEditorCursorStyle[style];
+  }, editor);
+}
+
+/** The line the primary cursor is on, and whether the editor's view shows that line. */
+export function monacoCursorLine(page: Page, editor = 0): Promise<{ line: number; inView: boolean }> {
+  return page.evaluate((index) => {
+    const ed = (window as unknown as FixtureWindow).fixtureMonaco.editor.getEditors()[index]!;
+    const line = ed.getPosition()!.lineNumber;
+    const top = ed.getTopForLineNumber(line) - ed.getScrollTop();
+    const height = ed.getLayoutInfo().height;
+    return { line, inView: top >= 0 && top < height };
+  }, editor);
+}
