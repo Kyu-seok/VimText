@@ -126,6 +126,22 @@ describe("Insert mode", () => {
     expect(ta.value).toMatch(/^the quick brown/);
   });
 
+  it("a line put in by one input above one of the same indent (a paste) is recorded where it went: . puts the line break first", () => {
+    // Read from the two texts alone the line could as well be `x\n  ` after
+    // the indent: the caret, at its end, says which (`diffTextAtCaret`). Typed
+    // key by key each change is one character, which has no such choice.
+    ta.value = "a {\n  y\n}";
+    ta.setSelectionRange(0, 0);
+    session.destroy();
+    session = new Session(field, { vimrc: "" });
+    keys("A");
+    typeNatively("\n  x");
+    keydown("Escape");
+    expect(ta.value).toBe("a {\n  x\n  y\n}");
+    keys("j.");
+    expect(ta.value).toBe("a {\n  x\n  y\n  x\n}");
+  });
+
   it("Ctrl-r {register} pastes the register", () => {
     keys("yiwA");
     keydown("r", { ctrlKey: true });

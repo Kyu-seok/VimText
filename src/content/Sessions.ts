@@ -45,17 +45,6 @@ function concernsFields(record: MutationRecord): boolean {
   return false;
 }
 
-/**
- * True while the element a Session is keyed by still resolves to a Field on
- * itself, of the kind its Field was made as: a host that gains or loses
- * `aria-multiline="false"` stops qualifying, and the next Activation makes a
- * Field of the new kind.
- */
-function stillQualifies(el: HTMLElement, field: Field): boolean {
-  const resolved = resolveField(el);
-  return resolved?.element === el && resolved.singleLine === field.singleLine;
-}
-
 const lifecycleOptions: MutationObserverInit = {
   childList: true,
   subtree: true,
@@ -143,7 +132,7 @@ export class Sessions {
 
   /** Mode of the Session on the focused Field, or null when it has none. */
   get focusedMode(): Session["mode"] | null {
-    const resolved = resolveField(deepActiveElement(this.document));
+    const resolved = this.resolve(deepActiveElement(this.document));
     const entry = resolved ? this.sessions.get(resolved.element) : undefined;
     return entry?.session.mode ?? null;
   }
@@ -151,6 +140,22 @@ export class Sessions {
   /** True while the lifecycle observer is connected: only while a Session exists. */
   get observing(): boolean {
     return this.lifecycleObserver !== null;
+  }
+
+  /** `resolveField` under the settings as they stand: the one way this class asks what is a Field. */
+  private resolve(target: EventTarget | null): ResolvedField | null {
+    return resolveField(target, { monaco: this.settings?.monaco ?? false });
+  }
+
+  /**
+   * True while the element a Session is keyed by still resolves to a Field on
+   * itself, of the kind its Field was made as: a host that gains or loses
+   * `aria-multiline="false"` stops qualifying, and the next Activation makes a
+   * Field of the new kind.
+   */
+  private stillQualifies(el: HTMLElement, field: Field): boolean {
+    const resolved = this.resolve(el);
+    return resolved?.element === el && resolved.singleLine === field.singleLine;
   }
 
   /** The Site Policy for this Site, or null while settings have not arrived. */
@@ -198,7 +203,12 @@ export class Sessions {
     this.settings = s;
     const policy = policyFor(s, this.site);
     if (policy === "off") this.disposeAll();
-    else this.reconcile(policy);
+    else {
+      // A setting that decides what is a Field (the Monaco Field's) may have
+      // been switched off: its Sessions end now, not at the page's next mutation.
+      for (const [el, { field }] of [...this.sessions]) if (!this.stillQualifies(el, field)) this.dispose(el);
+      this.reconcile(policy);
+    }
     // The arrival has decided what the remembered key was; a later change must not Activate from it.
     this.remembered = null;
     this.announcePolicy();
@@ -217,7 +227,7 @@ export class Sessions {
     const active = deepActiveElement(this.document);
     const blurred = this.remembered?.blurredByKey ? this.remembered.field : null;
     if (blurred?.isConnected && (active === null || active === this.document.body)) {
-      const resolved = resolveField(blurred);
+      const resolved = this.resolve(blurred);
       if (resolved?.element !== blurred) return;
       this.activate(resolved);
       const field = this.sessions.get(blurred)?.field;
@@ -226,7 +236,7 @@ export class Sessions {
       if (!field?.hasFocus()) this.dispose(blurred);
       return;
     }
-    const resolved = resolveField(active);
+    const resolved = this.resolve(active);
     if (!resolved || this.sessions.has(resolved.element)) return;
     if (policy === "normal" || resolved.element === this.remembered?.field) this.activate(resolved);
   }
@@ -239,7 +249,7 @@ export class Sessions {
     // sees the result. Keys inside the command line are handled by its own
     // input's listener, after this one: those are caught by `onDialog`.
     if (this.sessions.size) this.stateSync?.queueSnapshot();
-    const resolved = resolveField(deepTarget(e));
+    const resolved = this.resolve(deepTarget(e));
     if (!resolved) return;
     this.caretIn(resolved.element);
     const entry = this.sessions.get(resolved.element);
@@ -272,21 +282,51 @@ export class Sessions {
 
   private onSelectionChange = (): void => {
     if (!this.sessions.size) return;
-    const resolved = resolveField(deepActiveElement(this.document));
+    const resolved = this.resolve(deepActiveElement(this.document));
     if (resolved) this.caretIn(resolved.element);
   };
 
   private onFocusin = (e: FocusEvent): void => {
-    const resolved = resolveField(deepTarget(e));
+    const resolved = this.resolve(deepTarget(e));
     if (!resolved) return;
     this.caretField = resolved.element;
     const entry = this.sessions.get(resolved.element);
-    if (entry) entry.session.onFocus();
-    else if (this.policy() === "normal") this.activate(resolved);
+    if (entry) {
+      entry.session.onFocus();
+      return;
+    }
+    const held = this.endReplacedSessions();
+    if (held ?? this.policy() === "normal") this.activate(resolved);
   };
 
+  /**
+   * Ends the Sessions whose Field has just lost its element to the page's
+   * editor, which made a new one and focused it (a Monaco Field's editor given
+   * another model, `Field.elementReplaced`), called when focus arrives on a
+   * Field with no Session. Returns whether one of them held the keys (any
+   * Mode but Insert and Replace): then the new element's Field is Activated,
+   * so a Vim key typed next is not typed into the code, in Normal, with no
+   * undo history and no marks, on the new document. From Insert or Replace it
+   * is not, whatever the Start Mode: the person is typing, the typing stays
+   * the page's, and Esc Activates. Null when no element was replaced. The
+   * lifecycle observer has not run yet: it runs after the page's script, and
+   * the focus moves inside it. Covered in the four Modes, and from Insert on
+   * a Site with a Normal Start Mode, by `tests/e2e/monaco-lifecycle.spec.ts`,
+   * "the page swaps the editor's model".
+   */
+  private endReplacedSessions(): boolean | null {
+    let held: boolean | null = null;
+    for (const [el, { field, session }] of [...this.sessions]) {
+      if (el.isConnected || !field.elementReplaced) continue;
+      const mode = session.mode;
+      held = held || (mode !== "insert" && mode !== "replace");
+      this.dispose(el);
+    }
+    return held;
+  }
+
   private onFocusout = (e: FocusEvent): void => {
-    const resolved = resolveField(deepTarget(e));
+    const resolved = this.resolve(deepTarget(e));
     if (!resolved) return;
     this.sessions.get(resolved.element)?.session.onBlur();
     if (this.caretField === resolved.element) this.caretField = null;
@@ -316,7 +356,7 @@ export class Sessions {
       this.lifecycleObserver = new MutationObserver((records) => {
         if (!records.some(concernsFields)) return;
         for (const [el, { field }] of [...this.sessions])
-          if (!el.isConnected || !stillQualifies(el, field)) this.dispose(el);
+          if (!el.isConnected || !this.stillQualifies(el, field)) this.dispose(el);
       });
       this.lifecycleObserver.observe(this.document, lifecycleOptions);
     }

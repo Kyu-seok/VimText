@@ -1,6 +1,6 @@
 import { ChangeSet, EditorSelection, Text } from "@codemirror/state";
 import type { Field } from "../field/Field";
-import { diffText } from "../field/diff";
+import { diffText, diffTextAtCaret } from "../field/diff";
 import { ATOM_CHAR } from "../field/atoms";
 import { clipToLine, Mirror, Vim, type KeyLike } from "../engine/mirror";
 import { engineApi } from "../engine/pluginApi";
@@ -223,6 +223,9 @@ export class Session {
     // Key Policy row 6 passes a Single-line Field's Enter in Normal to the
     // page; the browser's own break it would then make is refused (#51).
     this.stopRefusingBreaks = field.refuseNativeBreaks?.(() => !this.mirror.vim.insertMode) ?? (() => {});
+    // The keys are VimText's from here: a popup the page's editor had open
+    // over the text would wait for an Esc that no longer reaches it.
+    field.closePopups?.();
     this.runVimrc(config);
     this.status.show();
     this.status.setMode(this.mode);
@@ -317,6 +320,8 @@ export class Session {
         if (this.pendingWrite || this.field.selectionSettling?.()) this.typeWhileWriting(e);
         return; // native typing
       }
+      // The Esc that would have closed the editor's popup over the text is taken here.
+      if (isEscape(e)) this.field.closePopups?.();
       this.syncFromField();
       this.dispatchToEngine(e);
       return;
@@ -636,10 +641,16 @@ export class Session {
     const doc = view.state.doc.toString();
     const sel = this.field.getSelection();
     const insert = this.mirror.vim.insertMode;
+    // The page replaced the Field's whole document (a Monaco Field's flush or
+    // language change): once its text is the mirror's, the past is forgotten.
+    const replaced = this.field.takeDocumentReplaced?.() ?? false;
     this.lastText = text;
+    const changed = text !== doc;
 
-    if (text !== doc) {
-      const { start, endOld, endNew } = diffText(doc, text);
+    if (changed) {
+      // Typing ends at the Field's caret, which tells where among the same
+      // characters it went: the engine repeats that text with `.`.
+      const { start, endOld, endNew } = insert ? diffTextAtCaret(doc, text, sel.head) : diffText(doc, text);
       const changes = view.state.changes({ from: start, to: endOld, insert: text.slice(start, endNew) });
       const newDoc = changes.apply(view.state.doc);
       // The Field's caret is where the cursor goes, unless the engine's own
@@ -663,9 +674,12 @@ export class Session {
             : EditorSelection.cursor(insert ? head : clipToLine(newDoc, head)),
         userEvent,
       });
-      this.agreeOn(this.here());
-      return;
     }
+    if (changed || replaced) {
+      if (replaced) this.mirror.forgetPast();
+      this.agreeOn(this.here());
+    }
+    if (changed) return;
 
     // The engine's own focus of the Field, its command line closing: focusing
     // a contenteditable host whose selection was elsewhere (in the command
@@ -700,7 +714,8 @@ export class Session {
     // A Field that measures the Cursor's box gets a caret before the Cursor's
     // character, and VimText draws the Cursor (ADR 0009): a page reads a
     // one-character selection as a person selecting it.
-    if (this.field.cursorBox) return { anchor: main.head, head: main.head };
+    // So does a Field whose editor draws the Cursor as its own block (ADR 0010).
+    if (this.field.cursorBox || this.field.showBlockCursor) return { anchor: main.head, head: main.head };
     const line = state.doc.lineAt(main.head);
     return main.head < line.to
       ? { anchor: main.head, head: main.head + 1 }
@@ -862,7 +877,6 @@ export class Session {
    * Command-line or while the Field does not have focus.
    */
   private drawCursor(): void {
-    if (!this.field.cursorBox) return;
     const mode = this.mode;
     const shape = !this.field.hasFocus()
       ? null
@@ -871,6 +885,10 @@ export class Session {
         : mode === "replace"
           ? "bar"
           : null;
+    // A Field whose editor draws the Cursor (a Monaco Field, ADR 0010) shows
+    // its block in the same Modes, and the page's own cursor style in the rest.
+    this.field.showBlockCursor?.(shape === "block");
+    if (!this.field.cursorBox) return;
     this.status.cursor.draw(shape, this.mirror.view.state.selection.main.head);
   }
 
@@ -1010,6 +1028,7 @@ export class Session {
     // alone, like a pending operator.
     this.pluginKeys.discard();
     this.status.cursor.hide();
+    this.field.showBlockCursor?.(false);
     for (const plugin of this.plugins) plugin.onBlur?.();
     // Keep the bar while the command line has focus (it lives in our shadow
     // root) or `:wq` is leaving behind its notice.

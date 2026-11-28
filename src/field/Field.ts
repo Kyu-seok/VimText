@@ -14,9 +14,32 @@ export interface FieldSelection {
 
 export interface Field {
   readonly element: HTMLElement;
+  /**
+   * The element whose box is the Field's on the page, which the Status Line
+   * sits under and the mirror takes its height from, where that is not
+   * `element`: a Monaco Field's element is a one-line input at the caret, and
+   * its box is the editor's. Absent on Fields whose element is their box.
+   */
+  boxElement?(): HTMLElement;
   /** True for fields that cannot hold a newline (single-line inputs). */
   readonly singleLine: boolean;
   getValue(): string;
+  /**
+   * True once after a `getValue()` found that the page replaced the Field's
+   * document under VimText: a Monaco Field's editor flushed its model or
+   * changed its language (ADR 0010; docs/engine-seams.md, "Monaco: changes
+   * from outside"). The texts before it are no states to undo to, and the
+   * Session forgets its undo history and marks. Absent on Fields where a
+   * page's rewrite is a change like any other.
+   */
+  takeDocumentReplaced?(): boolean;
+  /**
+   * True on a Field whose element the page's editor makes anew, focus kept,
+   * when it takes another document (a Monaco Field's on a swapped model;
+   * docs/engine-seams.md, "Monaco: changes from outside"): `Sessions` carries
+   * a Session's hold of the keys over to the element that took the focus.
+   */
+  readonly elementReplaced?: boolean;
   /**
    * Writes text in a way the host page's framework notices (React, Vue, …).
    * A textarea or input writes synchronously; a contenteditable host returns a
@@ -52,6 +75,20 @@ export interface Field {
    * input selects the character instead. Null when nothing is laid out there.
    */
   cursorBox?(offset: number): DOMRect | null;
+  /**
+   * Has the page's editor draw the Normal-mode Cursor itself (a Monaco Field;
+   * ADR 0010): a block over the character after its caret when `on`, the
+   * cursor style the page had otherwise. Present only on such a Field, whose
+   * selection outside Insert and Visual is a caret before the Cursor's
+   * character, as with `cursorBox`.
+   */
+  showBlockCursor?(on: boolean): void;
+  /**
+   * Closes what the page's editor has open over the text for the person's
+   * typing (a Monaco Field's suggestion popup), which the editor would have
+   * closed on the Esc VimText takes. Absent on Fields with nothing of the kind.
+   */
+  closePopups?(): void;
   focus(): void;
   /**
    * Takes focus off the Field, leaving nothing in it highlighted. A Field

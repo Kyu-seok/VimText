@@ -1,6 +1,8 @@
 import type { Field, TextControl } from "./Field";
 import { TextareaField } from "./TextareaField";
 import { ContentEditableField } from "./ContentEditableField";
+import { MonacoField } from "./MonacoField";
+import { askMonaco } from "./monacoAdapter";
 import { selectionFor } from "./domSelection";
 import { isStatusHost } from "../ui/statusHost";
 
@@ -109,15 +111,41 @@ function inVimTextUi(target: EventTarget | null): boolean {
   return false;
 }
 
+/** What `resolveField` is told of the settings. */
+export interface ResolveOptions {
+  /** The Monaco Field's setting is on (ADR 0010). Off, Monaco's input is never a Field. */
+  monaco?: boolean;
+}
+
+/**
+ * The input a Monaco code editor focuses and takes typing through:
+ * `textarea.inputarea`, or `div.native-edit-context` where Monaco takes input
+ * through an EditContext (docs/engine-seams.md, "Monaco: the EditContext input").
+ */
+function monacoCodeInput(target: EventTarget | null): HTMLElement | null {
+  return target instanceof HTMLElement &&
+    target.matches(".monaco-editor textarea.inputarea, .monaco-editor div.native-edit-context")
+    ? target
+    : null;
+}
+
 /**
  * The one decision of whether an event target is a Field and which kind:
  * every entry point (focus, keydown, the lifecycle observer, the popup's Mode
  * lookup) asks this, so a new Field kind is one more branch here. Null when
  * the target does not qualify, including a Field that stopped qualifying
  * (readonly, disabled, type changed): the lifecycle observer disposes on that.
+ * `options` carries the settings the decision depends on.
  */
-export function resolveField(target: EventTarget | null): ResolvedField | null {
+export function resolveField(target: EventTarget | null, options: ResolveOptions = {}): ResolvedField | null {
   if (inVimTextUi(target)) return null;
+  // Monaco's input is a Monaco Field only with the setting on and where VimText's
+  // page-world script answers for its editor: `window.monaco` is there, and the
+  // editor is writable and no diff editor (ADR 0010). Otherwise nothing, as in #111.
+  const input = options.monaco ? monacoCodeInput(target) : null;
+  if (input && askMonaco(input, { op: "selection" })) {
+    return { element: input, singleLine: false, create: () => new MonacoField(input) };
+  }
   if (isTextControl(target)) {
     return {
       element: target,

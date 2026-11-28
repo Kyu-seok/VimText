@@ -3,11 +3,12 @@
 node tools/tree-stamp.mjs passed || npm run check
 
 # The rich-editor specs again, repeated on four workers, when the push touches
-# the write path, the fixtures, the Status Line host every Field shares or the
-# helpers every spec drives the page with. The gate runs one worker, and a timing bug
+# the write path (the Monaco Field's page-world script included), the fixtures,
+# the Status Line host every Field shares or the helpers the specs drive the
+# page with. The gate runs one worker, and a timing bug
 # against an editor's late rendering hides there: #64 (Slate lost a keystroke)
 # passed four implementers' gates and the review, and surfaced only by chance.
 base=$(git merge-base HEAD origin/main 2>/dev/null || echo "")
-if [ -z "$base" ] || ! git diff --quiet "$base" HEAD -- src/field src/bridge src/ui tests/fixtures tests/e2e/extension.ts; then
+if [ -z "$base" ] || ! git diff --quiet "$base" HEAD -- src/field src/bridge src/ui src/page tests/fixtures tests/e2e/extension.ts tests/e2e/monaco.ts; then
   node tools/tree-stamp.mjs passed editors || npm run test:e2e:editors
 fi

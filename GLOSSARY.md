@@ -12,6 +12,10 @@ _Avoid_: input, element, editor, box
 A Field that is one editing host of a rich-text region, such as Gmail's compose body or Stack Overflow's answer editor: the outermost editable element, unless the caret is in an element inside it that is itself marked editable, which is then the Field (the innermost one around the caret). Its text is its plain text, each block a line; regions marked non-editable inside it belong to it. Notion marks every block editable inside one editable page root, so it has one Field per block.
 _Avoid_: rich-text field, contenteditable region, editor
 
+**Monaco Field**:
+A Field that is one Monaco code editor, such as the code box of LeetCode: the editor itself, not the input element Monaco focuses, which is never a Field. Its text is the editor's whole code. Behind a setting that is off unless switched on: ADR 0010. A page that gives the editor another model ends the Field's Session, since Monaco makes its input anew; where that Session held the keys (any Mode but Insert and Replace) the new input is Activated at once, in Normal.
+_Avoid_: code field, Monaco editor, model field
+
 **Atom**:
 Something inside a contenteditable Field that is not text but sits in it like a character: a mention chip, an inline image, a non-editable island. To Vim it is one character; yanked, it is its visible text. A non-editable element with no text and no replaced element (an image, a video, a form control) of its own (a list marker drawn by CSS) is decoration, not an Atom, and is not in the Field's text at all.
 _Avoid_: embed, node, widget, chip

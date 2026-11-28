@@ -2,13 +2,14 @@ import { defineConfig } from "@playwright/test";
 import { cpus, freemem, loadavg } from "node:os";
 import { fixturePort as port } from "./tests/e2e/fixture-port";
 import type { ContentEditableOption } from "./tests/e2e/contenteditable-option";
+import type { MonacoInputOption } from "./tests/e2e/monaco-option";
 
 // The e2e project on the extension launcher (tests/e2e/extension.ts): what
 // `npm run test:e2e`, the gate and a bare `playwright test` run. The store
 // screenshots are a second project in playwright.screenshots.config.ts, which
 // extends this config (`npm run screenshots`) and so stays out of the gate
 // (DESIGN.md "Tooling").
-export default defineConfig<ContentEditableOption>({
+export default defineConfig<ContentEditableOption & MonacoInputOption>({
   timeout: 30_000,
   // One retry tells a flake from a regression: a flake passes the retry and is
   // reported as flaky with a trace under test-results/; a regression fails twice.
@@ -40,6 +41,16 @@ export default defineConfig<ContentEditableOption>({
       testDir: "tests/e2e",
       testMatch: "contenteditable.spec.ts",
       use: { contenteditable: "plaintext-only" },
+    },
+    // The Monaco Field's specs again with Monaco taking input through an EditContext (#117):
+    // every `monaco*.spec.ts` that opens its page with `openMonaco` (tests/e2e/monaco.ts).
+    // monaco-page-world.spec.ts has no Monaco on its page.
+    {
+      name: "e2e monaco edit-context",
+      testDir: "tests/e2e",
+      testMatch: /monaco[^/]*\.spec\.ts$/,
+      testIgnore: "monaco-page-world.spec.ts",
+      use: { monacoInput: "editContext" },
     },
   ],
 });

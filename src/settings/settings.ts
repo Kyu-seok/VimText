@@ -9,6 +9,11 @@ export interface Settings {
   /** Ex commands run on every Activation. */
   vimrc: string;
   plugins: { surround: boolean; targets: boolean };
+  /**
+   * Monaco code editors are Fields (the Monaco Field; ADR 0010). Off unless
+   * switched on; settings stored before it existed read as off.
+   */
+  monaco: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -16,6 +21,7 @@ export const DEFAULT_SETTINGS: Settings = {
   sites: {},
   vimrc: "",
   plugins: { surround: false, targets: false },
+  monaco: false,
 };
 
 export function policyFor(settings: Settings, origin: string): SitePolicy {
