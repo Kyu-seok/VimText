@@ -37,6 +37,8 @@ export interface MonacoPage {
   second?: boolean;
   /** A plaintext editor of one line holding `ONE_LINE_TEXT`, the last among the editors. */
   oneLine?: boolean;
+  /** A code editor holding `SECOND_TEXT` inside the first one's element, index 1 among the editors. */
+  nested?: boolean;
 }
 
 type FixtureWindow = Window & { fixtureMonaco: typeof Monaco; pageKeys: string[] };
@@ -69,6 +71,7 @@ export async function openMonaco(page: Page, options: MonacoPage = {}): Promise<
   if (options.eol) query.set("eol", options.eol);
   if (options.second) query.set("second", "1");
   if (options.oneLine) query.set("oneLine", "1");
+  if (options.nested) query.set("nested", "1");
   await page.goto(`/monaco.html?${query.toString()}`);
   await page.waitForSelector('html[data-monaco="ready"]', { state: "attached" });
   await ready(page);

@@ -352,6 +352,21 @@ describe("the page's edits", () => {
     expect(blockTexts(host)[0]).toBe("the quick brown fox!");
   });
 
+  it("a line put in by one input above one of the same indent (a paste) is recorded where it went: . puts the line break first", async () => {
+    // As on a textarea (session.test.ts): read from the two texts alone the
+    // line could as well be `x\n  ` after the indent; the caret at its end says
+    // which (`diffTextAtCaret`).
+    const { field } = open("<div>a {</div><div>  y</div><div>}</div>");
+    // Kept spaces, so the indent is text.
+    current!.host.style.whiteSpace = "pre-wrap";
+    await keys("A");
+    typeNatively("\n  x");
+    await keydown("Escape");
+    expect(field.getValue()).toBe("a {\n  x\n  y\n}");
+    await keys("j.");
+    expect(field.getValue()).toBe("a {\n  x\n  y\n  x\n}");
+  });
+
   it("an outside DOM change is picked up on the next key", async () => {
     const { host } = open();
     host.children[1]!.textContent = "changed";

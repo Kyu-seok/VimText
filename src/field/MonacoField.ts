@@ -76,9 +76,16 @@ export class MonacoField implements Field {
     askMonaco(this.element, { op: "edit", edits });
   }
 
+  /**
+   * A selection answer outside the text this Field last read is not one: a
+   * page answering it would make every Vim key fail to set the mirror's
+   * selection. The selection kept is always one from inside that text.
+   */
   getSelection(): FieldSelection {
     const answer = askMonaco(this.element, { op: "selection" });
-    if (answer) this.selection = { anchor: answer.anchor, head: answer.head };
+    const length = this.text.length;
+    if (answer && answer.anchor <= length && answer.head <= length)
+      this.selection = { anchor: answer.anchor, head: answer.head };
     return this.selection;
   }
 

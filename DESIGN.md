@@ -408,6 +408,12 @@ it is outside the gate, so PNG churn never fails `npm run check`.
   click between them) repeats as everything from the first to the last, the text between
   included.
   Pinned by tests/e2e/monaco-insert.spec.ts, ". after an Insert that Monaco added to".
+- On every Field, not only a Monaco Field, a change made in Insert is placed among the same
+  characters by the caret: taken to end where the caret is (`diffTextAtCaret`), else where a
+  diff of the texts puts it last. A line put in by one input (a paste) above a line of the same
+  indent is then repeated by `.` as it was put in; a page that put text among the same
+  characters away from the caret is recorded at the wrong one of them, and `.` repeats its
+  characters rotated (docs/engine-seams.md, "Insert-mode recording").
 - On a Monaco Field, a bracket typed in Insert is closed or not as Monaco decides, with
   VimText as without it: not before a word character, and not for a moment after an Enter
   or after the page replaced the text (docs/engine-seams.md, "Monaco: bracket closing").

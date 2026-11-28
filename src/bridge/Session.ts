@@ -645,8 +645,9 @@ export class Session {
     // language change): once its text is the mirror's, the past is forgotten.
     const replaced = this.field.takeDocumentReplaced?.() ?? false;
     this.lastText = text;
+    const changed = text !== doc;
 
-    if (text !== doc) {
+    if (changed) {
       // Typing ends at the Field's caret, which tells where among the same
       // characters it went: the engine repeats that text with `.`.
       const { start, endOld, endNew } = insert ? diffTextAtCaret(doc, text, sel.head) : diffText(doc, text);
@@ -673,14 +674,12 @@ export class Session {
             : EditorSelection.cursor(insert ? head : clipToLine(newDoc, head)),
         userEvent,
       });
+    }
+    if (changed || replaced) {
       if (replaced) this.mirror.forgetPast();
       this.agreeOn(this.here());
-      return;
     }
-    if (replaced) {
-      this.mirror.forgetPast();
-      this.agreeOn(this.here());
-    }
+    if (changed) return;
 
     // The engine's own focus of the Field, its command line closing: focusing
     // a contenteditable host whose selection was elsewhere (in the command
