@@ -3,6 +3,8 @@ import { ChangeSet } from "@codemirror/state";
 import { resolveField } from "../../src/field/resolve";
 import { MAX_ANSWER_LENGTH } from "../../src/field/monacoAdapter";
 import { MONACO_ANSWER, MONACO_REQUEST, type MonacoRequest } from "../../src/field/monacoProtocol";
+import { Session } from "../../src/bridge/Session";
+import { keyDriver } from "./keys";
 
 /**
  * The content script's side of the Monaco Field (ADR 0010), with a stand-in
@@ -207,6 +209,48 @@ describe("an answer from the page world is untrusted", () => {
     expect(field.getValue()).toBe("good");
     bad = true;
     expect(field.getValue()).toBe("good");
+  });
+
+  it("a selection answered outside the text the Field read leaves the Field at the selection it last read", () => {
+    let bad = false;
+    pageWorld((request) => [
+      JSON.stringify(
+        request.op === "read"
+          ? { anchor: 1, head: 1, text: "good" }
+          : bad
+            ? { anchor: 0, head: 1e6 }
+            : { anchor: 2, head: 3 },
+      ),
+    ]);
+    const field = resolveField(monacoTextarea(), { monaco: true })!.create();
+    expect(field.getValue()).toBe("good");
+    expect(field.getSelection()).toEqual({ anchor: 2, head: 3 });
+    bad = true;
+    expect(field.getSelection()).toEqual({ anchor: 2, head: 3 });
+  });
+
+  it("a page world whose selection answers lie outside the text does not stop the next Vim key editing it", () => {
+    const ta = monacoTextarea();
+    const state = { text: "0123456789" };
+    pageWorld((request) => {
+      if (request.op === "edit") {
+        for (const { from, to, insert } of [...request.edits].reverse())
+          state.text = state.text.slice(0, from) + insert + state.text.slice(to);
+      }
+      return [
+        JSON.stringify(
+          request.op === "read" ? { anchor: 0, head: 0, text: state.text } : { anchor: 0, head: 1e6 },
+        ),
+      ];
+    });
+    ta.focus();
+    const session = new Session(resolveField(ta, { monaco: true })!.create(), { vimrc: "" });
+    try {
+      keyDriver(() => session).keys("x");
+      expect(state.text).toBe("123456789");
+    } finally {
+      session.destroy();
+    }
   });
 
   it("only the selection and the text are taken from an answer", () => {
