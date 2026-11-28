@@ -54,3 +54,7 @@ Riskiest piece: Insert pass-through. Monaco's own edits (a closed bracket, an ac
 ## Accepted (2026-11-28, #116)
 
 The owner decided to build on the spike's report (spec #115). The tracer (#116) is the route above end to end, on a fixture that loads the real Monaco package: the setting, the declared page-world script, the Monaco Field resolved by `resolveField`, and writes as the mirror's changes through `executeEdits` between undo stops. The install-warning check is now a test (`tests/e2e/install-warning.spec.ts`): Chromium reports the same warnings for the manifest with the page-world script as without it. A real packed update is still untried.
+
+## Built without change notifications (2026-11-28, #120)
+
+Spec #115 had the page-world script start and stop change notifications, and Monaco's edits in Insert reach the mirror through them. The build has none: the page world answers requests and sends nothing unasked. What Monaco wrote in Insert (typing, a closed bracket, an indent, an accepted suggestion, its own undo) reaches the mirror when the next key VimText takes reads the editor's text, Esc at the latest, as one change of the Insert's undo step; a change the page makes in Normal is read at the next key the same way. Why: a push was not needed for one undo step per Insert, which the read at the next key gives, and it would have told of each change while Monaco was still making it, before its caret moved (docs/engine-seams.md, "Monaco: Insert typing"; DESIGN.md, "Ownership of text, by Mode"). Until that key the mirror is behind the editor.
