@@ -15,6 +15,9 @@
 //   ?second=1       a second code editor in #second, holding SECOND_TEXT
 //   ?oneLine=1      a writable plaintext editor of one line in #one-line,
 //                   holding ONE_LINE_TEXT, as leetcode has beside its code editor (#113)
+//   ?nested=1       a code editor holding SECOND_TEXT inside the first one's element, in
+//                   an overlay widget, as Monaco nests a peek view's editor in the editor
+//                   it peeks from (EmbeddedCodeEditorWidget), registered after it
 // The extra editors come after the first in `monaco.editor.getEditors()`, in that order.
 // What the e2e specs rely on:
 //   #editor                the element the editor is created in
@@ -73,6 +76,19 @@ if (oneLine) {
     lineNumbers: "off",
     scrollbar: { vertical: "hidden", horizontal: "hidden" },
   });
+}
+
+if (on("nested")) {
+  const outer = monaco.editor.getEditors()[0]!;
+  const host = document.createElement("div");
+  host.id = "nested";
+  host.style.cssText = "width: 400px; height: 80px; border: 1px solid #888";
+  outer.addOverlayWidget({
+    getId: () => "fixture.nested",
+    getDomNode: () => host,
+    getPosition: () => ({ preference: monaco.editor.OverlayWidgetPositionPreference.BOTTOM_RIGHT_CORNER }),
+  });
+  monaco.editor.create(host, { ...options, value: SECOND_TEXT });
 }
 
 Object.assign(window, { pageKeys });

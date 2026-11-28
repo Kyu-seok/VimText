@@ -23,9 +23,16 @@ type CursorStyleName = NonNullable<Monaco.editor.IEditorOptions["cursorStyle"]>;
 /**
  * The editor `input` is the input of, when it can be a Monaco Field: a code
  * editor with a model, writable, and not a side of a diff editor. Null otherwise.
+ * Monaco nests editors in another's element (a peek view's, the references
+ * widget's), registered after the editor around them, so the editor is the
+ * innermost whose element holds `input`, not the first: the one that holds no
+ * other that holds it.
  */
 function editorOf(api: Api, input: Element): Editor | null {
-  const editor = api.editor.getEditors().find((ed) => ed.getDomNode()?.contains(input));
+  const around = api.editor.getEditors().filter((ed) => ed.getDomNode()?.contains(input));
+  const editor = around.find((ed) =>
+    around.every((other) => other === ed || !ed.getDomNode()!.contains(other.getDomNode())),
+  );
   if (!editor?.getModel()) return null;
   const { readOnly, inDiffEditor } = api.editor.EditorOption;
   return editor.getOption(readOnly) || editor.getOption(inDiffEditor) ? null : editor;

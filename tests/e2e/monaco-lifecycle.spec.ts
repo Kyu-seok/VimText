@@ -233,6 +233,24 @@ test.describe("several editors on one page are separate Fields", () => {
     expect(await monacoText(page, 1)).toBe(SECOND_TEXT.slice(1));
   });
 
+  test("an editor nested inside another's element, as a peek view's is, is the Field when its input has focus", async ({
+    page,
+    context,
+  }) => {
+    await setMonacoSetting(context, true);
+    await openMonaco(page, { nested: true });
+    await focusMonaco(page, 0, 1);
+    await page.keyboard.press("Escape");
+    await expect.poll(() => statusText(page)).toContain("NORMAL");
+    expect(await monacoCursorStyle(page, 1)).toBe("Block");
+    expect(await monacoCursorStyle(page)).toBe("Line");
+    await page.keyboard.type("jx");
+    expect(await monacoText(page, 1)).toBe(SECOND_TEXT.replace("const two", "onst two"));
+    expect(await monacoText(page)).toBe(MONACO_TEXT);
+    await page.keyboard.type("u");
+    expect(await monacoText(page, 1)).toBe(SECOND_TEXT);
+  });
+
   test("a one-line editor beside the code editor is its own Field", async ({ page, context }) => {
     await activate(page, context, 0, { oneLine: true });
     await page.keyboard.type("x");
